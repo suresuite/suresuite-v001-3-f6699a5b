@@ -282,19 +282,27 @@ export function RailStageCard({
         {numeral}
       </span>
 
-      <span className="flex min-w-0 flex-col items-start gap-[2px]">
+      {/* The text column takes the card's remaining width and both lines WRAP
+          inside it. They used to `truncate` from an `items-start` column, which
+          sized each line to its own content, so nothing clipped and a long label
+          or sub-label ran out of the card into its neighbour as the window
+          narrowed. Wrapping keeps every fact readable at any width; the cards in
+          a row stay equal height because the row is `items-stretch`. */}
+      <span className="flex min-w-0 flex-1 flex-col items-start gap-[2px]">
         <span
-          className="flex min-w-0 items-center gap-1.5 truncate whitespace-nowrap text-[13px] font-semibold tracking-[-0.011em]"
+          className="flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-semibold leading-tight tracking-[-0.011em]"
           style={{ color: state === "todo" ? c.quiet : palette === "zinc" ? RAIL.zinc.ink : RAIL.ink }}
         >
-          {label}
+          <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>
           {trailing}
         </span>
         <span
-          className="truncate whitespace-nowrap font-mono text-[10.5px] font-normal tabular-nums"
+          className="max-w-full font-mono text-[10.5px] font-normal leading-snug tabular-nums [overflow-wrap:anywhere]"
           style={{ color: current ? "#a1650a" : needsSetup ? "#bf2330" : c.quiet }}
         >
-          {sub}
+          {/* bind each `·` to the value before it and a number to its unit, so a
+              wrapped line never opens on a separator or splits "10 reps" */}
+          {sub.replace(/ · /g, " · ").replace(/(\d) (?=\S)/g, "$1 ")}
         </span>
       </span>
 
