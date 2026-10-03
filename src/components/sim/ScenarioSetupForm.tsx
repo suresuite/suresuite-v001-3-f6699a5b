@@ -31,7 +31,7 @@ export const KPI_OPTIONS = [
 
 /**
  * The scenario's parameters as two (plus one) titled Parameter | Value | Unit
- * cards — same shape as components/policies/PolicyDefaultsCard.tsx so the two
+ * cards — the shape the /policies defaults card had (now `ProjectRuleBar`), so the two
  * pages read as siblings. Days stay the stored truth; the planning unit is a
  * display concern owned by useTimeUnit.
  */

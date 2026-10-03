@@ -117,7 +117,7 @@ export default function CustomerStage() {
         </Key>
         <P>
           The <strong>allocation rule</strong> — priority, fair share, proportional, revenue
-          maximising or SLA tiers — is set once, on the <Term>Customer allocation</Term> card at{" "}
+          maximising or SLA tiers — is set once, on the <Term>Customer rules</Term> line above the grid at{" "}
           <AppLink to="/policies">/policies</AppLink>. Allocating between customers is a rule the
           chain applies <em>across</em> rows, so a per-row version would be several rules competing
           to be the rule; the engine reads one.
@@ -129,7 +129,7 @@ export default function CustomerStage() {
           while another of the same product loses what cannot be shipped, each with its own backlog,
           window and cost. When supply falls short, each product's units are split across its rows
           by the project's rule, a row's oldest backlog first. A project that sets none of this per
-          row runs exactly as before, with the card's settings for every row.
+          row runs exactly as before, with that line's settings for every row.
         </P>
         <P>
           The base under these cells is your data: the{" "}

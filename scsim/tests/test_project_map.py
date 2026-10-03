@@ -1072,6 +1072,51 @@ def test_an_mto_product_reads_no_fg_policy_and_the_run_says_so():
     assert any(w.field == "fg_policy" and "MTO" in w.reason for w in res.warnings)
 
 
+def test_a_plant_row_makes_an_mto_product_hold_fg_stock():
+    """The Plant row's MTS / MTO beats the master, and its FG levels then reach."""
+    d = _base()
+    d.products = [ProductRow(id="p1", sell_price=20.0, demand_mean=100.0,
+                             production_capacity=200.0, fulfillment_mode="mto",
+                             fg_base_stock=300.0)]
+    d.policies = {"node:Plant::p1": {"production": {"fulfillment_mode": "mts"}}}
+    res = from_project_data(d)
+    p = res.scenario.network.products[0]
+    assert (p.fulfillment_mode.value, p.fg_base_stock) == ("mts", 300.0)
+    assert res.resolved["products.fulfillment_mode"]["p1"] == {"source": "override", "value": "mts"}
+
+
+def test_a_plant_row_makes_an_mts_product_build_to_order():
+    res = from_project_data(_with_policies(_mts_base(fg_base_stock=300.0),
+                                           {"node:Plant::p1": {"production": {"fulfillment_mode": "mto"}}}))
+    p = res.scenario.network.products[0]
+    assert (p.fulfillment_mode.value, p.fg_base_stock) == ("mto", None)
+
+
+def test_an_unset_row_keeps_the_master_then_the_project_model():
+    res = from_project_data(_mts_base())
+    assert res.resolved["products.fulfillment_mode"]["p1"] == {"source": "master", "value": "mts"}
+    d = _base()
+    d.project_model = "Make-To-Stock"
+    d.products[0].fulfillment_mode = None
+    res = from_project_data(d)
+    assert res.resolved["products.fulfillment_mode"]["p1"] == {"source": "default", "value": "mts"}
+    # An unset row adds no run-log line (the log is unchanged for every project
+    # that never touched the cell).
+    assert not any(w.field == "products.fulfillment_mode" for w in res.warnings)
+
+
+def test_an_unknown_mode_override_is_ignored_and_says_so():
+    res = from_project_data(_with_policies(_mts_base(),
+                                           {"node:Plant::p1": {"production": {"fulfillment_mode": "eto"}}}))
+    assert res.scenario.network.products[0].fulfillment_mode.value == "mts"
+    assert any(w.field == "fulfillment_mode" and "not mts or mto" in w.reason for w in res.warnings)
+
+
+def _with_policies(d: ProjectData, policies: dict) -> ProjectData:
+    d.policies = policies
+    return d
+
+
 def test_a_customer_row_no_longer_reaches_the_product():
     """WP 14.2 found `_composite_patches` sent any `node:<x>::<product>` key to the
     product; WP 14.4 closed it — a Customer row's patch is the row's own."""

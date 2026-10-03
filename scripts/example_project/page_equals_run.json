@@ -337,6 +337,7 @@
     "family": "production",
     "patch": {
      "demand_mean": 40,
+     "fulfillment_mode": "mts",
      "fg_policy": "days_of_cover",
      "fg_cover_days": 10
     }
@@ -602,6 +603,16 @@
    "P2": {
     "source": "default",
     "value": null
+   }
+  },
+  "products.fulfillment_mode": {
+   "P1": {
+    "source": "master",
+    "value": "mto"
+   },
+   "P2": {
+    "source": "override",
+    "value": "mts"
    }
   },
   "products.production_capacity": {

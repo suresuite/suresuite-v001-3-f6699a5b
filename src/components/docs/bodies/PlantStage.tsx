@@ -19,11 +19,13 @@ export default function PlantStage() {
           <DocLink to="outbound-logistics">outbound lanes</DocLink> that name a product.
         </P>
         <P>
-          A product's <Term>fulfillment_mode</Term> decides how much of this stage applies to it: a
-          make-to-order product holds no finished goods, so its inventory columns describe a
-          decision the run never has to take. For a make-to-stock product the FG policy columns
-          decide how much to build: planned production is the policy's requirement plus any
-          backlog, capped at capacity.
+          Each row's <Term>FG stock</Term> switch — the product's <Term>fulfillment_mode</Term> —
+          decides how much of this stage applies to it. A make-to-order product holds no finished
+          goods, so its row shows no FG policy at all. For a make-to-stock product the FG policy
+          and only the levels it reads appear, and they decide how much to build: planned
+          production is the policy's requirement plus any backlog, capped at capacity. While any
+          product holds stock, the <Term>FG safety buffer</Term> line above the grid sets the one
+          project-wide buffer added to a derived target.
         </P>
         <StageSummary stage="plant" />
       </Section>
@@ -32,6 +34,13 @@ export default function PlantStage() {
         <StageColumns
           stage="plant"
           notes={{
+            fulfillment_mode: (
+              <>
+                MTS holds finished-goods stock and shows the FG columns; MTO builds to order and
+                shows none. Empty follows the product's own value, then the project's model, then
+                MTO — the order the run reads them in.
+              </>
+            ),
             fg_policy: (
               <>
                 Make-to-stock products only. <Term>base_stock</Term> builds up to S each week,{" "}
@@ -52,12 +61,6 @@ export default function PlantStage() {
               <>
                 The finished-goods stock the run starts with; empty starts at the policy target. See{" "}
                 <DocLink to="products">Products</DocLink> for the whole policy.
-              </>
-            ),
-            reorder_point: (
-              <>
-                The level at which a replenishment is triggered. Read the note below it before you
-                spend time tuning this.
               </>
             ),
           }}

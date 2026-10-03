@@ -39,6 +39,9 @@ import {
   fitColsForStage,
   vectorParamCols,
   flattenBundle,
+  isFgDependentCol,
+  projectFulfillmentModeOf,
+  rowFulfillmentMode,
   type ColSpec,
   type ColSpecCtx,
 } from "@/lib/policies/columnSpecs";
@@ -63,6 +66,7 @@ import {
   masterValueFor as masterValueForShared,
   derivedValueFor as derivedValueForShared,
   getEffectiveValue as getEffectiveValueShared,
+  rowGateCtx,
   savedOverrideValue,
   isPrefillPersistable,
   resolveCell,
@@ -132,6 +136,13 @@ interface Props {
   stageRows: StageRowsQuery;
   /** §23 WP 13.4 — reports how many lines hold unsaved drafts. */
   onDraftsChange?: (lines: number) => void;
+  /**
+   * The stage's project-level settings, one line above the grid. Given what
+   * only the grid knows: whether any line's product holds FG stock (P-P.4 is
+   * read only then) and how many customers the lines name (P-C.2's rule is
+   * applied only between two or more).
+   */
+  ruleBar?: (state: { anyFgStock: boolean; customerCount: number }) => React.ReactNode;
 }
 
 type RowDraft = Record<string, unknown>;
@@ -293,6 +304,7 @@ export function StagePolicyTable({
   leftActions,
   stageRows,
   onDraftsChange,
+  ruleBar,
 }: Props) {
   const spec = specFor(stageKey);
   const families = familiesForStage(stageKey);
@@ -470,16 +482,36 @@ export function StagePolicyTable({
     return m;
   }, [dataRows, defaults, overrides, spec.scope]);
 
+  // The project's own MTS / MTO — the engine's fallback for a product that
+  // states none (`projects.supply_chain_model`, §4 D197).
+  const projectFulfillmentMode = projectFulfillmentModeOf(selectedProject?.supply_chain_model);
+
   // Build the per-row ColSpecCtx once, then compute the union for the header.
-  const rowCtxs: ColSpecCtx[] = useMemo(
-    () =>
-      dataRows.map((r) => ({
-        fulfillmentStrategy,
-        row: r as Record<string, unknown>,
-        draft: drafts[String(r.key)],
-        effective: rowEffective.get(String(r.key)),
-      })),
-    [dataRows, drafts, fulfillmentStrategy, rowEffective],
+  // `resolved` carries the master-backed gate fields AS THE CELL SHOWS THEM
+  // (draft → override → item master), so "does this product hold FG stock?"
+  // is answered by the same chain the engine reads, not by the bundle.
+  const rowCtxByKey = useMemo(() => {
+    const m = new Map<string, ColSpecCtx>();
+    for (const r of dataRows) {
+      const rowKey = String(r.key);
+      m.set(rowKey, rowGateCtx({
+        rowKey, row: r as Record<string, unknown>, draft: drafts[rowKey], fulfillmentStrategy,
+        effective: rowEffective.get(rowKey), projectFulfillmentMode, families, masterColByField,
+        masterRowById, derived, defaults, overrides, scope: spec.scope,
+      }));
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `families` is derived from stageKey
+  }, [dataRows, drafts, fulfillmentStrategy, rowEffective, masterColByField, masterRowById, derived, defaults, overrides, spec.scope, projectFulfillmentMode]);
+  const rowCtxs: ColSpecCtx[] = useMemo(() => [...rowCtxByKey.values()], [rowCtxByKey]);
+  const ruleBarState = useMemo(
+    () => ({
+      anyFgStock: stageKey === "plant" && rowCtxs.some((c) => rowFulfillmentMode(c) === "mts"),
+      customerCount: new Set(
+        dataRows.map((r) => String((r as Record<string, unknown>).customer_id ?? "")).filter(Boolean),
+      ).size,
+    }),
+    [stageKey, rowCtxs, dataRows],
   );
 
   // Fit/render metadata for the header union (columnFit.ts, joined by field).
@@ -806,6 +838,13 @@ export function StagePolicyTable({
         value: o,
         label: POLICY_TYPE_SHORT[o] ?? o,
         title: policyTypeLabel("inventory", o),
+      }));
+    }
+    if (col.field === "fulfillment_mode") {
+      return opts.map((o) => ({
+        value: o,
+        label: o.toUpperCase(),
+        title: o === "mts" ? "Make to stock — holds FG stock; the FG policy applies" : "Make to order — no FG stock",
       }));
     }
     return opts.map((o) => ({ value: o, label: o }));
@@ -1318,15 +1357,7 @@ export function StagePolicyTable({
         if (col.synthetic || col.readOnly) continue;
         // Master-backed fields live in the item masters, never in overrides.
         if (col.master) continue;
-        if (
-          col.visibleWhen &&
-          !col.visibleWhen({
-            fulfillmentStrategy,
-            row: r,
-            draft: drafts[rowKey],
-            effective: rowEffective.get(rowKey),
-          })
-        )
+        if (col.visibleWhen && !col.visibleWhen(rowCtxByKey.get(rowKey) ?? { row: r }))
           continue;
         // D1 — persist ONLY what the project data or the user actually says;
         // never a value that would come from a default. Imputed averages stay
@@ -1774,10 +1805,40 @@ export function StagePolicyTable({
           if (!col) return null;
           const rowDraft = drafts[rowKey] ?? {};
           const eff = rowEffective.get(rowKey);
+          const rowCtx: ColSpecCtx =
+            rowCtxByKey.get(rowKey) ?? { fulfillmentStrategy, row: r, draft: rowDraft, effective: eff };
+          // A product built to order holds no FG stock, so none of its FG cells
+          // is read: they render as ONE sentence across the band, not a row of
+          // dashes that look like values someone forgot to type.
+          if (isFgDependentCol(col) && rowFulfillmentMode(rowCtx) !== "mts") {
+            const fgAt = (j: number) => {
+              const n = visible[j];
+              const nc = n && !n.foldedFamily ? specColByField.get(n.key) : undefined;
+              return !!nc && isFgDependentCol(nc);
+            };
+            if (fgAt(fi - 1)) return null;
+            let span = 1;
+            let spanW = fc.w;
+            while (fgAt(fi + span)) {
+              spanW += visible[fi + span].w;
+              span++;
+            }
+            const spanLast = fi + span - 1 === visible.length - 1;
+            const spanWidth = fills && spanLast ? undefined : spanW;
+            return (
+              <td
+                key={col.field}
+                colSpan={span}
+                className="border-b px-2 font-mono text-[10px] text-[#b4b4b4]"
+                style={{ width: spanWidth, minWidth: spanWidth, ...cellDivider(spanLast) }}
+                title="Made to order — this product holds no finished-goods stock, so no FG policy is read. Switch FG stock to MTS to set one."
+              >
+                made to order · no FG stock
+              </td>
+            );
+          }
           // per-row gating: hide cells whose policy choice doesn't apply
-          const isVisibleForRow =
-            !col.visibleWhen ||
-            col.visibleWhen({ fulfillmentStrategy, row: r, draft: rowDraft, effective: eff });
+          const isVisibleForRow = !col.visibleWhen || col.visibleWhen(rowCtx);
           if (!isVisibleForRow) {
             return (
               <td
@@ -1889,7 +1950,11 @@ export function StagePolicyTable({
               {kind === "segmented" && (
                 <CellSegmented
                   value={String(
-                    cellValue ?? liveDefault ?? (col.field === "sourcing_firm" ? firms?.[0] : opts?.[0]?.value) ?? "",
+                    // An empty FG-stock cell is the product's mode by the engine's
+                    // chain (master → the project → MTO), never the first option.
+                    col.field === "fulfillment_mode"
+                      ? rowFulfillmentMode(rowCtx)
+                      : cellValue ?? liveDefault ?? (col.field === "sourcing_firm" ? firms?.[0] : opts?.[0]?.value) ?? "",
                   )}
                   options={
                     col.field === "sourcing_firm" && firms
@@ -2544,6 +2609,8 @@ export function StagePolicyTable({
         </div>
       )}
 
+      {ruleBar?.(ruleBarState)}
+
       {/* Toolbar — sticky under the page header so the actions follow the grid.
           `top-[62px]` is desktop's PageHeader height; below `md` the mobile
           header is taller (two-line title + project switcher) and this offset
@@ -2802,7 +2869,7 @@ export function StagePolicyTable({
                   >
                     <FamilyBand
                       family={g.family}
-                      label={isCollapsed ? `${g.family} (folded)` : undefined}
+                      label={isCollapsed ? `${g.cols[0]?.bandLabel ?? g.family} (folded)` : g.cols[0]?.bandLabel}
                       width={width}
                       collapsed={isCollapsed}
                       last={gi === bandGroups.length - 1}

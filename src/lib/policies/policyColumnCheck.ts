@@ -75,11 +75,13 @@ export const STAGE_ROWS: Record<GridStage, string> = {
     "directly, never the stored graph — so a stale graph (§4 D187; Project 2 today) shows lanes the run does not use.",
   plant:
     "Rows: products that are a BOM parent in the stored graph AND ship outbound. The 'Focal plant' key is " +
-    "projects.plant_name (§4 D202: Project AA's data sits on a different plant name). Everything from 'Policy type' " +
-    "down appears only when the policy fulfillment strategy is MTS / ATO / CTO — a value the worker engine does not read (§4 D197).",
+    "projects.plant_name (§4 D202: Project AA's data sits on a different plant name). The FG stock columns appear " +
+    "per row, behind the row's own MTS / MTO — the value the engine reads (row → products.fulfillment_mode → " +
+    "projects.supply_chain_model → MTO); the policy's fulfillment strategy decides nothing here (§4 D197). " +
+    "The FG safety buffer (P-P.4) is the one project setting above the grid, shown while some product holds stock.",
   customer:
-    "Rows: outbound lanes of the stored graph. Fulfillment (backorder, allocation) is not per row — it is the " +
-    "Fulfillment defaults card below the grid.",
+    "Rows: outbound lanes of the stored graph. Backorder, priority, price and service target are per row (WP 14.3); " +
+    "the allocation rule and the backorder an EMPTY row cell inherits are the Customer rules line above the grid.",
 };
 
 /** The key (identity) columns, which are not in the column spec's `cols`. */
@@ -148,9 +150,6 @@ export const KEY_COLUMNS: Record<GridStage, Array<{ label: string; check: Column
     { label: "Product", check: { shows: "product id (outbound lane)", savedTo: "—", engine: "product id", verdict: "info" } },
   ],
 };
-
-const DROPPED_PER_ROW =
-  "per-row value DROPPED — the engine reads this field only at the project-default scope";
 
 /**
  * One verdict per grid column, keyed `<stage>:<field>`. The test requires the
@@ -370,24 +369,15 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     engine: "multiplies the line rate — only when the row's capacity (override or master) is blank",
     verdict: "info",
   },
-  "plant:type": {
-    shows: "override → project default",
-    savedTo: "override inventory.type (plant row)",
-    engine: "plant rows are DROPPED — the engine has no per-product stock policy",
-    verdict: "ignored",
-    shouldBe: "remove from the plant stage, or add a finished-goods policy to the engine",
+  // Whether the product holds FG stock — the switch the FG columns sit behind.
+  "plant:fulfillment_mode": {
+    shows: "your override → products.fulfillment_mode → projects.supply_chain_model → MTO",
+    savedTo: "override production.fulfillment_mode (Plant row — /policies never writes the master)",
+    engine: "Product.fulfillment_mode: MTS holds FG stock and reads the FG policy below; MTO reads none of it",
+    verdict: "works",
+    note: "The FG columns appear only on an MTS row, so every FG cell shown is one the run reads.",
+    refs: ["D197"],
   },
-  "plant:__inv_params": {
-    shows: "the Replenishment cell (rows below)",
-    savedTo: "the individual fields below",
-    engine: "plant rows are DROPPED",
-    verdict: "ignored",
-  },
-  "plant:basis": { shows: "override", savedTo: "override inventory.basis", engine: "not read", verdict: "ignored" },
-  "plant:reorder_point": { shows: "override → 50", savedTo: "override inventory.reorder_point (plant row)", engine: "plant rows are DROPPED", verdict: "ignored" },
-  "plant:order_up_to": { shows: "override → 200", savedTo: "override inventory.order_up_to (plant row)", engine: "plant rows are DROPPED", verdict: "ignored" },
-  "plant:rop_q_quantity": { shows: "override → 0", savedTo: "override inventory.rop_q_quantity (plant row)", engine: "plant rows are DROPPED", verdict: "ignored" },
-  "plant:review_period_days": { shows: "override → 1", savedTo: "override inventory.review_period_days", engine: "not read", verdict: "ignored" },
   // PLAN.md §24 WP 14.4 — the FG policy per product and FG opening stock. The
   // opening-stock cell replaced `initial_on_hand`, which had no reader (D89).
   "plant:fg_initial_on_hand": {
@@ -426,18 +416,6 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     verdict: "conditional",
     note: "Read under days of cover only, MTS products only.",
   },
-  "plant:safety_stock_days": { shows: "override → 7", savedTo: "override inventory.safety_stock_days (plant row)", engine: DROPPED_PER_ROW, verdict: "ignored" },
-  "plant:holding_cost_pct": { shows: "override → 0.2", savedTo: "override inventory.holding_cost_pct (plant row)", engine: DROPPED_PER_ROW, verdict: "ignored" },
-  "plant:service_level_target": { shows: "override → 0.95", savedTo: "override inventory.service_level_target (plant row)", engine: DROPPED_PER_ROW, verdict: "ignored" },
-  "plant:fg_safety_stock": {
-    shows: "override → none",
-    savedTo: "override inventory.fg_safety_stock (plant row)",
-    engine: "per-row value DROPPED; the project default drives P-P.4, and only when an MTS product exists",
-    verdict: "ignored",
-    shouldBe: "a project-level control",
-  },
-  "plant:fg_service_level_target": { shows: "override → 0.95", savedTo: "override inventory.fg_service_level_target (plant row)", engine: DROPPED_PER_ROW, verdict: "ignored" },
-  "plant:fg_safety_stock_days": { shows: "override → 2", savedTo: "override inventory.fg_safety_stock_days (plant row)", engine: DROPPED_PER_ROW, verdict: "ignored" },
   "plant:allocation_priority_weight": {
     shows: "override → 1 (column appears only when the recovery response includes 'allocate materials')",
     savedTo: "override production.allocation_priority_weight",
@@ -509,7 +487,7 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   },
   // PLAN.md §24 WP 14.3 — fulfillment per customer × product row.
   "customer:backorder_allowed": {
-    shows: "your override, else the project's setting (Customer allocation card)",
+    shows: "your override, else the project's setting (the Customer rules line above the grid)",
     savedTo: "override fulfillment.backorder_allowed (Customer row)",
     engine: "P-C.1: this row waits (backorder) or loses (lost sales); its own backlog",
     verdict: "works",
@@ -574,11 +552,11 @@ export function stageColumnChecks(stage: GridStage) {
 }
 
 /**
- * The Fulfillment defaults card (Customer stage) — the only project-default
- * card left on /policies. Keys are the card's fields; the test holds them
- * equal to the fields the card renders.
+ * The Customer rules line above the Customer grid (`projectRules.ts`
+ * CUSTOMER_RULE) — project scope, saves the whole fulfillment family. Keys are
+ * the line's fields; the test holds them equal to the fields it renders.
  */
-export const FULFILLMENT_CARD_CHECK: Record<string, ColumnCheck> = {
+export const CUSTOMER_RULE_CHECK: Record<string, ColumnCheck> = {
   allocation: {
     shows: "saved value; never saved → 'priority'",
     savedTo: "policy_defaults.fulfillment (whole family on save); a policy version stores the shown default",
@@ -592,7 +570,7 @@ export const FULFILLMENT_CARD_CHECK: Record<string, ColumnCheck> = {
     savedTo: "policy_defaults.fulfillment",
     engine: "P-C.1 backorder; never saved → YES, as shown (§23 WP 13.4)",
     verdict: "works",
-    note: "Never saved in 9 of 10 projects: before WP 13.4 (§4 D204 a) every run there simulated lost sales while this card said backorders are allowed. The policy version now stores the default the page shows.",
+    note: "Never saved in 9 of 10 projects: before WP 13.4 (§4 D204 a) every run there simulated lost sales while the page said backorders are allowed. The policy version now stores the default the page shows.",
     refs: ["D204"],
   },
   max_backorder_days: {
@@ -606,8 +584,35 @@ export const FULFILLMENT_CARD_CHECK: Record<string, ColumnCheck> = {
     savedTo: "policy_defaults.fulfillment",
     engine: "backorder penalty × 7 per week; never saved → 2, as shown (§23 WP 13.4)",
     verdict: "works",
-    note: "Before WP 13.4 (§4 D204 a) an unsaved cost was 2 on the card and 0 in the run.",
+    note: "Before WP 13.4 (§4 D204 a) an unsaved cost was 2 on the page and 0 in the run.",
     refs: ["D204"],
+  },
+};
+
+/**
+ * The FG safety buffer line above the Plant grid (`projectRules.ts`
+ * FG_BUFFER_RULE) — P-P.4, project scope, saves the whole inventory family.
+ */
+export const FG_BUFFER_CHECK: Record<string, ColumnCheck> = {
+  fg_safety_stock: {
+    shows: "saved value; never saved → none (the line appears only while some product holds FG stock)",
+    savedTo: "policy_defaults.inventory (whole family on save)",
+    engine: "P-P.4 sizes a buffer on a DERIVED FG target S, for MTS products only; a typed S gets nothing on top",
+    verdict: "conditional",
+    note: "Was a Plant-row column whose per-row value was dropped; the engine reads it project-wide only.",
+    refs: ["D283"],
+  },
+  fg_service_level_target: {
+    shows: "saved value; never saved → 0.95 (visible under service level)",
+    savedTo: "policy_defaults.inventory",
+    engine: "the z of P-P.4's service-level sizing",
+    verdict: "conditional",
+  },
+  fg_safety_stock_days: {
+    shows: "saved value; never saved → 2 (visible under fixed days)",
+    savedTo: "policy_defaults.inventory",
+    engine: "P-P.4's fixed cover in days of demand",
+    verdict: "conditional",
   },
 };
 
@@ -625,7 +630,7 @@ export const PAGE_LEVEL_CHECK: Array<{ label: string; check: ColumnCheck }> = [
   {
     label: "Fulfillment strategy (display only since presets were removed)",
     check: {
-      shows: "policy_defaults.fulfillment_strategy — decides whether the Plant inventory columns appear",
+      shows: "policy_defaults.fulfillment_strategy — decides nothing on the grid since the FG columns follow each row's own MTS / MTO",
       savedTo: "no control on /policies any more",
       engine: "worker: products.fulfillment_mode → projects.supply_chain_model → MTO. Browser engine: this value",
       verdict: "differs",

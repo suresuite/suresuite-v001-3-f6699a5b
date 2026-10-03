@@ -10,6 +10,35 @@ export interface ColSpecCtx {
   draft?: Record<string, unknown>;
   /** Flattened effective bundle for this row (all families merged). */
   effective?: Record<string, unknown>;
+  /**
+   * The row's RESOLVED value of each master-backed gate field (`GATE_FIELDS`):
+   * draft → the row's override → the item master, as the cell shows it. The
+   * flattened bundle above cannot carry these — a master value is not in it —
+   * and a gate that read the bundle would hide a product's FG policy whenever
+   * the master, not an override, says it holds stock.
+   */
+  resolved?: Record<string, unknown>;
+  /** The project's own MTS / MTO (`projects.supply_chain_model`), the engine's
+   *  fallback when neither the row nor the product states one. */
+  projectFulfillmentMode?: "mts" | "mto";
+}
+
+/** The master-backed fields a `visibleWhen` gate reads (via `ctx.resolved`). */
+export const GATE_FIELDS = ["fulfillment_mode", "fg_policy"] as const;
+
+/** `projects.supply_chain_model` as the mapper reads it (`_fulfillment_mode`):
+ *  Make-To-Stock / mts → mts, anything else → mto. */
+export function projectFulfillmentModeOf(model: string | null | undefined): "mts" | "mto" {
+  const t = String(model ?? "").trim().toLowerCase().replace(/[- ]/g, "_");
+  return t === "mts" || t === "make_to_stock" ? "mts" : "mto";
+}
+
+/** Whether this Plant row's product holds finished-goods stock, by the
+ *  engine's own chain: the row → the product master → the project → MTO. */
+export function rowFulfillmentMode(ctx: ColSpecCtx): "mts" | "mto" {
+  const v = String(ctx.resolved?.fulfillment_mode ?? "").trim().toLowerCase();
+  if (v === "mts" || v === "mto") return v;
+  return ctx.projectFulfillmentMode ?? "mto";
 }
 
 export interface ColSpec {
@@ -76,6 +105,12 @@ export interface ColSpec {
   vectorGroup?: "invParams";
   /** A render-only anchor column with no stored field (holds the vector cell). */
   synthetic?: boolean;
+  /**
+   * The header BAND the column sits under, when it is not its family. The
+   * family still decides where an edit is saved (the engine reads the FG keys
+   * from `production`); the band only groups what the planner reads together.
+   */
+  band?: { family: PolicyFamily; label: string };
 }
 
 export interface StageTableSpec {
@@ -108,6 +143,7 @@ const col = (
     master?: ColSpec["master"];
     vectorGroup?: ColSpec["vectorGroup"];
     synthetic?: ColSpec["synthetic"];
+    band?: ColSpec["band"];
   } = {},
 ): ColSpec => ({ field, family, label: lbl(field), ...opts });
 
@@ -135,10 +171,16 @@ const ruleIs =
 /** A row's window and cost matter only when the row backorders. */
 const rowBackorders: ColSpec["visibleWhen"] = ({ effective, draft }) =>
   (draft?.backorder_allowed ?? effective?.backorder_allowed) === true;
-const plantNeedsInventory: ColSpec["visibleWhen"] = ({ fulfillmentStrategy }) =>
-  fulfillmentStrategy === "make_to_stock" ||
-  fulfillmentStrategy === "assemble_to_order" ||
-  fulfillmentStrategy === "configure_to_order";
+/** The product holds FG stock (MTS) — the switch every FG column depends on.
+ *  Read per ROW from the product's own mode, as the engine reads it; the page's
+ *  fulfillment strategy decides nothing here (§4 D197). */
+const holdsFgStock: ColSpec["visibleWhen"] = (ctx) => rowFulfillmentMode(ctx) === "mts";
+/** An FG level is shown only for the FG policies that use it: base-stock S,
+ *  min-max s and S, days of cover D. Empty policy = base-stock (the engine's). */
+const fgPolicyIn =
+  (...policies: string[]): ColSpec["visibleWhen"] =>
+  (ctx) =>
+    holdsFgStock(ctx) && policies.includes(String(ctx.resolved?.fg_policy || "base_stock"));
 
 const multiSourcing: ColSpec["visibleWhen"] = ({ effective }) =>
   String(effective?.strategy ?? "") === "multi" ||
@@ -148,19 +190,19 @@ const wantsMaterialAllocation: ColSpec["visibleWhen"] = ({ effective }) =>
   Array.isArray(effective?.response) &&
   (effective?.response as unknown[]).includes("allocate_materials");
 
-const fgStockOn: ColSpec["visibleWhen"] = (ctx) =>
-  plantNeedsInventory(ctx) && String(ctx.effective?.fg_safety_stock ?? "none") !== "none";
-
 // 6.A — a level/lot parameter is editable only for the inventory Policy Types
 // that use it (§II.3): picking a type changes which params show. The row's
 // chosen type is `effective.type` (min_max | base_stock | rop | periodic_review).
 const invTypeIn = (...types: string[]): ColSpec["visibleWhen"] =>
   ({ effective }) => types.includes(String(effective?.type ?? "min_max"));
 
-// Plant inventory params only apply when the product carries finished-goods
-// inventory (MTS/ATO/CTO) AND its type uses the param.
-const plantInvType = (...types: string[]): ColSpec["visibleWhen"] =>
-  (ctx) => plantNeedsInventory(ctx) && invTypeIn(...types)(ctx);
+/** The Plant grid's FG columns read as one band (their saves stay `production`). */
+const FG_BAND: ColSpec["band"] = { family: "inventory", label: "FG stock" };
+
+/** A column that exists only for a product that holds FG stock — every FG
+ *  column but the switch itself. An MTO row renders them as one sentence. */
+export const isFgDependentCol = (c: Pick<ColSpec, "field" | "band">): boolean =>
+  c.band === FG_BAND && c.field !== "fulfillment_mode";
 
 export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
   // ----------------------------- SUPPLIER -----------------------------
@@ -331,60 +373,65 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // number here could only ever speak by disagreeing (the WP 0.1 gap
       // check's second divergence).
       col("utilization_cap_pct", "production", { readOnly: true }),
+      // P-P.9 per-product allocation priority (recovery response opt-in).
+      col("allocation_priority_weight", "production", { visibleWhen: wantsMaterialAllocation, defaultWhenMissing: 1 }),
+      // Fulfillment (backorder, allocation, service level) is a customer-stage
+      // concern only — the engine reads it from the Customer rows and the
+      // project's rule, never from a plant node — so no fulfillment column here.
+
+      // ── FG STOCK — one switch, then only what it switches on ──────────────
+      // DOES THIS PRODUCT HOLD FINISHED-GOODS STOCK? The engine answers per
+      // product (the row → products.fulfillment_mode → the project → MTO), and
+      // every FG key below is read for an MTS product ONLY. So the switch is the
+      // first FG cell and the rest appear behind it: an MTO row shows no FG
+      // policy, because none would be read.
+      //
+      // WHAT LEFT THIS STAGE, AND WHY. The Plant grid used to carry the whole
+      // inventory family — Policy type, s/S/Q, safety days, holding, service
+      // level, P-P.4's sizing — each badged "not simulated", because the engine
+      // reads none of them from a Plant row (`POLICY_BUNDLE_KEYS` scopes, D204 b).
+      // Thirteen cells that changed nothing. P-P.4 is read project-wide, so it is
+      // the one project control above the grid (`FgBufferBar`), shown only when
+      // some product holds stock.
+      col("fulfillment_mode", "production", {
+        label: "FG stock",
+        master: { table: "products", field: "fulfillment_mode", idFrom: "product_id" },
+        band: FG_BAND,
+      }),
       // THE FG INVENTORY POLICY, MTS (PLAN.md §24 WP 14.4, ADR 0002 decision 3):
       // base-stock fills to S, min-max fills to S only below s, days of cover
       // fills to D/7 × the projected weekly demand. A typed level IS the target —
       // P-P.4's buffer is never added on top of it. Over the `products` master,
-      // edits are Plant-row overrides (§23 WP 13.1).
+      // edits are Plant-row overrides (§23 WP 13.1). Each level shows only under
+      // the policies that read it.
       col("fg_policy", "production", {
-        visibleWhen: plantNeedsInventory,
+        visibleWhen: holdsFgStock,
         master: { table: "products", field: "fg_policy", idFrom: "product_id" },
-      }),
-      col("fg_base_stock", "production", {
-        visibleWhen: plantNeedsInventory,
-        master: { table: "products", field: "fg_base_stock", idFrom: "product_id" },
+        band: FG_BAND,
       }),
       col("fg_reorder_point", "production", {
-        visibleWhen: plantNeedsInventory,
+        visibleWhen: fgPolicyIn("min_max"),
         master: { table: "products", field: "fg_reorder_point", idFrom: "product_id" },
+        band: FG_BAND,
+      }),
+      col("fg_base_stock", "production", {
+        visibleWhen: fgPolicyIn("base_stock", "min_max"),
+        master: { table: "products", field: "fg_base_stock", idFrom: "product_id" },
+        band: FG_BAND,
       }),
       col("fg_cover_days", "production", {
-        visibleWhen: plantNeedsInventory,
+        visibleWhen: fgPolicyIn("days_of_cover"),
         master: { table: "products", field: "fg_cover_days", idFrom: "product_id" },
+        band: FG_BAND,
       }),
-      // Fulfillment (backorder, allocation, service level) is a customer-stage
-      // concern only — the engine reads it from the project fulfillment default,
-      // never from a plant node — so no fulfillment column is offered here.
-
-      // Policy Type → dynamic parameters for finished goods (§II.1–II.3, §III.13).
-      // Type-specific level/lot params render in the one dynamic vector cell.
-      col("type", "inventory", { visibleWhen: plantNeedsInventory }),
-      col("__inv_params", "inventory", { synthetic: true, label: "Replenishment parameters", visibleWhen: plantNeedsInventory }),
-      col("basis", "inventory", { visibleWhen: plantNeedsInventory, vectorGroup: "invParams" }),
-      col("reorder_point", "inventory", { visibleWhen: plantInvType("min_max", "rop"), defaultWhenMissing: 50, vectorGroup: "invParams" }),
-      col("order_up_to", "inventory", { visibleWhen: plantInvType("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200, vectorGroup: "invParams" }),
-      col("rop_q_quantity", "inventory", { visibleWhen: plantInvType("rop"), defaultWhenMissing: 0, vectorGroup: "invParams" }),
-      col("review_period_days", "inventory", { visibleWhen: plantInvType("periodic_review"), defaultWhenMissing: 1, vectorGroup: "invParams" }),
       // FG OPENING STOCK IS A REAL CELL SINCE PLAN.md §24 WP 14.4 (§4 D89's
-      // remainder, engine RFC 4). Until then this was `initial_on_hand` with no
-      // `master:` block — its pointer had named `products.initial_on_hand`, a
-      // column that did not exist, and no scsim reader existed either. Engine
-      // 0.5.0 starts an MTS product at `fg_initial_on_hand`, and the column
-      // followed the capability in RFC 4's own order, so the pointer is real now.
+      // remainder, engine RFC 4). Engine 0.5.0 starts an MTS product at
+      // `fg_initial_on_hand`; empty = it starts at the policy target.
       col("fg_initial_on_hand", "production", {
-        visibleWhen: plantNeedsInventory,
+        visibleWhen: holdsFgStock,
         master: { table: "products", field: "fg_initial_on_hand", idFrom: "product_id" },
+        band: FG_BAND,
       }),
-      col("safety_stock_days", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 7 }),
-      col("holding_cost_pct", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.2 }),
-      col("service_level_target", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.95 }),
-
-      // P-P.4 finished-goods safety stock (MTS): sizing + its parameter.
-      col("fg_safety_stock", "inventory", { visibleWhen: plantNeedsInventory }),
-      col("fg_service_level_target", "inventory", { visibleWhen: fgStockOn, defaultWhenMissing: 0.95 }),
-      col("fg_safety_stock_days", "inventory", { visibleWhen: fgStockOn, defaultWhenMissing: 2 }),
-      // P-P.9 per-product allocation priority (recovery response opt-in).
-      col("allocation_priority_weight", "production", { visibleWhen: wantsMaterialAllocation, defaultWhenMissing: 1 }),
     ],
     targetKey: (r) => `${r.item_id}::${r.product_id ?? ""}`,
   },
@@ -579,10 +626,6 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   capacity_units_per_day: { sub: "units / day", w: 96, kind: "int", keep: true },
   utilization_cap_pct: { sub: "% of line capacity", w: 84, kind: "int", unit: "%", prio: 6 },
   allocation_priority_weight: { sub: "weight", w: 76, kind: "num", dec: 2, prio: 9 },
-  // ---- plant · finished goods
-  fg_safety_stock: { sub: "sizing · P-P.4", w: 132, kind: "chip", keep: true, filterable: false, align: "left" },
-  fg_service_level_target: { sub: "0–1 · when sized", w: 88, kind: "num", dec: 2, prio: 2 },
-  fg_safety_stock_days: { sub: "days · when sized", w: 78, kind: "int", unit: "d", prio: 1 },
   // ---- customer · fulfillment
   sourcing_firm: { sub: "serving node", w: 168, kind: "text", keep: true, align: "left" },
   // ---- customer · demand per row (WP 14.2)
@@ -593,11 +636,13 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   row_demand_variation: { sub: "CV (normal) · ± (triangularAV)", w: 96, kind: "num", dec: 2, prio: 5 },
   row_demand_min: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
   row_demand_max: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
-  // ---- plant · FG policy (WP 14.4)
+  // ---- plant · FG stock (WP 14.4) — the switch, then only the levels the
+  // row's FG policy reads, so each one that shows is one the run uses.
+  fulfillment_mode: { sub: "mts holds stock · mto", w: 104, kind: "text", keep: true, filterable: false, align: "left" },
   fg_policy: { sub: "base · min-max · cover", w: 120, kind: "text", keep: true, align: "left" },
-  fg_base_stock: { sub: "S · units", w: 84, kind: "int", prio: 5 },
-  fg_reorder_point: { sub: "s · units · min-max", w: 88, kind: "int", prio: 4 },
-  fg_cover_days: { sub: "D · days · cover", w: 84, kind: "num", dec: 1, prio: 4 },
+  fg_reorder_point: { sub: "s · units · reorder", w: 84, kind: "int", keep: true },
+  fg_base_stock: { sub: "S · units · target", w: 84, kind: "int", keep: true },
+  fg_cover_days: { sub: "D · days of demand", w: 84, kind: "num", dec: 1, keep: true },
   fg_initial_on_hand: { sub: "units · opening", w: 88, kind: "int", prio: 6 },
   // ---- customer · fulfillment per row (WP 14.3)
   backorder_allowed: { sub: "this row waits", w: 76, kind: "toggle", keep: true, filterable: false, align: "center" },
@@ -639,9 +684,6 @@ export const SHORT_LABEL: Record<string, string> = {
   capacity_units_per_day: "Line capacity",
   utilization_cap_pct: "Utilization cap",
   allocation_priority_weight: "Allocation wt.",
-  fg_safety_stock: "FG safety stock",
-  fg_service_level_target: "FG service",
-  fg_safety_stock_days: "FG days",
   sourcing_firm: "Sourcing firm",
   row_demand_mode: "Demand mode",
   row_forecast: "Forecast",
@@ -650,11 +692,12 @@ export const SHORT_LABEL: Record<string, string> = {
   row_demand_variation: "Variation",
   row_demand_min: "Min",
   row_demand_max: "Max",
+  fulfillment_mode: "FG stock",
   fg_policy: "FG policy",
   fg_base_stock: "FG S",
   fg_reorder_point: "FG s",
   fg_cover_days: "FG cover",
-  fg_initial_on_hand: "Initial FG",
+  fg_initial_on_hand: "Opening FG",
   backorder_allowed: "Backorder",
   max_backorder_days: "Max backorder",
   backorder_cost_per_day: "Backorder cost",
@@ -680,7 +723,8 @@ export function shortLabelFor(stage: StageKey, field: string, fallback: string):
 export function fitColsForStage(stage: StageKey, rowsCtx: ColSpecCtx[]): FitCol[] {
   return headerColsUnion(stage, rowsCtx).map((c) => ({
     key: c.field,
-    family: c.family,
+    family: c.band?.family ?? c.family,
+    ...(c.band ? { bandLabel: c.band.label } : {}),
     label: shortLabelFor(stage, c.field, c.label),
     ...FIT_FALLBACK,
     ...(COLUMN_FIT[c.field] ?? {}),

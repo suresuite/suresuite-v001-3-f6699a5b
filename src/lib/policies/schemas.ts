@@ -413,6 +413,9 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
   row_demand_distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
   // PLAN.md §24 WP 14.4 — the Plant row's FG policy (MTS).
   fg_policy: ["base_stock", "min_max", "days_of_cover"],
+  // Whether the product holds FG stock — the Plant row's switch over
+  // `products.fulfillment_mode` (`entityOverrides.ts`'s domain).
+  fulfillment_mode: ["mts", "mto"],
   // production
   lot_policy: LotPolicy.options,
   scheduling: SchedulingRule.options,
@@ -569,7 +572,7 @@ export const FIELD_LABELS: Record<string, string> = {
   fixed_dispatch_cost: "Fixed dispatch cost",
   routing: "Routing",
   carbon_intensity_kg_per_tkm: "Carbon (kg/t-km)",
-  allocation: "Material allocation",
+  allocation: "Customer allocation rule",
   backorder_allowed: "Backorder allowed",
   max_backorder_days: "Max backorder (days)",
   backorder_cost_per_day: "Backorder cost / day",
@@ -643,6 +646,7 @@ export const FIELD_LABELS: Record<string, string> = {
   row_demand_min: "Demand min (units/wk, triangular)",
   row_demand_max: "Demand max (units/wk, triangular)",
   // plant · FG policy per product (PLAN.md §24 WP 14.4) — MTS only.
+  fulfillment_mode: "Holds FG stock (mts) or builds to order (mto)",
   fg_policy: "FG policy (base-stock / min-max / days of cover)",
   fg_base_stock: "FG target S (units)",
   fg_reorder_point: "FG reorder point s (units, min-max)",

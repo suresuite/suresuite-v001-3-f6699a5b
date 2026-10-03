@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  FULFILLMENT_CARD_CHECK,
+  CUSTOMER_RULE_CHECK,
+  FG_BUFFER_CHECK,
   GRID_STAGES,
   KEY_COLUMNS,
   MEASURED,
@@ -160,11 +161,22 @@ export function PolicyColumnCheck() {
           />
           {stage === "customer" && (
             <CheckTable
-              title="Fulfillment defaults card (below the Customer grid) — project scope, saves the whole family"
-              rows={Object.entries(FULFILLMENT_CARD_CHECK).map(([field, check]) => ({
+              title="Customer rules line (above the Customer grid) — project scope, saves the whole family"
+              rows={Object.entries(CUSTOMER_RULE_CHECK).map(([field, check]) => ({
                 key: `fulfillment:${field}`,
                 label: field,
                 field: `fulfillment.${field}`,
+                check,
+              }))}
+            />
+          )}
+          {stage === "plant" && (
+            <CheckTable
+              title="FG safety buffer line (above the Plant grid) — project scope, P-P.4"
+              rows={Object.entries(FG_BUFFER_CHECK).map(([field, check]) => ({
+                key: `inventory:${field}`,
+                label: field,
+                field: `inventory.${field}`,
                 check,
               }))}
             />
