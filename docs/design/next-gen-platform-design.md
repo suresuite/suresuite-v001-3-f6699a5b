@@ -768,6 +768,20 @@ Two runs are *comparable* iff they are CRN-paired (same seed spec) and their Run
 > "nothing to compare". The rule (`src/lib/sim/comparability.ts`) now has three components —
 > policies, world, and the run's stamped disruption schedule — reads the seed from the run rather
 > than the live scenario, and the pane picks the validated baseline as A by default (PLAN.md §4 D221).
+>
+> **One baseline, many scenarios (2026-10-03).** The pane held one pair, so reading five stress
+> scenarios against the baseline was five trips through two selects. It now holds a baseline and
+> every other scenario with results: each is tested against the baseline ON ITS OWN by the same
+> predicate (the rule stays pairwise — nothing is compared challenger-to-challenger), the
+> comparable ones become columns of one matrix of CRN-paired deltas, and the rest are listed with
+> their reasons. Per column, a tally of separated-better / worse / changed / within-noise; a
+> rank-by-KPI order (direction-aware, default the baseline's objective); a "best" mark only on a
+> separated improvement; and the old pair table one click away. Because every cell is its own 95%
+> test, the pane states the multiple-comparisons caveat beneath the matrix (T3) rather than
+> correcting the intervals, so a cell still means exactly what the pair table says it means. The
+> pure rules are `src/lib/sim/multiCompare.ts`. Unchanged: an exploratory run is never the
+> baseline (WP 10.5) — a project whose runs are all exploratory now gets that reason in place of
+> an empty picker.
 
 ### 9.4 Worker orchestration
 
