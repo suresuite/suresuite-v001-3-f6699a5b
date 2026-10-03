@@ -82,7 +82,8 @@ export const STAGE_ROWS: Record<GridStage, string> = {
     "How much FG to keep is the row's S (or s,S / D); P-P.4's project buffer has no control, and a saved one shows as a removable notice.",
   customer:
     "Rows: outbound lanes of the stored graph. Backorder, priority, price and service target are per row (WP 14.3); " +
-    "the allocation rule and the backorder an EMPTY row cell inherits are the Customer rules line above the grid.",
+    "the allocation rule is the one line above the grid (2+ customers only). The demand parameters follow the row's " +
+    "distribution, and Forecast is offered only on a row with an uploaded series.",
 };
 
 /** The key (identity) columns, which are not in the column spec's `cols`. */
@@ -468,7 +469,7 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   },
   // PLAN.md §24 WP 14.3 — fulfillment per customer × product row.
   "customer:backorder_allowed": {
-    shows: "your override, else the project's setting (the Customer rules line above the grid)",
+    shows: "your override, else the project's value, shown greyed in the cell",
     savedTo: "override fulfillment.backorder_allowed (Customer row)",
     engine: "P-C.1: this row waits (backorder) or loses (lost sales); its own backlog",
     verdict: "works",
@@ -533,9 +534,9 @@ export function stageColumnChecks(stage: GridStage) {
 }
 
 /**
- * The Customer rules line above the Customer grid (`projectRules.ts`
- * CUSTOMER_RULE) — project scope, saves the whole fulfillment family. Keys are
- * the line's fields; the test holds them equal to the fields it renders.
+ * The Allocation line above the Customer grid (`projectRules.ts` CUSTOMER_RULE)
+ * — project scope, shown only with 2+ customers, saves the whole fulfillment
+ * family. Keys are the line's fields; the test holds them equal.
  */
 export const CUSTOMER_RULE_CHECK: Record<string, ColumnCheck> = {
   allocation: {
@@ -546,22 +547,31 @@ export const CUSTOMER_RULE_CHECK: Record<string, ColumnCheck> = {
     note: "Never saved in 9 of 10 projects. Before WP 13.4 (§4 D204 a) the page said 'priority' and the run had no rule; the policy version now stores the default the page shows.",
     refs: ["D204"],
   },
+};
+
+/**
+ * The project backorder values an EMPTY Customer-row cell inherits — no control
+ * since §24 WP 14.8 (owner decision: backorder is set per row; a project line of
+ * "defaults for empty cells" read as a second backorder setting). The engine
+ * still reads them for an empty cell, and the cell shows the inherited value.
+ */
+export const PROJECT_BACKORDER_CHECK: Record<string, ColumnCheck> = {
   backorder_allowed: {
-    shows: "saved value; never saved → YES",
-    savedTo: "policy_defaults.fulfillment",
+    shows: "no control; an empty row cell shows it as the inherited value (never saved → YES)",
+    savedTo: "policy_defaults.fulfillment — Excel import or a version restore only",
     engine: "P-C.1 backorder; never saved → YES, as shown (§23 WP 13.4)",
     verdict: "works",
     note: "Never saved in 9 of 10 projects: before WP 13.4 (§4 D204 a) every run there simulated lost sales while the page said backorders are allowed. The policy version now stores the default the page shows.",
     refs: ["D204"],
   },
   max_backorder_days: {
-    shows: "saved value; never saved → 14 (visible when backorder is on)",
+    shows: "no control; an empty row cell shows it (never saved → 14)",
     savedTo: "policy_defaults.fulfillment",
     engine: "backorder horizon in weeks (days ÷ 7 rounded half up, clamped 0–26); never saved → 14",
     verdict: "works",
   },
   backorder_cost_per_day: {
-    shows: "saved value; never saved → 2 (visible when backorder is on)",
+    shows: "no control; an empty row cell shows it (never saved → 2)",
     savedTo: "policy_defaults.fulfillment",
     engine: "backorder penalty × 7 per week; never saved → 2, as shown (§23 WP 13.4)",
     verdict: "works",

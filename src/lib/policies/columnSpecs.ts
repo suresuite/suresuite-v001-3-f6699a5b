@@ -24,7 +24,7 @@ export interface ColSpecCtx {
 }
 
 /** The master-backed fields a `visibleWhen` gate reads (via `ctx.resolved`). */
-export const GATE_FIELDS = ["fulfillment_mode", "fg_policy", "fg_base_stock"] as const;
+export const GATE_FIELDS = ["fulfillment_mode", "fg_policy", "fg_base_stock", "row_demand_distribution"] as const;
 
 /** `projects.supply_chain_model` as the mapper reads it (`_fulfillment_mode`):
  *  Make-To-Stock / mts → mts, anything else → mto. */
@@ -187,6 +187,36 @@ export function fgBufferAppliesToRow(ctx: ColSpecCtx): boolean {
   const s = ctx.resolved?.fg_base_stock;
   return s === undefined || s === null || s === "";
 }
+
+/** The Customer row's demand mode as the engine runs it (`rowGateCtx`):
+ *  `forecast` only when the row has an uploaded series. */
+export function rowDemandMode(ctx: ColSpecCtx): "forecast" | "model" {
+  return ctx.resolved?.row_demand_mode === "forecast" ? "forecast" : "model";
+}
+export const rowHasForecast = (ctx: ColSpecCtx): boolean => ctx.resolved?.has_forecast === true;
+
+/** The row's own distribution, or "" when it runs its product's (× share). */
+const rowDistribution = (ctx: ColSpecCtx): string =>
+  String(ctx.resolved?.row_demand_distribution ?? "").toLowerCase().replace("triangularav", "triangular_av");
+
+/**
+ * A demand PARAMETER is shown only for the distributions that read it (the
+ * engine's row centre, `scsim/core/context.py`):
+ *   deterministic, poisson → mean · normal → mean + CV · triangular_av → mean + ±
+ *   triangular → min, mode, max.
+ * Under a forecast the series IS the mean, so the mean cell goes — except for
+ * triangular, whose min / mode / max give the SHAPE the series is scaled by.
+ * A row with no distribution of its own runs its product's: no row parameters.
+ */
+const demandParamFor =
+  (field: "mean" | "variation" | "bounds"): ColSpec["visibleWhen"] =>
+  (ctx) => {
+    const d = rowDistribution(ctx);
+    if (!d) return false;
+    if (field === "bounds") return d === "triangular";
+    if (field === "variation") return d === "normal" || d === "triangular_av";
+    return d === "triangular" || rowDemandMode(ctx) === "model";
+  };
 
 /** An FG level is shown only for the FG policies that use it: base-stock S,
  *  min-max s and S, days of cover D. Empty policy = base-stock (the engine's). */
@@ -481,22 +511,31 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // column to point at. Empty = the engine's rule; `model` sets an uploaded
       // series aside, and the Forecast cell beside it says whether there is one.
       col("row_demand_mode", "demand"),
-      col("row_forecast", "demand", { readOnly: true }),
+      // The uploaded series, shown only on a row that has one.
+      col("row_forecast", "demand", { readOnly: true, visibleWhen: rowHasForecast }),
       col("row_demand_distribution", "demand", {
+        // Empty = the row runs its product's distribution × its volume share; the
+        // select says "product's" (an enum cannot carry `nullMeans`).
         master: { table: "outbound_logistics", field: "demand_distribution", idFrom: "customer_id::product_id" },
       }),
+      // THE PARAMETERS FOLLOW THE DISTRIBUTION (`demandParamFor`): each shows
+      // only on a row whose distribution reads it — not five static columns.
       col("row_demand_mean", "demand", {
+        label: "Mean / mode",
+        visibleWhen: demandParamFor("mean"),
         master: { table: "outbound_logistics", field: "demand_mean", idFrom: "customer_id::product_id" },
       }),
-      // Read BY THE DISTRIBUTION: a CV for normal, the ± fraction for
-      // triangularAV. The cell's title says which, for the row's distribution.
+      // A CV for normal, the ± fraction for triangularAV; the title says which.
       col("row_demand_variation", "demand", {
+        visibleWhen: demandParamFor("variation"),
         master: { table: "outbound_logistics", field: "demand_variation", idFrom: "customer_id::product_id" },
       }),
       col("row_demand_min", "demand", {
+        visibleWhen: demandParamFor("bounds"),
         master: { table: "outbound_logistics", field: "demand_min", idFrom: "customer_id::product_id" },
       }),
       col("row_demand_max", "demand", {
+        visibleWhen: demandParamFor("bounds"),
         master: { table: "outbound_logistics", field: "demand_max", idFrom: "customer_id::product_id" },
       }),
       // WP 14.3 — backorder per row. Empty = the project's setting.
@@ -699,7 +738,7 @@ export const SHORT_LABEL: Record<string, string> = {
   row_demand_mode: "Demand mode",
   row_forecast: "Forecast",
   row_demand_distribution: "Distribution",
-  row_demand_mean: "Mean",
+  row_demand_mean: "Mean / mode",
   row_demand_variation: "Variation",
   row_demand_min: "Min",
   row_demand_max: "Max",

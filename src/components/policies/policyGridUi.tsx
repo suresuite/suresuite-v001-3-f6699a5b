@@ -615,7 +615,7 @@ export function CellSegmented<T extends string>({
   tiny,
 }: {
   value: T;
-  options: Array<{ value: T; label: string; title?: string }>;
+  options: Array<{ value: T; label: string; title?: string; disabled?: boolean }>;
   onChange: (v: T) => void;
   tiny?: boolean;
 }) {
@@ -629,11 +629,13 @@ export function CellSegmented<T extends string>({
             key={o.value}
             type="button"
             title={o.title}
+            disabled={o.disabled}
             onClick={() => onChange(o.value)}
             className={cn(
               "whitespace-nowrap rounded-[2px] font-mono transition-colors",
               tiny ? "px-[4px] py-[2px] text-[9px]" : "px-1.5 py-[2px] text-[10px]",
               active ? "bg-foreground font-medium text-background" : "text-[--hair-quiet] hover:text-foreground",
+              o.disabled && "cursor-not-allowed opacity-40 hover:text-[--hair-quiet]",
             )}
           >
             {o.label}

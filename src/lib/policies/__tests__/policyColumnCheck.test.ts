@@ -8,6 +8,7 @@ import {
   CUSTOMER_RULE_CHECK,
   FG_BUFFER_CHECK,
   GRID_STAGES,
+  PROJECT_BACKORDER_CHECK,
   KEY_COLUMNS,
   NO_COLUMN_CHECK,
   PAGE_LEVEL_CHECK,
@@ -62,13 +63,13 @@ describe("policyColumnCheck — one verdict per /policies column", () => {
     }
   });
 
-  it("the Customer rules section lists exactly the fields the line renders, and they are the card's", () => {
+  it("the Allocation section lists exactly the line's fields, and every old card field is accounted for", () => {
     const lineFields = CUSTOMER_RULE.fields.map((f) => f.field);
     expect(new Set(Object.keys(CUSTOMER_RULE_CHECK))).toEqual(new Set(lineFields));
-    // The line replaced the card field for field: every scsim-visible
-    // fulfillment default that HAS a control is on it.
+    // Every scsim-visible fulfillment default the old card rendered is either on
+    // the line or named as a no-control project value (WP 14.8).
     const cardFields = Object.values(visibleFieldGroups("fulfillment")).flat();
-    expect(new Set(lineFields)).toEqual(new Set(cardFields));
+    expect(new Set([...lineFields, ...Object.keys(PROJECT_BACKORDER_CHECK)])).toEqual(new Set(cardFields));
   });
 
   it("the FG safety buffer section lists exactly the fields the line renders", () => {
@@ -81,6 +82,7 @@ describe("policyColumnCheck — one verdict per /policies column", () => {
       ...Object.values(COLUMN_CHECK),
       ...Object.values(CUSTOMER_RULE_CHECK),
       ...Object.values(FG_BUFFER_CHECK),
+      ...Object.values(PROJECT_BACKORDER_CHECK),
       ...GRID_STAGES.flatMap((s) => KEY_COLUMNS[s].map((k) => k.check)),
       ...[PAGE_LEVEL_CHECK, RUN_VALIDATE_CHECK, NO_COLUMN_CHECK].flat().map((r) => r.check),
     ];

@@ -62,7 +62,10 @@ export function cellEngineRead(
     };
   }
   if (col.master) {
-    return masterOverrideRule(col.family, col.field, stage === "plant" ? "plant" : "supplier")
+    // The REAL stage: a Customer master cell was asked of the Supplier rows and
+    // every one — distribution, mean, priority — read "not simulated" while the
+    // engine read it (§4 D287).
+    return masterOverrideRule(col.family, col.field, stage)
       ? { reaches: true, via: `your override, else ${col.master.table}.${col.master.field}` }
       : {
           reaches: false,

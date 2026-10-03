@@ -28,7 +28,7 @@ describe("PolicyColumnCheck renders the whole page's columns", () => {
   });
 
   it("the sections outside the grid render too", () => {
-    for (const t of ["Page-level controls", "Customer rules line", "FG safety buffer (P-P.4)", "Run & validate", "Engine inputs with no column"]) {
+    for (const t of ["Page-level controls", "Allocation line", "FG safety buffer (P-P.4)", "Run & validate", "Engine inputs with no column"]) {
       expect(text).toContain(t);
     }
     expect(text).toContain("backorder_allowed");

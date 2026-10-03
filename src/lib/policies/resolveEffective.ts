@@ -451,6 +451,19 @@ export function rowGateCtx(args: {
       defaults: args.defaults, overrides: args.overrides, scope: args.scope,
     });
   }
+  // The Customer row's demand mode, as the ENGINE resolves it: a draft or saved
+  // override of `row_demand_mode`, else `forecast` when the row has an uploaded
+  // series and `model` when it has none. `forecast` without a series is
+  // ignored by the engine (it runs the model), so it resolves to `model` here
+  // too — the cell must never claim a forecast the run does not have.
+  if (row.customer_id != null && row.product_id != null) {
+    const base = args.masterRowById.outbound_logistics?.get(`${String(row.customer_id)}::${String(row.product_id)}`);
+    const hasForecast = base?.demand_mode === "forecast";
+    const chosen = draft?.row_demand_mode ?? args.effective?.row_demand_mode;
+    const mode = chosen === "model" ? "model" : chosen === "forecast" || hasForecast ? "forecast" : "model";
+    resolved.has_forecast = hasForecast;
+    resolved.row_demand_mode = hasForecast ? mode : "model";
+  }
   return {
     fulfillmentStrategy: args.fulfillmentStrategy,
     row,
