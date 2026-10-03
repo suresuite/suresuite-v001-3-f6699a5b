@@ -23,8 +23,10 @@ export type OverrideDomain =
   | "fulfillment_mode";
 /** `row` (PLAN.md §24 WP 14.2) is a customer × product row of
  *  `outbound_logistics`, keyed exactly as the Customer stage keys it,
- *  `<customer>::<product>`. */
-export type OverrideEntity = "material" | "supplier" | "product" | "row";
+ *  `<customer>::<product>`. `lane` is its inbound twin: one supplier × material
+ *  link of `inbound_logistics`, keyed as the Supplier stage keys it,
+ *  `<supplier>::<material>` (the row's lead time). */
+export type OverrideEntity = "material" | "supplier" | "product" | "row" | "lane";
 
 /** The values an ENUM domain accepts — the mapper's `_ROW_KIND` targets and the
  *  row's two modes. */
@@ -64,6 +66,8 @@ const ENTITY_OF_TABLE: Record<string, OverrideEntity> = {
   // WP 14.3 — a row's priority / service target override sits over its
   // CUSTOMER's master value, but is keyed by the row like every Customer cell.
   customers: "row",
+  // One supplier × material link — the Supplier row's own lead time.
+  inbound_logistics: "lane",
 };
 
 /** The override declarations among the registry's `policy_bundle_keys`. */
@@ -183,8 +187,10 @@ export function entityOverride(
   }
 
   // A customer × product row (WP 14.2): the Customer row's own key, exactly
-  // (`_apply_row_demand_overrides` reads `node:<customer>::<product>`).
-  if (decl.entity === "row") {
+  // (`_apply_row_demand_overrides` reads `node:<customer>::<product>`). A
+  // supplier × material LANE is read the same way: the arc loop looks up
+  // `node:<supplier>::<material>` exactly, never split to an entity.
+  if (decl.entity === "row" || decl.entity === "lane") {
     for (const o of rows) {
       if (String(o.target_key) !== entityId) continue;
       const v = patchOf(o)[decl.key];

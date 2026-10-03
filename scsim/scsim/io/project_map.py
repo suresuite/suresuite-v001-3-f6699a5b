@@ -518,6 +518,26 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
                      "(master) -> 1.0",
     },
     {
+        # The lane's own lead time (the T_s of P-P.1's levels), per
+        # supplier × material — the first override of a LANE column rather than
+        # an item master, on the pattern the Customer row's `price` set over
+        # `outbound_logistics.unit_price`. The upload is the suggestion; the
+        # /policies row is what runs.
+        "key": "lead_time_weeks",
+        "scopes": ("supplier",),
+        "family": "sourcing",
+        "target": "SupplierLink.lead_time_weeks",
+        "catalog_ref": None,
+        "master": "inbound_logistics.lead_time",
+        "rows": "supplier",
+        "domain": "positive",
+        "empty_default": 2.0,
+        "transform": "weeks, > 0, on THIS supplier x material link only; rounded half to "
+                     "even and clamped 1-51 like the uploaded value. Order: the Supplier-stage "
+                     "row (`node:<supplier>::<material>`) -> inbound_logistics.lead_time x "
+                     "lead_time_unit -> 2 weeks",
+    },
+    {
         "key": "initial_on_hand",
         "scopes": ("supplier",),
         "family": "inventory",
@@ -1861,6 +1881,21 @@ def from_project_data(data: ProjectData) -> MappingResult:
     vol_price_num: dict[str, float] = {}
     vol_price_den: dict[str, float] = {}
     mat_lt_dist = {m.id: m for m in data.materials}
+    # The Supplier row's own lead time (`lead_time_weeks`), read per LANE: the
+    # row key IS the arc, `node:<supplier>::<material>`, so it is looked up
+    # exactly rather than split to an entity — an override on one supplier's
+    # lane never moves another's. Validated once per lane, not once per
+    # duplicate upload row.
+    row_lead: dict[tuple[str, str], float] = {}
+    for sup_id, mat_id in sorted({(a.supplier_id, a.material_id) for a in data.supply_arcs}):
+        v = ((data.policies.get(f"node:{sup_id}::{mat_id}") or {}).get("sourcing") or {}).get("lead_time_weeks")
+        if v in (None, ""):
+            continue
+        n = _override_num(v, entity=f"supply:{sup_id}->{mat_id}", field="lead_time_weeks",
+                          domain=domains["lead_time_weeks"], w=w)
+        if n is not None:
+            row_lead[(sup_id, mat_id)] = n
+    lt_source: dict[tuple[str, str], str] = {}
     for arc in data.supply_arcs:
         # A master row is not what makes a material real — the BOM is. An arc
         # whose material the BOM consumes counts even with no row in
@@ -1878,9 +1913,15 @@ def from_project_data(data: ProjectData) -> MappingResult:
         # Lead times are weeks; time_unit describes the volume period only
         # (§3). With lead_time_unit unset, _duration_to_weeks defaults to a
         # 7-day basis → the value is taken as weeks verbatim.
+        # Order: the /policies row → the uploaded lane → 2 weeks.
+        key = (arc.supplier_id, arc.material_id)
         lt_unit = arc.lead_time_unit
-        lt_weeks = _duration_to_weeks(arc.lead_time, lt_unit) if arc.lead_time else 2.0
-        if not arc.lead_time:
+        if key in row_lead:
+            lt_weeks, lt_src = row_lead[key], "override"
+        elif arc.lead_time:
+            lt_weeks, lt_src = _duration_to_weeks(arc.lead_time, lt_unit), "master"
+        else:
+            lt_weeks, lt_src = 2.0, "default"
             w.append(MappingWarning("warn", f"supply:{arc.supplier_id}->{arc.material_id}",
                                     "lead_time", "missing lead_time → defaulted to 2 weeks"))
         mrow = mat_lt_dist.get(arc.material_id)
@@ -1893,10 +1934,10 @@ def from_project_data(data: ProjectData) -> MappingResult:
             lead_time_cv=float(mrow.lead_time_cv) if mrow and mrow.lead_time_cv else 0.0,
             moq=moq_by_mat.get(arc.material_id, 0.0),
         )
-        key = (arc.supplier_id, arc.material_id)
         prev = links_by_key.get(key)
         if prev is None:
             links_by_key[key] = link
+            lt_source[key] = lt_src
         else:
             w.append(MappingWarning("warn", f"supply:{arc.supplier_id}->{arc.material_id}",
                                     "duplicate_arc",
@@ -1904,6 +1945,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
                                     "cheapest unit_price (tie: shortest lead time)"))
             if (link.cost, link.lead_time_weeks) < (prev.cost, prev.lead_time_weeks):
                 links_by_key[key] = link
+                lt_source[key] = lt_src
         cheapest_cost[arc.material_id] = min(cheapest_cost.get(arc.material_id, cost), cost)
         # `time_unit` describes the VOLUME period (§3), so the weight is a
         # weekly rate. A zero/absent/negative volume is no weight at all
@@ -1930,6 +1972,16 @@ def from_project_data(data: ProjectData) -> MappingResult:
         return None
 
     links = list(links_by_key.values())
+    # Each lane's lead time as the link carries it, with its source — what the
+    # Supplier grid's lead-time cell must show (page-equals-run). Counted in the
+    # run log only when some lane takes the /policies value, so a project that
+    # overrides none logs exactly as before the key existed.
+    any_lead_override = "override" in lt_source.values()
+    for (sup_id, mat_id), link in sorted(links_by_key.items()):
+        lane = f"{sup_id}::{mat_id}"
+        tally.add("inbound_logistics.lead_time", lt_source[(sup_id, mat_id)], lane,
+                  count=any_lead_override)
+        tally.value("inbound_logistics.lead_time", lane, link.lead_time_weeks)
     _apply_primary_choice(links, data.policies, w)
 
     # BOM materials with no source link cannot be simulated. Since D166 this

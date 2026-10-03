@@ -1019,6 +1019,90 @@ def test_a_supplier_override_on_two_rows_that_disagree_keeps_the_first_and_says_
                and "conflicting" in w.reason for w in res.warnings)
 
 
+# ── The Supplier row's lead time — an override of a LANE column ────────────────
+#
+# `lead_time_weeks` on `node:<supplier>::<material>` beats the uploaded
+# `inbound_logistics.lead_time` for that one link: the upload is the suggestion,
+# the /policies row is what runs.
+
+def _two_lanes() -> ProjectData:
+    d = _base()
+    d.suppliers.append(SupplierRow(id="s2"))
+    d.supply_arcs.append(SupplyArc(supplier_id="s2", material_id="m1", unit_price=3.0,
+                                   lead_time=4, lead_time_unit="week"))
+    return d
+
+
+def _lead(res, sup, mat="m1"):
+    return next(l.lead_time_weeks for l in res.scenario.network.supplier_links
+                if l.supplier_id == sup and l.material_id == mat)
+
+
+def test_a_supplier_row_lead_time_beats_the_uploaded_lane_and_only_that_lane():
+    d = _two_lanes()
+    d.policies = {"node:s2::m1": {"sourcing": {"lead_time_weeks": 7}}}
+    res = from_project_data(d)
+    assert (_lead(res, "s1"), _lead(res, "s2")) == (2, 7)
+    lt = res.resolved["inbound_logistics.lead_time"]
+    assert lt["s1::m1"] == {"source": "master", "value": 2}
+    assert lt["s2::m1"] == {"source": "override", "value": 7}
+    assert _sources(res, "inbound_logistics.lead_time").endswith("override 1 · master 1")
+    # The upload is an input and is not touched.
+    assert d.supply_arcs[1].lead_time == 4
+
+
+def test_without_a_lead_time_override_the_run_log_is_unchanged():
+    res = from_project_data(_two_lanes())
+    assert not any(w.entity == "source" and w.field == "inbound_logistics.lead_time"
+                   for w in res.warnings)
+    assert res.resolved["inbound_logistics.lead_time"]["s2::m1"] == {"source": "master", "value": 4}
+
+
+def test_a_lead_time_override_fills_a_blank_lane_instead_of_the_two_week_default():
+    d = _base()
+    d.supply_arcs[0].lead_time = None
+    res = from_project_data(d)
+    assert _lead(res, "s1") == 2
+    assert res.resolved["inbound_logistics.lead_time"]["s1::m1"] == {"source": "default", "value": 2}
+    d.policies = {"node:s1::m1": {"sourcing": {"lead_time_weeks": 5}}}
+    res = from_project_data(d)
+    assert _lead(res, "s1") == 5
+    assert not any(w.field == "lead_time" and "defaulted to 2 weeks" in w.reason for w in res.warnings)
+
+
+def test_a_lead_time_override_is_rounded_and_clamped_like_the_upload():
+    d = _base()
+    d.policies = {"node:s1::m1": {"sourcing": {"lead_time_weeks": 2.5}}}
+    assert _lead(from_project_data(d), "s1") == 2           # half to even, as round() does
+    d.policies = {"node:s1::m1": {"sourcing": {"lead_time_weeks": 80}}}
+    res = from_project_data(d)
+    assert _lead(res, "s1") == 51
+    assert res.resolved["inbound_logistics.lead_time"]["s1::m1"] == {"source": "override", "value": 51}
+
+
+def test_an_unusable_lead_time_override_is_ignored_and_said_and_the_upload_decides():
+    d = _base()
+    d.policies = {"node:s1::m1": {"sourcing": {"lead_time_weeks": 0}}}
+    res = from_project_data(d)
+    assert _lead(res, "s1") == 2
+    assert any(w.field == "lead_time_weeks" and "not a usable value" in w.reason for w in res.warnings)
+    assert res.resolved["inbound_logistics.lead_time"]["s1::m1"]["source"] == "master"
+
+
+def test_a_lead_time_override_moves_the_engines_primary_tie_break():
+    # Equal cost: the engine's own rule then picks the SHORTER lead time.
+    from scsim.entities.network import primary_rank
+
+    def primary(res):
+        return min(res.scenario.network.supplier_links, key=primary_rank).supplier_id
+
+    d = _two_lanes()
+    d.supply_arcs[1].unit_price = 2.0
+    assert primary(from_project_data(d)) == "s1"
+    d.policies = {"node:s2::m1": {"sourcing": {"lead_time_weeks": 1}}}
+    assert primary(from_project_data(d)) == "s2"
+
+
 def test_a_production_capacity_override_shadows_the_line_capacity_and_says_which():
     d = _base()
     d.products[0].production_capacity = None

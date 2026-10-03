@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { resolvePrimarySupplier } from "@/lib/sim/stressTargets";
+import { supplierLaneMasters } from "@/lib/policies/supplierLanes";
 
 /**
  * Audit 2026-09-29 — the single-source audit's findings, PROVED rather than
@@ -75,10 +76,27 @@ describe("D189 · the Supplier grid's demand placeholder is not the engine's dem
   it.fails("it sums a product's outbound lanes (the engine sums; the grid averages)", () => {
     expect(read("src/hooks/useStageRows.tsx")).not.toMatch(/const dPerDay = avg\(outVolByProduct\.get\(parent\)/);
   });
-  it.fails("its lead time reads `lead_time_unit`, as the engine does", () => {
-    const src = read("src/hooks/useStageRows.tsx");
-    const builder = src.slice(src.indexOf("const inboundByKey"), src.indexOf("const outboundByKey"));
-    expect(builder).toMatch(/lead_time_unit/);
+  // CLOSED 2026-10-03 for the lead-time cell: it is master-backed on the lane
+  // (`lead_time_weeks` over `inbound_logistics.lead_time`) and its base is
+  // `supplierLaneMasters`, the engine's own link build — so it reads the unit,
+  // rounds and clamps as the mapper does, and a blank lane is the engine's
+  // default rather than an average of other lanes. Behavioural now: the row no
+  // longer carries a lead time to pin by source.
+  it("its lead time reads `lead_time_unit`, as the engine does", () => {
+    const lanes = supplierLaneMasters([
+      { supplier_id: "A", material_id: "M", unit_price: 1, lead_time: 14, lead_time_unit: "day" },
+      { supplier_id: "B", material_id: "M", unit_price: 1, lead_time: 2.5, lead_time_unit: "week" },
+    ]);
+    expect(lanes.get("A::M")?.lead_time).toBe(2);
+    expect(lanes.get("B::M")?.lead_time).toBe(2); // half to even, as round() does
+  });
+  it("a blank lane lead time is the engine's default, not an average of the other lanes", () => {
+    const lanes = supplierLaneMasters([
+      { supplier_id: "A", material_id: "M", unit_price: 1, lead_time: 6, lead_time_unit: "week" },
+      { supplier_id: "B", material_id: "M", unit_price: 1, lead_time: null },
+    ]);
+    expect(lanes.get("B::M")?.lead_time).toBeNull();
+    expect(read("src/hooks/useStageRows.tsx")).not.toMatch(/"lead_time_days"/);
   });
 });
 

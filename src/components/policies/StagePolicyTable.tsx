@@ -102,6 +102,7 @@ import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { customerRowMasters, demandCellNote, fulfillmentCellNote } from "@/lib/policies/customerRows";
+import { supplierLaneMasters } from "@/lib/policies/supplierLanes";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
@@ -353,8 +354,11 @@ export function StagePolicyTable({
       outbound_logistics: customerRowMasters(lanes.outbound, lanes.forecasts),
       // WP 14.3 — the base under a Customer row's priority and service target.
       customers: new Map((lanes.customers ?? []).map((c) => [String(c.customer_id), c])),
+      // The base under a Supplier row's lead time: each lane as the engine
+      // builds its link, keyed `<supplier>::<material>`.
+      inbound_logistics: supplierLaneMasters(lanes.inbound),
     }),
-    [materials, products, suppliers, lanes.outbound, lanes.forecasts, lanes.customers],
+    [materials, products, suppliers, lanes.outbound, lanes.forecasts, lanes.customers, lanes.inbound],
   );
   const masterColByField = useMemo(() => {
     const m = new Map<string, ColSpec>();
@@ -887,8 +891,13 @@ export function StagePolicyTable({
     // the global policy made visible per row. A number typed into the cell
     // becomes THIS material's level, exactly: no safety stock is added on top
     // of it and nothing raises it (inventory_control.material_overrides).
-    const ltDays = Number(getEffective(rowKey, r, "lead_time_days", "sourcing"));
-    const ltWeeks = Number.isFinite(ltDays) && ltDays > 0 ? ltDays / 7 : undefined;
+    // The lane's lead time as the engine reads it — the row's override, else the
+    // uploaded lane, else the engine's declared default — in weeks already.
+    const ltRaw = Number(
+      getEffective(rowKey, r, "lead_time_weeks", "sourcing") ??
+        masterOverrideRule("sourcing", "lead_time_weeks")?.emptyDefault,
+    );
+    const ltWeeks = Number.isFinite(ltRaw) && ltRaw > 0 ? ltRaw : undefined;
     const dWeek = Number((r as Record<string, unknown>).__mat_demand_per_week);
     const kappaRaw = Number(getEffective(rowKey, r, "coverage_weeks", "inventory"));
     const kappa = Number.isFinite(kappaRaw) ? kappaRaw : 8;
@@ -1118,13 +1127,14 @@ export function StagePolicyTable({
       else if (!r.__in_house) {
         f.suppliers += 1;
         f.lines += 1;
-        const fromData = (r.__from_data as Record<string, true> | undefined)?.lead_time_days === true;
-        if (!fromData) f.leadMissing += 1;
+        // The lane as the engine builds it: `null` is a blank upload.
+        const lane = masterRowById.inbound_logistics?.get(`${String(r.supplier_id ?? "")}::${id}`);
+        if (lane?.lead_time == null) f.leadMissing += 1;
       }
       m.set(id, f);
     }
     return m;
-  }, [treeActive, dataRows]);
+  }, [treeActive, dataRows, masterRowById]);
   const collapsibleGroups = useMemo(() => rowGroups.filter((g) => g.members.length > 1), [rowGroups]);
   const anyGroupExpanded = collapsibleGroups.some((g) => !collapsedGroups.has(`${stageKey}::${g.id}`));
   const toggleAllGroups = () => {
@@ -1946,8 +1956,18 @@ export function StagePolicyTable({
           const kind = kindOf(col, opts, firms, cellValue, liveDefault);
           // A cleared master-backed cell is *reset to master* (§23 WP 13.1):
           // `null` removes the override on save, `undefined` would be no edit.
+          // A column the engine rounds (`ColSpec.round`, the lane lead time) is
+          // rounded here too, so the cell shows the value that runs.
           const commit = (v: unknown) =>
-            onCellChange(rowKey, col.field, col.master && v === undefined ? null : v);
+            onCellChange(
+              rowKey,
+              col.field,
+              col.master && v === undefined
+                ? null
+                : col.round && typeof v === "number" && Number.isFinite(v)
+                  ? col.round(v)
+                  : v,
+            );
           const rowDraftValue = rowDraft[col.field];
           const canResetToMaster =
             !!col.master &&

@@ -412,6 +412,6 @@ This snapshot's SIMULATION scope version — the `graph_level_versions` row whos
 
 ---
 
-*Generated from data contract `7c04cbb07bdd`, engine `0.6.1`,
+*Generated from data contract `4c80c3d64438`, engine `0.6.1`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
