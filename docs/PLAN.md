@@ -23299,6 +23299,12 @@ NOW (a run does not freeze them); server runs merge a recovery playbook over `DE
 and this, like a browser run, does not — identical for every version saved since D204 (a), which
 stores all recovery keys. The first Export in a session loads the browser engine (~20 s).
 
+### ~~D289 — /policies: the Supplier row's lead time is an override of its lane~~ · renumbered, not removed
+
+This entry was written as D289 on its branch (`e34945f`). The merge into `main` found D289 already
+taken by the version-Export defect and renumbered it **D290**; the entry continues below under that
+number. This heading keeps §16 append-only (R7), which the renumbering had broken on `main`.
+
 ### D290 — /policies: the Supplier row's lead time is an override of its lane · 2026-10-03 · no migration · engine stays 0.6.1
 
 **What the previous package promised.** D288 made the Replenishment column the levels the run
