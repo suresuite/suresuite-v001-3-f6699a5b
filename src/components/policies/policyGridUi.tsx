@@ -660,10 +660,11 @@ export const POLICY_PARAMS: Record<string, Array<{ field: string; symbol: string
     { field: "order_up_to", symbol: "S" },
     { field: "coverage_weeks", symbol: "κ" },
   ],
+  // (R,Q) orders Q whenever the position falls below R — κ plays no part,
+  // so it is not a parameter of this type. Q is required (stageGuards).
   rop: [
     { field: "rop_q_quantity", symbol: "Q" },
     { field: "reorder_point", symbol: "R" },
-    { field: "coverage_weeks", symbol: "κ" },
   ],
   periodic_review: [
     { field: "review_period_days", symbol: "T" },
@@ -684,8 +685,8 @@ export const POLICY_TYPE_OPTIONS = [
 
 /**
  * The dynamic cell: only the parameters the current policy type uses — and κ
- * only where the run reads it (`kappaIsRead`: S from the formula, or (R,Q)
- * with no lot). `basis` is hidden unless it deviates from days_of_supply (or
+ * only where the run reads it (`kappaIsRead`: S from the formula; never on
+ * (R,Q) or MRP). `basis` is hidden unless it deviates from days_of_supply (or
  * showBasis) — it repeated identically on every line and read as noise.
  */
 export function ReplenishmentCell({

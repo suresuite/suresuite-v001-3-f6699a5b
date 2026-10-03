@@ -268,14 +268,14 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     savedTo: "override inventory.rop_q_quantity",
     engine: "order quantity Q for that material, when > 0; its S is then R + Q",
     verdict: "works",
-    note: "Type rop only. The project's Q is read whatever the project's own type.",
+    note: "Type rop only, and required there: an (R,Q) row with no Q (its own or the project's) is flagged as needing input. The project's Q is read whatever the project's own type.",
   },
   "supplier:coverage_weeks": {
     shows: "override → project default → 8",
     savedTo: "override inventory.coverage_weeks",
     engine: "κ for that material, else the project default — which the policy version now stores as the page shows it (8), so the run reads 8",
     verdict: "works",
-    note: "Shown only where the run reads it: S from the formula (S empty), or (R,Q) with no Q; never for MRP. Before §23 WP 13.4 (§4 D204 a) an unsaved κ was 8 on the page and the 8 / 10 / 12-week strip in the run; κ was saved in no project.",
+    note: "Shown only where the run reads it: S from the formula (S empty) on min-max, base-stock and periodic rows; never for (R,Q) or MRP. Before §23 WP 13.4 (§4 D204 a) an unsaved κ was 8 on the page and the 8 / 10 / 12-week strip in the run; κ was saved in no project.",
     refs: ["D204"],
   },
   "supplier:review_period_days": {

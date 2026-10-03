@@ -179,3 +179,12 @@ def test_the_project_q_reaches_an_rop_row_whatever_the_project_type():
                        "node:S1::M1": {"inventory": {"type": "rop"}}})
     assert ic["rop_q_quantity"] == 500
     assert ic["material_overrides"]["M1"] == {"policy_type": "rop_q"}
+
+
+def test_an_rop_row_reads_no_kappa_and_says_when_it_has_no_q():
+    ic, w = _project({"node:S1::M1": {"inventory": {"type": "rop", "reorder_point": 100,
+                                                    "coverage_weeks": 4}}})
+    assert ic["material_overrides"]["M1"] == {"policy_type": "rop_q", "reorder_point": 100.0}
+    assert any(x.entity == "material:M1" and x.field == "rop_q_quantity" and x.level == "warn"
+               for x in w)
+    assert any(x.entity == "material:M1" and "coverage_weeks" in x.reason for x in w)

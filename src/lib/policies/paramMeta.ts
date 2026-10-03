@@ -145,7 +145,7 @@ export const PARAM_META: Record<string, ParamMeta> = {
     unit: "units",
     range: "≥ MOQ",
     meaning:
-      "Fixed lot size for the (R,Q) policy — when the position falls below R, one lot of Q is ordered (at least the MOQ). With Q set the order-up-to level is R + Q and κ is not used; empty Q = order up to S instead.",
+      "Fixed lot size for the (R,Q) policy — when the position falls below R, one lot of Q is ordered (at least the MOQ). Required on an (R,Q) row — a row without Q is flagged as needing input. The order-up-to level is R + Q; κ is not used.",
     formula: "O_{i,t} = max(Q, MOQ)·1[IP_{i,t} < R]",
     specRef: "§III.3",
   },

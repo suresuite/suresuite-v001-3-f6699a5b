@@ -2549,7 +2549,8 @@ _TYPE_PARAMS = frozenset({
 _TYPE_SHOWS: dict[str, frozenset[str]] = {
     "min_max": frozenset({"reorder_point", "order_up_to", "coverage_weeks"}),
     "base_stock": frozenset({"order_up_to", "coverage_weeks"}),
-    "rop_q": frozenset({"rop_q_quantity", "reorder_point", "coverage_weeks"}),
+    # (R,Q) orders Q below R; κ sizes no (R,Q) level, so a stored κ is not read.
+    "rop_q": frozenset({"rop_q_quantity", "reorder_point"}),
     "periodic": frozenset({"periodic_review_weeks", "order_up_to", "coverage_weeks"}),
     "mrp": frozenset(),
 }
@@ -2760,6 +2761,18 @@ def _map_policies(
                 "does not use it (the page does not show it)"))
         if not entry:
             mat_over.pop(mat)
+    # An (R,Q) row with no lot — its own or the project's — is a row the page
+    # flags as needing input. If it is run anyway the engine orders up to S
+    # (the declared substitution); say so per material, not only at project
+    # scope, so the run log names the row.
+    project_q = inv.get("rop_q_quantity")
+    has_project_q = project_q is not None and float(project_q) > 0
+    for mat, entry in mat_over.items():
+        if entry.get("policy_type") == "rop_q" and "rop_q_quantity" not in entry and not has_project_q:
+            w.append(MappingWarning(
+                "warn", f"material:{mat}", "rop_q_quantity",
+                "(R,Q) row with no lot size Q — ordered up to S (min-max lot) instead; "
+                "set Q on the row"))
     # An absolute band a row states inverted (s ≥ S) would be refused by the
     # engine's validator and abort the run; keep the reorder point (the half
     # that triggers) and say what was dropped.

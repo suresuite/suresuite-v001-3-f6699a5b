@@ -42,7 +42,9 @@ export function groupHasPrimary(
  * A line needs input when the project data cannot answer it:
  *  - the material has no supplier at all,
  *  - it is multi-source and no primary has been picked,
- *  - (customer) no sourcing firm is known and none has been set.
+ *  - (customer) no sourcing firm is known and none has been set,
+ *  - (supplier) the row is (R,Q) and has no lot size Q — an (R,Q) policy IS
+ *    "order Q below R"; without Q there is no policy to run, only a fallback.
  */
 export function lineNeedsInput(
   stage: StageKey,
@@ -58,11 +60,20 @@ export function lineNeedsInput(
   ) {
     return true;
   }
+  if (stage === "supplier" && rowNeedsLot(r, resolve)) return true;
   if (stage === "customer") {
     const firms = (r.__firms_available as string[] | undefined) ?? [];
     if (firms.length === 0 && !resolve(r, "sourcing_firm")) return true;
   }
   return false;
+}
+
+/** An (R,Q) Supplier row with no positive Q — the row's own, else the
+ *  project's. The schema stores 0 for "unset", never a zero lot. */
+export function rowNeedsLot(r: Record<string, unknown>, resolve: ResolveField): boolean {
+  if (String(resolve(r, "type") ?? "") !== "rop") return false;
+  const q = Number(resolve(r, "rop_q_quantity"));
+  return !(Number.isFinite(q) && q > 0);
 }
 
 /** How many lines in a stage still need input. */
