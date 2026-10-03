@@ -27,7 +27,9 @@ describe("walk-to: /policies first", () => {
     expect(fieldWalkToRoute("materials.moq", "p")).toBe("/policies?stage=supplier");
     expect(fieldWalkToRoute("materials.holding_cost_pct", "p")).toBe("/policies?stage=supplier");
     expect(fieldWalkToRoute("suppliers.capacity_per_week", "p")).toBe("/policies?stage=supplier");
-    expect(fieldWalkToRoute("products.demand_cv", "p")).toBe("/policies?stage=plant");
+    // Demand is authored on the Customer rows (§4 D286).
+    expect(fieldWalkToRoute("products.demand_cv", "p")).toBe("/policies?stage=customer");
+    expect(fieldWalkToRoute("products.demand_mean", "p")).toBe("/policies?stage=customer");
   });
 
   it("a field with no /policies cell still goes to the Project Manager", () => {
@@ -37,7 +39,7 @@ describe("walk-to: /policies first", () => {
 
   it("findings name the /policies column, not the table", () => {
     expect(findingFieldLabel("materials.holding_cost_pct")).toBe("Holding · Supplier stage");
-    expect(findingFieldLabel("products.demand_cv")).toBe("Demand CV · Plant stage");
+    expect(findingFieldLabel("products.demand_cv")).toBe("Variation · Customer stage");
     expect(findingFieldLabel("inbound_logistics.unit_price")).toBe("inbound_logistics.unit_price");
   });
 });

@@ -949,16 +949,15 @@ def test_supplier_row_overrides_beat_every_material_and_supplier_master():
 
 
 def test_plant_row_overrides_beat_every_product_master():
+    # Demand is not among them since §4 D286: it is authored on Customer rows.
     d = _base()
     d.products[0].demand_cv = 0.2
     d.policies = {"node:Plant A::p1": {"production": {
-        "sell_price": 31.0, "production_capacity": 333.0, "demand_mean": 70.0, "demand_cv": 0.4}}}
+        "sell_price": 31.0, "production_capacity": 333.0}}}
     res = from_project_data(d)
     p = res.scenario.network.products[0]
     assert p.unit_price == pytest.approx(31.0)
     assert p.production_capacity == pytest.approx(333.0)
-    assert p.demand_mode == pytest.approx(70.0)
-    assert "override 1" in _sources(res, "products.demand_cv")
     assert "override 1" in _sources(res, "products.sell_price")
 
 
@@ -1070,6 +1069,20 @@ def test_an_mto_product_reads_no_fg_policy_and_the_run_says_so():
     res = from_project_data(d)
     assert res.scenario.network.products[0].fg_base_stock is None
     assert any(w.field == "fg_policy" and "MTO" in w.reason for w in res.warnings)
+
+
+def test_a_plant_row_demand_override_is_no_longer_read_and_says_so():
+    """Demand is authored on the Customer rows (WP 14.2); the product's mean is
+    only what a row without its own inherits. A Plant-row demand override was a
+    second author of it (§4 D286) — ignored, and named in the run log."""
+    base = from_project_data(_mts_base())
+    d = _mts_base()
+    d.policies = {"node:Plant::p1": {"production": {"demand_mean": 999.0, "demand_cv": 0.9}}}
+    res = from_project_data(d)
+    a, b = base.scenario.network.products[0], res.scenario.network.products[0]
+    assert a.model_dump() == b.model_dump()
+    assert {w.field for w in res.warnings if "no longer read" in w.reason} == {"demand_mean", "demand_cv"}
+    assert res.resolved["products.demand_mean"]["p1"]["source"] == "master"
 
 
 def test_a_plant_row_makes_an_mto_product_hold_fg_stock():

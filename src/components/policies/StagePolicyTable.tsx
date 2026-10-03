@@ -39,6 +39,7 @@ import {
   fitColsForStage,
   vectorParamCols,
   flattenBundle,
+  fgBufferAppliesToRow,
   isFgDependentCol,
   projectFulfillmentModeOf,
   rowFulfillmentMode,
@@ -138,11 +139,11 @@ interface Props {
   onDraftsChange?: (lines: number) => void;
   /**
    * The stage's project-level settings, one line above the grid. Given what
-   * only the grid knows: whether any line's product holds FG stock (P-P.4 is
-   * read only then) and how many customers the lines name (P-C.2's rule is
-   * applied only between two or more).
+   * only the grid knows: how many lines P-P.4's buffer is added to (an MTS
+   * product on base-stock with an empty S) and how many customers the lines
+   * name (P-C.2's rule is applied only between two or more).
    */
-  ruleBar?: (state: { anyFgStock: boolean; customerCount: number }) => React.ReactNode;
+  ruleBar?: (state: { fgBufferRows: number; customerCount: number }) => React.ReactNode;
 }
 
 type RowDraft = Record<string, unknown>;
@@ -506,7 +507,7 @@ export function StagePolicyTable({
   const rowCtxs: ColSpecCtx[] = useMemo(() => [...rowCtxByKey.values()], [rowCtxByKey]);
   const ruleBarState = useMemo(
     () => ({
-      anyFgStock: stageKey === "plant" && rowCtxs.some((c) => rowFulfillmentMode(c) === "mts"),
+      fgBufferRows: stageKey === "plant" ? rowCtxs.filter(fgBufferAppliesToRow).length : 0,
       customerCount: new Set(
         dataRows.map((r) => String((r as Record<string, unknown>).customer_id ?? "")).filter(Boolean),
       ).size,

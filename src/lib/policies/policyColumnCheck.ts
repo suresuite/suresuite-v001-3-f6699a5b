@@ -75,10 +75,11 @@ export const STAGE_ROWS: Record<GridStage, string> = {
     "directly, never the stored graph — so a stale graph (§4 D187; Project 2 today) shows lanes the run does not use.",
   plant:
     "Rows: products that are a BOM parent in the stored graph AND ship outbound. The 'Focal plant' key is " +
-    "projects.plant_name (§4 D202: Project AA's data sits on a different plant name). The FG stock columns appear " +
+    "projects.plant_name (§4 D202: Project AA's data sits on a different plant name). No demand cell: demand is " +
+    "authored on the Customer rows, and a Plant-row demand override is no longer read (§4 D286). The FG stock columns appear " +
     "per row, behind the row's own MTS / MTO — the value the engine reads (row → products.fulfillment_mode → " +
     "projects.supply_chain_model → MTO); the policy's fulfillment strategy decides nothing here (§4 D197). " +
-    "The FG safety buffer (P-P.4) is the one project setting above the grid, shown while some product holds stock.",
+    "The FG safety buffer (P-P.4) is the one project setting above the grid, shown while some MTS product's S is derived.",
   customer:
     "Rows: outbound lanes of the stored graph. Backorder, priority, price and service target are per row (WP 14.3); " +
     "the allocation rule and the backorder an EMPTY row cell inherits are the Customer rules line above the grid.",
@@ -336,26 +337,6 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     engine: "override → master → line capacity × 7 × utilization → max(2 × demand, 1000)",
     verdict: "works",
   },
-  "plant:demand_cv": {
-    shows: "your override → products.demand_cv (item master)",
-    savedTo: "override production.demand_cv (per row — /policies never writes the item master, §23 WP 13.1)",
-    engine:
-      "override → products.demand_cv → the scenario's demand-model cv → 0.30; spreads a TRIANGULAR product's demand, and through " +
-      "that variance sizes P-P.3 safety stock",
-    verdict: "conditional",
-    note:
-      "Inert when the product's distribution resolves to Poisson — variance is the mean, the CV is never read, by the " +
-      "draw or by P-P.3. Every app-created scenario is Poisson (§4 D190), so set a product distribution for this to matter.",
-    refs: ["D190"],
-  },
-  "plant:demand_mean": {
-    shows: "your override → products.demand_mean, units / week (item master) → Σ weekly outbound volume",
-    savedTo: "override production.demand_mean (per row — /policies never writes the item master, §23 WP 13.1)",
-    engine: "override → products.demand_mean → Σ weekly outbound volume → 0",
-    verdict: "works",
-    note: "The run uses it; the network pages and the Supplier tree do not (they use outbound volume) — all 6 Aumovio products differ.",
-    refs: ["D195"],
-  },
   "plant:capacity_units_per_day": {
     shows: "read-only: the row's saved line rate → the project default (1000), the input of the derived capacity",
     savedTo: "— (read-only since §23 WP 13.4; set the capacity itself in the Capacity column, the project line rate on the Defaults card)",
@@ -595,7 +576,7 @@ export const CUSTOMER_RULE_CHECK: Record<string, ColumnCheck> = {
  */
 export const FG_BUFFER_CHECK: Record<string, ColumnCheck> = {
   fg_safety_stock: {
-    shows: "saved value; never saved → none (the line appears only while some product holds FG stock)",
+    shows: "saved value; never saved → none (the line appears only while some MTS product is on base-stock with an empty S)",
     savedTo: "policy_defaults.inventory (whole family on save)",
     engine: "P-P.4 sizes a buffer on a DERIVED FG target S, for MTS products only; a typed S gets nothing on top",
     verdict: "conditional",

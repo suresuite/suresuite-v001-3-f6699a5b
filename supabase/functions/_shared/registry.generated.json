@@ -3699,35 +3699,6 @@
       "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.production_capacity (master) -> the line capacity (capacity_units_per_day x 7 x utilization) -> max(2 x demand, 1000)"
     },
     {
-      "catalog_ref": null,
-      "domain": "positive",
-      "empty_default": 0.0,
-      "family": "production",
-      "key": "demand_mean",
-      "master": "products.demand_mean",
-      "rows": "plant",
-      "scopes": [
-        "plant"
-      ],
-      "target": "Product.demand_mode",
-      "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.demand_mean (master) -> the weekly outbound volume -> 0"
-    },
-    {
-      "catalog_ref": null,
-      "domain": "nonnegative",
-      "empty_default": null,
-      "empty_note": "the scenario demand model's CV, else 0.30",
-      "family": "production",
-      "key": "demand_cv",
-      "master": "products.demand_cv",
-      "rows": "plant",
-      "scopes": [
-        "plant"
-      ],
-      "target": "Product.demand_cv",
-      "transform": "sigma / mean, >= 0. Order: the Plant-stage row -> products.demand_cv (master) -> the scenario demand model's cv -> 0.30. Read by the triangular and negative-binomial draws; not under Poisson"
-    },
-    {
       "catalog_ref": "P-X.2",
       "family": "inventory",
       "key": "service_level_target",

@@ -8,7 +8,8 @@
 // - P-C.2 `fulfillment.allocation`, applied only between two or more customers;
 // - P-C.1's backorder trio, which an EMPTY Customer-row cell inherits (a row's
 //   own cell wins, WP 14.3);
-// - P-P.4's FG buffer, read only for a product that holds FG stock.
+// - P-P.4's FG buffer, added only for an MTS product on base-stock whose S is
+//   empty (derived) — so the line shows only while such a product exists.
 import type { PolicyFamily } from "./schemas";
 
 export interface RuleField {
@@ -77,11 +78,17 @@ const FG_SIZING_LABEL: Record<string, string> = {
   fixed_days: "fixed days of demand",
 };
 
+/** The FG buffer line's own sentence: what it does, and to how many lines. */
+export function fgBufferNote(lines: number): string {
+  const what = lines === 1 ? "1 make-to-stock product" : `${lines} make-to-stock products`;
+  return `Extra finished-goods stock added to the derived target S of ${what} whose S is left empty. A typed S, min-max or days of cover is used as typed.`;
+}
+
 export const FG_BUFFER_RULE: ProjectRule = {
   family: "inventory",
   title: "FG safety buffer",
   hint:
-    "Project-wide (P-P.4): a buffer added to a DERIVED FG target S for every product that holds FG stock. " +
+    "Project-wide (P-P.4): a buffer added to a DERIVED FG target S — base-stock products that hold FG stock and leave S empty. " +
     "A level typed in the grid is the target as typed — nothing is added on top of it.",
   fields: [
     { field: "fg_safety_stock", label: "Size it by", optionLabel: (t) => FG_SIZING_LABEL[t] ?? t },

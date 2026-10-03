@@ -22,7 +22,7 @@ import type { StageRowsQuery } from "@/hooks/useStageGuards";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/policies/schemas";
 import type { ProjectContext } from "@/lib/policies/resolvePreset";
-import { CUSTOMER_RULE, FG_BUFFER_RULE, customerRuleFields, type RuleField } from "@/lib/policies/projectRules";
+import { CUSTOMER_RULE, FG_BUFFER_RULE, customerRuleFields, fgBufferNote, type RuleField } from "@/lib/policies/projectRules";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import {
@@ -171,9 +171,11 @@ export function FocusedStage({
 
   // The stage's project-level settings, one line above its grid
   // (`projectRules.ts`): the Customer stage's allocation rule and the backorder
-  // an empty row inherits; the Plant stage's FG buffer, only while some product
-  // holds FG stock — for an all-MTO project it is read by nothing.
-  const ruleBar = ({ anyFgStock, customerCount }: { anyFgStock: boolean; customerCount: number }) => {
+  // an empty row inherits; the Plant stage's FG buffer, only while some line
+  // gets the buffer — an MTS product on base-stock whose S is left empty. A
+  // typed target (S, min-max, days of cover) gets nothing on top, so for a
+  // project of typed targets the line would be a control that does nothing.
+  const ruleBar = ({ fgBufferRows, customerCount }: { fgBufferRows: number; customerCount: number }) => {
     if (stageKey === "customer") {
       return (
         <ProjectRuleBar
@@ -187,7 +189,7 @@ export function FocusedStage({
         />
       );
     }
-    if (stageKey === "plant" && anyFgStock) {
+    if (stageKey === "plant" && fgBufferRows > 0) {
       return (
         <ProjectRuleBar
           family="inventory"
@@ -197,6 +199,7 @@ export function FocusedStage({
           value={defaults.inventory}
           onSave={(v) => saveDefault("inventory", v)}
           readOnly={!canImport}
+          note={fgBufferNote(fgBufferRows)}
         />
       );
     }

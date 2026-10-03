@@ -793,76 +793,6 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "plant",
-    "field": "demand_mean",
-    "family": "production",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `demand_mean` (family `production`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`products.demand_mean` (item master, keyed from `product_id`)",
-        "evidence": null
-      },
-      {
-        "kind": "unit",
-        "detail": "`units per week`, fixed by `fixed`",
-        "evidence": null
-      },
-      {
-        "kind": "engine",
-        "detail": "project_map.py::_map_products -> demand_mode",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "demand_cv",
-    "family": "production",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `demand_cv` (family `production`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`products.demand_cv` (item master, keyed from `product_id`)",
-        "evidence": null
-      },
-      {
-        "kind": "unit",
-        "detail": "`coefficient of variation (dimensionless)`, fixed by `fixed`",
-        "evidence": null
-      },
-      {
-        "kind": "engine",
-        "detail": "project_map.py::_map_products -> demand cv",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
     "field": "capacity_units_per_day",
     "family": "production",
     "hops": [
@@ -4264,5 +4194,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 48;
+export const CHAIN_COUNT = 46;
 export const BROKEN_COUNT = 3;
