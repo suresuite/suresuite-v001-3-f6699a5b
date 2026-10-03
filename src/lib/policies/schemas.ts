@@ -631,6 +631,7 @@ export const FIELD_LABELS: Record<string, string> = {
   capacity_per_week: "Supplier capacity (units/wk)",
   reliability_score: "Reliability (0–1)",
   material_moq: "MOQ (master)",
+  lead_time_weeks: "Lead time (weeks)",
   // inventory extensions
   moq: "MOQ",
   // production extensions

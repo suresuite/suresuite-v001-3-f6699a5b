@@ -40225,7 +40225,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc assign_material_supplier",
           "grain": "table",
-          "evidence": "src/components/policies/StagePolicyTable.tsx:395",
+          "evidence": "src/components/policies/StagePolicyTable.tsx:400",
           "confirmed": true
         },
         {
@@ -43779,5 +43779,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "7c04cbb07bdd"
+  "contract_version": "4c80c3d64438"
 }
