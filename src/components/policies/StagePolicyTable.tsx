@@ -91,6 +91,7 @@ import {
   type SavePlan,
 } from "@/lib/policies/masterOverrides";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
+import { engineClassificationFor } from "@/lib/policies/engineBridge";
 import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
 import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
@@ -880,23 +881,44 @@ export function StagePolicyTable({
     const basis = String(getEffective(rowKey, r, "basis", "inventory") ?? "days_of_supply");
 
     // The engine's own default band, computed from the row's data with the
-    // engine formulas (P-P.1 Eqs. 2–3): s = E[D]·T_s, S = E[D]·(T_s+κ). An
-    // EMPTY level cell resolves to these in the run, so they render as the
-    // greyed placeholder — the global policy made visible per row. A number
-    // typed into the cell becomes THIS material's override and replaces the
-    // formula for it (inventory_control.material_overrides).
+    // engine formulas (P-P.1 Eqs. 2–3): s = E[D]·T_s, S = E[D]·(T_s+κ), each
+    // PLUS the safety stock P-P.3 adds to a formula level. An EMPTY level cell
+    // resolves to these in the run, so they render as the greyed placeholder —
+    // the global policy made visible per row. A number typed into the cell
+    // becomes THIS material's level, exactly: no safety stock is added on top
+    // of it and nothing raises it (inventory_control.material_overrides).
     const ltDays = Number(getEffective(rowKey, r, "lead_time_days", "sourcing"));
     const ltWeeks = Number.isFinite(ltDays) && ltDays > 0 ? ltDays / 7 : undefined;
     const dWeek = Number((r as Record<string, unknown>).__mat_demand_per_week);
     const kappaRaw = Number(getEffective(rowKey, r, "coverage_weeks", "inventory"));
     const kappa = Number.isFinite(kappaRaw) ? kappaRaw : 8;
     const canCompute = ltWeeks !== undefined && Number.isFinite(dWeek) && dWeek > 0;
-    const sDefault = canCompute ? dWeek * ltWeeks! : undefined;
-    const SDefault = canCompute ? dWeek * (ltWeeks! + kappa) : undefined;
+    // The safety stock the run adds to a formula level. Days-based — the row's
+    // own safety-stock days, else the project's when its method is fixed days
+    // — it is E[D]·days/7 and the placeholder includes it. A service-level or
+    // King buffer needs σ and z the page does not hold, so the hover says the
+    // run adds it rather than the page inventing a number.
+    const rowSsDays = drafts[rowKey]?.safety_stock_days
+      ?? savedOverrideValue(overrides, rowKey, "safety_stock_days", "inventory", families);
+    const ssMethod = String(getDefault("safety_stock_method", "inventory") ?? "fixed_days");
+    const daysBased = rowSsDays != null || (engineClassificationFor(ssMethod) ?? "fixed_days") === "fixed_days";
+    const ssDays = Number(rowSsDays ?? getDefault("safety_stock_days", "inventory") ?? 7);
+    const ssUnits = daysBased && canCompute && Number.isFinite(ssDays) ? (dWeek * ssDays) / 7 : 0;
+    const sDefault = canCompute ? dWeek * ltWeeks! + ssUnits : undefined;
+    const SDefault = canCompute ? dWeek * (ltWeeks! + kappa) + ssUnits : undefined;
     const fmt = (n: number | undefined) => (n === undefined ? undefined : String(Math.round(n)));
     const placeholderFor: Record<string, string | undefined> = {
       reorder_point: fmt(sDefault),
       order_up_to: fmt(SDefault),
+    };
+    const ssNote = !canCompute
+      ? undefined
+      : daysBased
+        ? `includes ${Math.round(ssUnits)} safety stock (${ssDays} d); a typed value is used exactly`
+        : "plus the service-level safety stock the run sizes; a typed value is used exactly";
+    const placeholderNoteFor: Record<string, string | undefined> = {
+      reorder_point: ssNote,
+      order_up_to: ssNote,
     };
 
     // Level cells resolve ROW-SCOPE only (draft → this row's saved override):
@@ -933,6 +955,7 @@ export function StagePolicyTable({
             onCommit: (v: number | undefined) => onCellChange(rowKey, p.field, v),
             invalid: paramFeasibility(p, value ?? undefined) ?? undefined,
             placeholder: placeholderFor[p.field],
+            placeholderNote: placeholderNoteFor[p.field],
             notSimulated: notSimulatedNote(p.field),
           };
         })}

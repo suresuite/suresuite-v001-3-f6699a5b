@@ -14,6 +14,11 @@ Mechanics (Eqs. 20–21), applied on top of P-P.1's levels at PH-70:
     S_m += z_m · σ_{D_m} · √(T_s + κ)
 The incremental holding cost of the planned reorder-point buffer
 (h_m · c_m · SS_m weekly) flows into C^res as ``ss_holding``.
+
+A level the planner STATED on a /policies row is the level the run uses, so
+no buffer is added to it (P-P.1 publishes which at compile); an (R,Q)
+material with a lot keeps S = R + Q, so its S moves with its s. κ in Eq. 21
+is the material's own κ when its row states one.
 """
 from __future__ import annotations
 
@@ -156,7 +161,9 @@ class SafetyStockMaterials(PolicyPlugin):
                 ss_S = ss_s
             else:
                 ss_s = z * sigma * np.sqrt(lt)            # Eq. 20
-                ss_S = z * sigma * np.sqrt(lt + self._kappa_hint(ctx))  # Eq. 21
+                kappa = np.asarray(getattr(m, "kappa_override", np.full(m.n_mats, np.nan)))
+                kappa = np.where(np.isnan(kappa), self._kappa_hint(ctx), kappa)
+                ss_S = z * sigma * np.sqrt(lt + kappa)  # Eq. 21
         if p.fixed_days_by_material:
             ss_s = np.array(ss_s, dtype=float)
             ss_S = np.array(ss_S, dtype=float)
@@ -164,7 +171,18 @@ class SafetyStockMaterials(PolicyPlugin):
                 i = m.mat_index.get(mid)
                 if i is not None:
                     ss_s[i] = ss_S[i] = exp_d[i] * days / 7.0
-        ctx.policy_state[self.id] = {"ss_s": ss_s, "ss_S": ss_S}
+        # What is actually ADDED to the levels: nothing on a stated level, and
+        # on an (R,Q) lot the S increment equals the s one so S stays R + Q.
+        stated_s = getattr(m, "stated_s_mask", None)
+        stated_S = getattr(m, "stated_S_mask", None)
+        lot_S = getattr(m, "lot_S_mask", None)
+        add_s = np.array(ss_s, dtype=float)
+        add_S = np.array(ss_S, dtype=float)
+        if stated_s is not None:
+            add_s = np.where(stated_s, 0.0, add_s)
+            add_S = np.where(lot_S, add_s, np.where(stated_S, 0.0, add_S))
+        ctx.policy_state[self.id] = {"ss_s": add_s, "ss_S": add_S,
+                                     "stated_S": stated_S}
         # WP 14.5 — the same buffer as DAYS of cover per material, published at
         # setup for MRP (design doc §3.4: SS = days/7 × average weekly need over
         # the horizon). One buffer, counted once: MRP does not read the levels
@@ -206,7 +224,12 @@ class SafetyStockMaterials(PolicyPlugin):
 
     def on_phase(self, phase: PhaseId, ctx: SimContext) -> None:
         state = ctx.policy_state[self.id]
-        ctx.write_levels(ctx.level_s + state["ss_s"], ctx.level_S + state["ss_S"])
+        s = ctx.level_s + state["ss_s"]
+        S = ctx.level_S + state["ss_S"]
+        # A stated S is never raised: a buffered formula s above it is lowered.
+        if state["stated_S"] is not None and state["stated_S"].any():
+            s = np.where(state["stated_S"], np.minimum(s, S), s)
+        ctx.write_levels(s, S)
 
     def cost_contribution(self, ctx: SimContext) -> CostBreakdown:
         # Incremental holding on the planned reorder-point buffer (weekly).

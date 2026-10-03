@@ -109,6 +109,22 @@ def _clamp(
     return used
 
 
+def _review_weeks(days: float, *, w: list["MappingWarning"], entity: str) -> int:
+    """A periodic review period T typed in DAYS → the engine's whole weeks.
+
+    The engine steps a week at a time, so T rounds to the nearest week and never
+    below one; a T that is not a whole number of weeks says what it became."""
+    weeks = max(1, math.floor(days / 7.0 + 0.5))
+    weeks = int(_clamp(float(weeks), 1.0, 13.0, w=w, entity=entity,
+                       field="review_period_days", unit=" wk"))
+    if weeks * 7 != days:
+        w.append(MappingWarning(
+            "info", entity, "review_period_days",
+            f"review period {_fmt(days)} d → reviewed every {weeks} wk "
+            "(the engine steps in whole weeks)"))
+    return weeks
+
+
 # ── Typed, Supabase-agnostic input ────────────────────────────────────────────
 
 @dataclass
@@ -634,7 +650,9 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     # `inventory_control.material_overrides[<material>]`, which is how a
     # row-level adjustment reaches the engine (before this, node-scoped
     # inventory was dropped with a warning — the D-class the (R,Q)
-    # inventory-flatline defect exposed).
+    # inventory-flatline defect exposed). A row's stored value that its policy
+    # type does not show (an s on a base-stock row, an S on an (R,Q) row, …) is
+    # NOT applied: the run uses exactly the cells the page shows.
     {
         "key": "rop_q_quantity",
         "scopes": ("default", "supplier"),
@@ -643,7 +661,9 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "catalog_ref": "P-P.1",
         "transform": "units; 0 means UNSET (the frontend schema's default), never a "
                      "zero lot — an (R,Q) scope with no positive Q orders up to S "
-                     "instead, and the substitution is warned at dispatch",
+                     "instead, and the substitution is warned at dispatch. The "
+                     "project's Q is read whatever the project's own type: it is the "
+                     "lot of every (R,Q) row that states none",
     },
     {
         "key": "coverage_weeks",
@@ -674,6 +694,20 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "transform": "absolute units replacing S = E[D]·(T_s+κ) for that material "
                      "only; dropped with a warning when it does not exceed the row's "
                      "reorder point. Not read at default scope",
+    },
+    {
+        # The T of the periodic (T, S) type. Until this row it was read nowhere:
+        # the grid showed T and every periodic material was reviewed every 4
+        # weeks whatever it said.
+        "key": "review_period_days",
+        "scopes": ("default", "supplier"),
+        "family": "inventory",
+        "target": "inventory_control.periodic_review_weeks",
+        "catalog_ref": "P-P.1",
+        "transform": "days → whole weeks (nearest, at least 1, at most 13; a T that is "
+                     "not a whole number of weeks is stated). At default scope the "
+                     "project's T; on a Supplier-stage row that material's T. Read only "
+                     "for a periodic material",
     },
     # ── Demand per customer × product row (PLAN.md §24 WP 14.2, D284 b) ─────
     # The Customer stage's demand cells. Each is an OVERRIDE of the row's
@@ -2504,6 +2538,22 @@ _FULFILLMENT_ROW = frozenset({
     "price", "row_priority", "sla_fill_floor_pct",
 })
 
+# The replenishment parameters a Supplier-stage row can carry, and which of them
+# each engine policy type uses — the same sets the grid shows per type
+# (`src/components/policies/policyGridUi.tsx` POLICY_PARAMS; `reorder_point` is
+# the R of (R,Q)). MRP orders from the plan and uses none of them.
+_TYPE_PARAMS = frozenset({
+    "rop_q_quantity", "coverage_weeks", "reorder_point", "order_up_to",
+    "periodic_review_weeks",
+})
+_TYPE_SHOWS: dict[str, frozenset[str]] = {
+    "min_max": frozenset({"reorder_point", "order_up_to", "coverage_weeks"}),
+    "base_stock": frozenset({"order_up_to", "coverage_weeks"}),
+    "rop_q": frozenset({"rop_q_quantity", "reorder_point", "coverage_weeks"}),
+    "periodic": frozenset({"periodic_review_weeks", "order_up_to", "coverage_weeks"}),
+    "mrp": frozenset(),
+}
+
 
 def _backorder_weeks(days: float, *, w: list["MappingWarning"], entity: str) -> int:
     """Max backorder DAYS → whole WEEKS, rounded HALF UP (3 → 0, 4 → 1, 10 → 1,
@@ -2680,6 +2730,9 @@ def _map_policies(
             if v <= 0 and dst in ("rop_q_quantity", "order_up_to"):
                 continue
             _take(dst, v)
+        if inv_o.get("review_period_days") is not None:
+            _take("periodic_review_weeks", _review_weeks(
+                float(inv_o["review_period_days"]), w=w, entity=f"material:{mat}"))
         if not entry:
             mat_over.pop(mat, None)
         else:
@@ -2690,6 +2743,23 @@ def _map_policies(
         if (inv_o.get("holding_cost_pct") is not None or inv_o.get("safety_stock_days") is not None
                 or inv_o.get("initial_on_hand") is not None):
             consumed_keys.add(k)
+    # A row applies only the parameters its policy type SHOWS (policyGridUi
+    # POLICY_PARAMS): a value left stored from an earlier type is invisible on
+    # the page, so it must not move the run. Said, never silent.
+    default_type = type_map.get(str(inv.get("type", "min_max")), "min_max")
+    for mat, entry in list(mat_over.items()):
+        eff_type = entry.get("policy_type", default_type)
+        shown = _TYPE_SHOWS.get(eff_type, _TYPE_SHOWS["min_max"])
+        hidden = sorted(f for f in _TYPE_PARAMS if f in entry and f not in shown)
+        for f in hidden:
+            entry.pop(f)
+        if hidden:
+            w.append(MappingWarning(
+                "info", f"material:{mat}", "inventory",
+                f"stored {', '.join(hidden)} not applied — the row's {eff_type} policy "
+                "does not use it (the page does not show it)"))
+        if not entry:
+            mat_over.pop(mat)
     # An absolute band a row states inverted (s ≥ S) would be refused by the
     # engine's validator and abort the run; keep the reorder point (the half
     # that triggers) and say what was dropped.
@@ -2724,18 +2794,23 @@ def _map_policies(
             "plant-row stock settings are consumed at the project default "
             "scope only; supplier-row overrides ARE applied"))
 
-    out["inventory_control"] = {"policy_type": type_map.get(str(inv.get("type", "min_max")), "min_max")}
-    if out["inventory_control"]["policy_type"] == "rop_q":
-        q_default = inv.get("rop_q_quantity")
-        if q_default is not None and float(q_default) > 0:
-            out["inventory_control"]["rop_q_quantity"] = float(q_default)
-        else:
-            # DECLARED substitution (T2): (R,Q) with no positive Q orders up to
-            # S (the min_max lot) — stated here, enacted in the plugin.
-            w.append(MappingWarning(
-                "warn", "policy:inventory_control", "rop_q_quantity",
-                "(R,Q) selected with no positive Q at project scope — such "
-                "materials order up to S (min_max lot) instead"))
+    out["inventory_control"] = {"policy_type": default_type}
+    if inv.get("review_period_days") is not None:
+        out["inventory_control"]["periodic_review_weeks"] = _review_weeks(
+            float(inv["review_period_days"]), w=w, entity="policy:default")
+    # The project's Q is the lot of EVERY (R,Q) material without its own — a row
+    # switched to (R,Q) shows it, so it is read whatever the project's own type
+    # (the engine applies it to (R,Q) materials only).
+    q_default = inv.get("rop_q_quantity")
+    if q_default is not None and float(q_default) > 0:
+        out["inventory_control"]["rop_q_quantity"] = float(q_default)
+    elif out["inventory_control"]["policy_type"] == "rop_q":
+        # DECLARED substitution (T2): (R,Q) with no positive Q orders up to
+        # S (the min_max lot) — stated here, enacted in the plugin.
+        w.append(MappingWarning(
+            "warn", "policy:inventory_control", "rop_q_quantity",
+            "(R,Q) selected with no positive Q at project scope — such "
+            "materials order up to S (min_max lot) instead"))
     if inv.get("coverage_weeks") is not None:
         k_scalar = _clamp(float(inv["coverage_weeks"]), 0.0, 26.0, w=w,
                           entity="policy:default", field="coverage_weeks", unit=" wk")
@@ -2750,8 +2825,9 @@ def _map_policies(
             f"{len(mat_over)} material(s) carry supplier-grid replenishment "
             "overrides (type/Q/κ/absolute levels) — applied per material"))
     w.append(MappingWarning("info", "policy:inventory_control", "order_up_to",
-                            "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks); "
-                            "a supplier-grid row's absolute s/S IS applied to that material"))
+                            "project-wide s/S are the formulas s = E[D]·T_s, S = E[D]·(T_s+κ); "
+                            "a supplier-grid row's absolute s/S IS that material's level, "
+                            "with no safety stock added on top"))
 
     ss_method = str(inv.get("safety_stock_method", "fixed_days"))
     if ss_method in ("service_level", "demand_variability"):

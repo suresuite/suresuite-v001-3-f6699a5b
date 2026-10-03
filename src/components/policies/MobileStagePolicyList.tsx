@@ -26,9 +26,10 @@ import {
 import { groupByKeyA } from "@/lib/policies/groupRows";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import { lineNeedsInput, groupHasPrimary, type ResolveField } from "@/lib/policies/stageGuards";
-import { inventoryParamsForType } from "@/lib/policies/registryPolicyTypes";
+import { inventoryParamsForType, kappaIsRead } from "@/lib/policies/registryPolicyTypes";
 import {
   resolveCell,
+  savedOverrideValue,
   substitutionNote,
   getEffectiveValue,
   rowGateCtx,
@@ -317,8 +318,26 @@ export function MobileStagePolicyList({
               const type = String(
                 resolveCol(openRow, specColByField.get("type") ?? cols[0]).value ?? "min_max",
               );
+              // The same values the desktop cell shows: a level (s, S) is the
+              // ROW's own or empty (the schema's 50/200 are never what the run
+              // reads), a Q ≤ 0 is unset, and κ only where the run reads it.
+              const paramValue = (field: string): number | undefined => {
+                const raw =
+                  field === "reorder_point" || field === "order_up_to"
+                    ? savedOverrideValue(overrides, String(openRow.key), field, "inventory", families)
+                    : resolveCol(openRow, { field, family: fam, label: field } as ColSpec).value;
+                const n = typeof raw === "number" ? raw : raw == null || raw === "" ? NaN : Number(raw);
+                if (!Number.isFinite(n)) return undefined;
+                return field === "rop_q_quantity" && n <= 0 ? undefined : n;
+              };
               const activeParams =
-                vectorCols.length > 0 ? inventoryParamsForType(type).filter((p) => p.field !== "basis") : [];
+                vectorCols.length > 0
+                  ? inventoryParamsForType(type).filter(
+                      (p) =>
+                        p.field !== "basis" &&
+                        (p.field !== "coverage_weeks" || kappaIsRead(type, (f) => paramValue(f) !== undefined)),
+                    )
+                  : [];
               return (
                 <MobilePanel
                   key={fam}
@@ -368,9 +387,8 @@ export function MobileStagePolicyList({
                     );
                   })}
                   {activeParams.map((p) => {
-                    const raw = resolveCol(openRow, { field: p.field, family: fam, label: p.label } as ColSpec).value;
-                    const n = typeof raw === "number" ? raw : Number(raw);
-                    const shown = Number.isFinite(n) ? `${n}${p.unit ? ` ${p.unit}` : ""}` : "—";
+                    const n = paramValue(p.field);
+                    const shown = n !== undefined ? `${n}${p.unit ? ` ${p.unit}` : ""}` : "—";
                     return <MobileRow key={p.field} chevron={false} label={p.label} value={shown} />;
                   })}
                 </MobilePanel>

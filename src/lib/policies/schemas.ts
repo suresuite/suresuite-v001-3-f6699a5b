@@ -459,6 +459,9 @@ export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<stri
     "reorder_point",
     "order_up_to",
     "coverage_weeks",
+    // The periodic type's T — read per material and at the project default
+    // since it reaches inventory_control.periodic_review_weeks.
+    "review_period_days",
     "safety_stock_method",
     "safety_stock_days",
     "service_level_target",

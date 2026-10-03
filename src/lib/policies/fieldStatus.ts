@@ -43,6 +43,8 @@ const PENDING_FAMILY_POLICY: Partial<Record<PolicyFamily, string[]>> = {
  * is COMPUTED by both engines and never read, `review_period_days` and
  * `order_up_to` are read only by the frozen legacy engine, and `material_price`
  * was read by nothing at all (§4 D18, D91). None of them is waiting for a policy.
+ * (Since then a Supplier-stage s / S reaches scsim per material, and T reaches
+ * it as `periodic_review_weeks` — see POLICY_BUNDLE_KEYS.)
  *
  * `material_price` LEFT THAT LIST IN WP 6.2, and how it left is the useful part.
  * It is not consumed and it never was — but the cell was SEEDED FROM

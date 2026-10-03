@@ -127,7 +127,7 @@ export const PARAM_META: Record<string, ParamMeta> = {
     unit: "units",
     range: "0 ≤ s < S",
     meaning:
-      "Reorder point — when inventory position falls below it, a replenishment fires. Used by Min-max (s) and (R,Q) (R). Stored & versioned; consumed once the Quantity basis lands (§II.4).",
+      "Reorder point — when inventory position falls below it, a replenishment fires. Used by Min-max (s) and (R,Q) (R). Empty = the formula E[D]·T_s plus the safety stock (the greyed number); a typed value is that material's reorder point exactly — no safety stock is added on top.",
     formula: "order when IP_{i,t} < s",
     specRef: "§III.1 / §III.3",
   },
@@ -136,7 +136,7 @@ export const PARAM_META: Record<string, ParamMeta> = {
     unit: "units",
     range: "> s",
     meaning:
-      "Order-up-to level — replenishment raises the inventory position back up to S. Used by Min-max, Base-stock and Periodic-review. Stored & versioned; consumed once the Quantity basis lands (§II.4).",
+      "Order-up-to level — replenishment raises the inventory position back up to S. Used by Min-max, Base-stock and Periodic-review. Empty = the formula E[D]·(T_s+κ) plus the safety stock (the greyed number); a typed value is that material's S exactly — no safety stock is added and nothing raises it.",
     formula: "O_{i,t} = ρ_t·(S − IP_{i,t})⁺",
     specRef: "§III.1 / §III.4 / §III.5",
   },
@@ -145,8 +145,8 @@ export const PARAM_META: Record<string, ParamMeta> = {
     unit: "units",
     range: "≥ MOQ",
     meaning:
-      "Fixed lot size for the (R,Q) policy — each replenishment orders whole multiples of Q to clear the deficit below R. Floored to the material MOQ.",
-    formula: "O_{i,t} = ρ_t·Q·⌈(R − IP_{i,t})⁺ / Q⌉",
+      "Fixed lot size for the (R,Q) policy — when the position falls below R, one lot of Q is ordered (at least the MOQ). With Q set the order-up-to level is R + Q and κ is not used; empty Q = order up to S instead.",
+    formula: "O_{i,t} = max(Q, MOQ)·1[IP_{i,t} < R]",
     specRef: "§III.3",
   },
   review_period_days: {
@@ -154,7 +154,7 @@ export const PARAM_META: Record<string, ParamMeta> = {
     unit: "days",
     range: "≥ 1",
     meaning:
-      "Review period for the Periodic-review (T,S) policy — the position is topped up to S only every T days; between reviews it drifts down with demand.",
+      "Review period for the Periodic-review (T,S) policy — the position is topped up to S only every T days; between reviews it drifts down with demand. The engine steps in weeks, so T rounds to the nearest whole week (at least 1).",
     formula: "O_{i,t} = 1[(t − t₀) mod T = 0]·(S − IP_{i,t})⁺",
     specRef: "§III.5",
   },
@@ -173,7 +173,7 @@ export const PARAM_META: Record<string, ParamMeta> = {
     options: [
       { value: "min_max", meaning: "(s,S): when position IP < s, order up to S. O = ρ·(S−IP)⁺·1[IP<s]." },
       { value: "base_stock", meaning: "(S): every review, top position back up to S. O = ρ·(S−IP)⁺." },
-      { value: "rop", meaning: "(R,Q): when IP < R, order fixed lot(s) of Q. O = ρ·Q·⌈(R−IP)⁺/Q⌉." },
+      { value: "rop", meaning: "(R,Q): when IP < R, order one lot of Q (at least the MOQ). O = max(Q, MOQ)·1[IP<R]." },
       { value: "periodic_review", meaning: "(T,S): every T weeks order up to S. O = 1[(t−t₀) mod T = 0]·(S−IP)⁺." },
     ],
   },

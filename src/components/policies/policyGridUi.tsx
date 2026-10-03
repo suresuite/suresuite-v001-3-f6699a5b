@@ -9,6 +9,7 @@
 import React, { startTransition, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { LAYER, tint } from "@/components/intelligence/piUi";
+import { kappaIsRead } from "@/lib/policies/registryPolicyTypes";
 
 /* ── provenance ──────────────────────────────────────────────────────── */
 
@@ -669,6 +670,9 @@ export const POLICY_PARAMS: Record<string, Array<{ field: string; symbol: string
     { field: "order_up_to", symbol: "S" },
     { field: "coverage_weeks", symbol: "κ" },
   ],
+  // MRP orders from the plan (WP 14.5): no level, no lot, no κ. Its buffer is
+  // the row's safety-stock days, a column of its own.
+  mrp: [],
 };
 
 export const POLICY_TYPE_OPTIONS = [
@@ -679,9 +683,10 @@ export const POLICY_TYPE_OPTIONS = [
 ] as const;
 
 /**
- * The dynamic cell: only the parameters the current policy type uses.
- * `basis` is hidden unless it deviates from days_of_supply (or showBasis) —
- * it repeated identically on every line and read as noise.
+ * The dynamic cell: only the parameters the current policy type uses — and κ
+ * only where the run reads it (`kappaIsRead`: S from the formula, or (R,Q)
+ * with no lot). `basis` is hidden unless it deviates from days_of_supply (or
+ * showBasis) — it repeated identically on every line and read as noise.
  */
 export function ReplenishmentCell({
   policyType,
@@ -700,9 +705,12 @@ export function ReplenishmentCell({
     onCommit: (v: number | undefined) => void;
     invalid?: string;
     /** The engine-default number an EMPTY cell resolves to (e.g. the computed
-     *  s = E[D]·T_s), rendered greyed in place — so the global default is
-     *  visible on every row, and typing replaces it for that row only. */
+     *  s = E[D]·T_s plus its safety stock), rendered greyed in place — so the
+     *  global default is visible on every row, and typing replaces it for
+     *  that row only. */
     placeholder?: string;
+    /** How the placeholder is made, for its hover. */
+    placeholderNote?: string;
     /** §23 WP 13.4 — the engine does not read this parameter on this stage. */
     notSimulated?: string;
   }>;
@@ -716,7 +724,10 @@ export function ReplenishmentCell({
    *  itself has been compacted, so the cell's contents keep fitting its box. */
   paramW?: number;
 }) {
-  const spec = POLICY_PARAMS[policyType] ?? POLICY_PARAMS.min_max;
+  const hasValue = (f: string) => params.find((x) => x.field === f)?.value !== undefined;
+  const spec = (POLICY_PARAMS[policyType] ?? POLICY_PARAMS.min_max).filter(
+    ({ field }) => field !== "coverage_weeks" || kappaIsRead(policyType, hasValue),
+  );
   const visibleBasis = showBasis || basis !== "days_of_supply";
   const w = paramW ?? 52;
   return (
@@ -732,7 +743,12 @@ export function ReplenishmentCell({
               key={String(p?.value)}
               defaultValue={p?.value ?? ""}
               placeholder={p?.placeholder ?? "—"}
-              title={p?.notSimulated ?? (p?.placeholder ? `engine default: ${p.placeholder}` : undefined)}
+              title={
+                p?.notSimulated ??
+                (p?.placeholder
+                  ? `engine default: ${p.placeholder}${p.placeholderNote ? ` — ${p.placeholderNote}` : ""}`
+                  : undefined)
+              }
               size={1}
               onBlur={(e) => {
                 const raw = e.target.value.trim();
@@ -760,7 +776,12 @@ export function ReplenishmentCell({
           </div>
         );
       })}
-      {visibleBasis && (
+      {spec.length === 0 && (
+        <span className="font-mono text-[10px] text-muted-foreground" title="MRP orders the plan's need over the lead time, net of stock and the pipeline — no level, lot or κ">
+          from the plan
+        </span>
+      )}
+      {visibleBasis && spec.length > 0 && (
         <span className="flex min-w-0 items-center gap-[3px]" title={basisNotSimulated}>
           <CellSegmented
             tiny

@@ -352,7 +352,7 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
         # this list in WP 14.3: they are Customer-stage cells now, declared.)
         "ratios", "strategy", "safety_stock_method", "allocation",
         "tier_overrides", "fulfillment_strategy",
-        "min_share_pct", "review_period_days",
+        "min_share_pct",
         "material_price",
         "sourcing_firm", "moq", "lead_time_distribution", "ordering_cost",
         "supplier_capacity_per_day", "capacity_machine_per_day",
@@ -553,6 +553,7 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "fg_safety_stock_days": {"inventory": {"fg_safety_stock": "fixed_days"}},
         "allocation_priority_weight": {"recovery": {"response": ["allocate_materials"]}},
         "rop_q_quantity": {"inventory": {"type": "rop"}},
+        "review_period_days": {"inventory": {"type": "periodic_review"}},
         # WP 14.3: a window and a cost are read only for something that backorders;
         # a priority and a floor only under the rules that use them.
         "max_backorder_days": {"fulfillment": {"backorder_allowed": True}},
@@ -565,7 +566,8 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "primary_source": True, "service_level_target": 0.85, "capacity_units_per_day": 77,
         "utilization_cap_pct": 50, "fg_safety_stock": "fixed_days", "fg_service_level_target": 0.85,
         "fg_safety_stock_days": 5, "allocation_priority_weight": 3, "rop_q_quantity": 33,
-        "coverage_weeks": 3, "reorder_point": 40, "order_up_to": 400, "material_cost": 3.3,
+        "coverage_weeks": 3, "reorder_point": 40, "order_up_to": 400, "review_period_days": 14,
+        "material_cost": 3.3,
         "material_moq": 9, "capacity_per_week": 77, "reliability_score": 0.5, "initial_on_hand": 5,
         "sell_price": 7, "production_capacity": 66,
         "row_demand_mode": "model", "row_demand_distribution": "poisson", "row_demand_mean": 25,

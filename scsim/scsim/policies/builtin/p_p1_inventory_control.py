@@ -16,6 +16,11 @@ Mechanics (Eqs. 2–6): levels at PH-70, release at PH-80 — order
 max(S_m − position, MOQ) when position < s_m, on the material's primary
 (min-cost) supplier link.
 
+A level the planner states on a /policies row IS the level the run uses: an
+absolute s or S replaces its formula, P-P.3 adds no safety stock on top of it,
+and a stated S is never raised to a formula s. An (R,Q) material with a lot
+orders Q and its S is R + Q, so κ is read only where S comes from the formula.
+
 MRP (WP 14.5, design doc §3.4, ADR 0002 decision 1). A material whose type is
 ``mrp`` is ordered from the PLAN, not from consumption:
 
@@ -119,6 +124,12 @@ class MaterialInventoryOverride(PolicyParams):
         None, gt=0,
         json_schema_extra={"unit": "units", "scope": "M",
                            "notes": "Absolute S replacing E[D]·(T_s+κ) for this material."},
+    )
+    periodic_review_weeks: Optional[int] = Field(
+        None, ge=1, le=13,
+        json_schema_extra={"unit": "weeks", "scope": "M",
+                           "notes": "Review period T for this material (periodic); "
+                                    "absent → the project's."},
     )
 
     @model_validator(mode="after")
@@ -289,8 +300,14 @@ class InventoryControl(PolicyPlugin):
     def configure_model(self, m) -> None:
         """At compile, before any context exists: mark the MRP materials and set
         the planning horizon H = the longest MRP primary lead time + 1, so the
-        plan (PH-40) projects far enough for every order to net its lead time."""
-        type_code = self._override_arrays(m)[0]
+        plan (PH-40) projects far enough for every order to net its lead time.
+        Also publish which levels a row STATED, for P-P.3 (see the module doc)."""
+        type_code, q, k_ov, s_abs, S_abs, _rw = self._override_arrays(m)
+        lot = (type_code == self._TYPE_CODE["rop_q"]) & ~np.isnan(q)
+        m.stated_s_mask = ~np.isnan(s_abs)
+        m.stated_S_mask = ~np.isnan(S_abs) & ~lot
+        m.lot_S_mask = lot
+        m.kappa_override = k_ov
         mask = type_code == self._TYPE_CODE["mrp"]
         m.mrp_mask = mask
         m.has_mrp = bool(mask.any())
@@ -357,10 +374,11 @@ class InventoryControl(PolicyPlugin):
 
     def _override_arrays(
         self, m,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Per-material vectors from `material_overrides`: (type_code, Q, κ,
-        absolute s, absolute S). NaN means "no override" for the float arrays;
-        unknown material ids are skipped (the mapping already filtered them)."""
+        absolute s, absolute S, review period T in weeks). NaN means "no
+        override" for the float arrays; unknown material ids are skipped (the
+        mapping already filtered them)."""
         p: InventoryControlParams = self.params
         n = m.n_mats
         type_code = np.full(n, self._TYPE_CODE[p.policy_type], dtype=int)
@@ -368,6 +386,7 @@ class InventoryControl(PolicyPlugin):
         kappa = np.full(n, np.nan)
         s_abs = np.full(n, np.nan)
         S_abs = np.full(n, np.nan)
+        review = np.full(n, int(p.periodic_review_weeks), dtype=int)
         for mid, ov in p.material_overrides.items():
             i = m.mat_index.get(mid)
             if i is None:
@@ -382,7 +401,9 @@ class InventoryControl(PolicyPlugin):
                 s_abs[i] = ov.reorder_point
             if ov.order_up_to is not None:
                 S_abs[i] = ov.order_up_to
-        return type_code, q, kappa, s_abs, S_abs
+            if ov.periodic_review_weeks is not None:
+                review[i] = ov.periodic_review_weeks
+        return type_code, q, kappa, s_abs, S_abs, review
 
     def on_phase(self, phase: PhaseId, ctx: SimContext) -> None:
         if phase == PhaseId.PH70:
@@ -408,7 +429,7 @@ class InventoryControl(PolicyPlugin):
     def _set_levels(self, ctx: SimContext) -> None:
         m = ctx.model
         kappa = self._kappa(ctx)
-        _types, _q, k_ov, s_abs, S_abs = self._override_arrays(m)
+        types, q, k_ov, s_abs, S_abs, _rw = self._override_arrays(m)
         kappa_vec = np.where(np.isnan(k_ov), float(kappa), k_ov)
 
         # κ diagnostics (9bf05df). DEBUG-level, not print(): PH70 runs every
@@ -433,14 +454,20 @@ class InventoryControl(PolicyPlugin):
             s = exp_d * lt
             S = exp_d * (lt + kappa_vec)
         # Absolute row-level levels (supplier grid) replace the formula where
-        # present; S is kept ≥ s so a lone absolute s cannot invert the band
-        # (both-set inversions are refused at validation).
+        # present. A STATED S is the level: a formula s above it is lowered to
+        # it rather than S raised (write_levels keeps S ≥ s); a lone absolute s
+        # still lifts a formula S (both-set inversions are refused at
+        # validation). An (R,Q) material with a lot orders Q, so S = R + Q.
         has_s = ~np.isnan(s_abs)
         has_S = ~np.isnan(S_abs)
+        lot = (types == self._TYPE_CODE["rop_q"]) & ~np.isnan(q)
         if has_s.any():
             s = np.where(has_s, s_abs, s)
         if has_S.any():
             S = np.where(has_S, S_abs, S)
+            s = np.where(has_S & ~lot, np.minimum(s, S), s)
+        if lot.any():
+            S = np.where(lot, s + np.nan_to_num(q), S)
         S = np.maximum(S, s)
         ctx.write_levels(s, S)
 
@@ -451,7 +478,7 @@ class InventoryControl(PolicyPlugin):
         position = ctx.on_hand + on_order
         orders_mat = np.zeros(m.n_mats)
         moq = m.link_moq[m.primary_link]
-        type_code, qv, _k, _s, _S = self._override_arrays(m)
+        type_code, qv, _k, _s, _S, review = self._override_arrays(m)
         short = position < ctx.level_s
         deficit = ctx.level_S - position
 
@@ -470,10 +497,11 @@ class InventoryControl(PolicyPlugin):
         q_sel = qv[rq]
         orders_mat[rq] = np.maximum(np.where(np.isnan(q_sel), deficit[rq], q_sel), moq[rq])
 
-        pr = type_code == self._TYPE_CODE["periodic"]
-        if ctx.week % p.periodic_review_weeks == 0:
-            sel = pr & (deficit > 1e-12)
-            orders_mat[sel] = np.maximum(deficit[sel], moq[sel])
+        # Periodic review: each material on its own T (the row's, else the
+        # project's).
+        pr = (type_code == self._TYPE_CODE["periodic"]) & (ctx.week % review == 0)
+        sel = pr & (deficit > 1e-12)
+        orders_mat[sel] = np.maximum(deficit[sel], moq[sel])
 
         if m.has_mrp:
             mrp = m.mrp_mask

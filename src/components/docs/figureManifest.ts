@@ -352,8 +352,8 @@ export const FIGURE_SLOTS: FigureSlot[] = [
       "The four types side by side on ONE demand sequence so the shapes compare, each marked " +
       "with the parameters that type uses — read from INVENTORY_TYPES, which is the grid's " +
       "own library. And the half the page's prose already carries: which of those parameters " +
-      "the strategic engine consults, read from CHAINS, because `reorder_point` is overridden " +
-      "and `order_up_to`/`review_period_days` reach the frozen engine only.",
+      "the strategic engine consults, read from CHAINS rather than restated here — s, S, Q, " +
+      "κ and T all reach it per material from a Supplier-stage row.",
   },
 
   // ── 7 · Experiments & scenarios (WP 5.2k) ───────────────────────────────

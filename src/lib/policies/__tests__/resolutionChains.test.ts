@@ -243,7 +243,9 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
     // supplier.primary_source left this list when a saved Supplier-stage primary
     // became the engine's primary link (`SupplierLink.primary`, §4 D188). The
     // CUSTOMER stage's primary stays: same name, other family, no reader.
-    "supplier.review_period_days",
+    // supplier.review_period_days left this list when the periodic type's T
+    // began reaching `inventory_control.periodic_review_weeks` (P-P.1) — until
+    // then every periodic material was reviewed every 4 weeks whatever it said.
     // reorder_point / order_up_to left this list when the supplier grid's
     // replenishment cells started reaching the engine as
     // `inventory_control.material_overrides` (P-P.1). The PLANT stage's copies
@@ -335,14 +337,15 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     // s, S, safety days, service level and the three P-P.4 cells were eight
     // chains declared to reach nothing from a Plant row (D204 b) — the FG
     // policy that replaced them resolves as master overrides.
-    expect(byDeclaration.length).toBe(13);
+    // FOURTEEN since the periodic type's T (`review_period_days`) is declared.
+    expect(byDeclaration.length).toBe(14);
     // 17 rendered fields resolve by declaration (14 until WP 14.3 added the
     // three backorder cells; rop_q_quantity, coverage_weeks
     // and holding_cost_pct resolve through their own doors on some stages, so
     // the field count trails the 16 keys project_map declares).
     // 13 fields too: with the Plant copies of `type`, `safety_stock_days`, s
     // and S gone, no declared field is rendered on two stages any more.
-    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(13);
+    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(14);
     for (const c of byDeclaration) {
       const detail = c.hops.find((h) => h.kind === "engine")!.detail;
       // The TARGET is what makes the chain followable; the TRANSFORM is what makes
