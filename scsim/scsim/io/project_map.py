@@ -19,6 +19,7 @@ every fallback is recorded as a warning.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal, Optional
 
@@ -216,16 +217,19 @@ class CustomerRow:
     put demand-less customers into `len(net.customers)`, which P-C.2's own
     feasibility check reads.
 
-    ``sla_fill_floor_pct`` is deliberately absent: the column exists on the table
-    and ``Customer`` has no field for it, so there is nothing to carry it into.
-    Mapping a per-customer floor onto P-C.2's per-SEGMENT ``sla_tiers`` needs a
-    rule for what happens when two customers in one segment disagree, and
-    inventing that rule is not a reader change (§16).
+    ``sla_fill_floor_pct`` is read since WP 14.3 (PLAN.md §24): the floor is
+    per CUSTOMER × PRODUCT ROW now, not per segment, so a customer's contracted
+    floor is the default service target of each of its rows under ``sla_tier``
+    (``Customer.sla_fill_floor_pct``), and the segment's ``sla_tiers`` floor
+    applies only where it is empty. The question that kept it out — two
+    customers of one segment disagreeing — has no answer to invent when the
+    floor belongs to the row.
     """
     id: str
     name: Optional[str] = None
     segment: Optional[str] = None
     priority_weight: Optional[float] = None
+    sla_fill_floor_pct: Optional[float] = None
 
 
 @dataclass
@@ -786,6 +790,85 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "transform": "units per week, triangular only. Order: the Customer-stage row -> "
                      "outbound_logistics.demand_max",
     },
+    # ── Per-row fulfillment (PLAN.md §24 WP 14.3, D284 c) ───────────────────
+    # Backorder, its window and cost are read at the project default AND on a
+    # Customer row (`node:<customer>::<product>`, an existing row only); a row
+    # that names any of them gets all three resolved row → project → default,
+    # so the engine never falls to a parameter default the page does not show.
+    # The allocation RULE stays one per project (decision 4); the row's
+    # priority, price and service target are what that rule reads per row.
+    {
+        "key": "backorder_allowed",
+        "scopes": ("default", "customer"),
+        "family": "fulfillment",
+        "target": "unmet_demand_handling.rule / row_overrides[row].backorder_allowed",
+        "catalog_ref": "P-C.1",
+        "transform": "boolean. Project: backorder (else lost_sales). Row: whether this "
+                     "customer × product row waits; empty = the project's setting",
+    },
+    {
+        "key": "max_backorder_days",
+        "scopes": ("default", "customer"),
+        "family": "fulfillment",
+        "target": "unmet_demand_handling.backorder_horizon / row_overrides[row].backorder_horizon",
+        "catalog_ref": "P-C.1",
+        "transform": "days -> whole weeks rounded HALF UP (3 -> 0, 4 -> 1, 10 -> 1, 11 -> 2), "
+                     "clamped 0-26; empty = the project's, else 14 days. Read only for a "
+                     "project or row that backorders",
+    },
+    {
+        "key": "backorder_cost_per_day",
+        "scopes": ("default", "customer"),
+        "family": "fulfillment",
+        "target": "unmet_demand_handling.backorder_penalty / row_overrides[row].backorder_penalty",
+        "catalog_ref": "P-C.1",
+        "transform": "per unit per day x 7 -> per unit per week; empty = the project's, else 0. "
+                     "Read only for a project or row that backorders",
+    },
+    {
+        "key": "row_priority",
+        "scopes": ("customer",),
+        "family": "fulfillment",
+        "target": "customer_allocation.row_priority",
+        "catalog_ref": None,
+        "master": "customers.priority_weight",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": 1.0,
+        "transform": "weight, >= 0; higher serves first. Order: the Customer-stage row -> "
+                     "customers.priority_weight of the row's customer -> 1.0. Read under the "
+                     "priority and sla_tier rules",
+    },
+    {
+        "key": "price",
+        "scopes": ("customer",),
+        "family": "fulfillment",
+        "target": "CustomerLink.unit_price",
+        "catalog_ref": None,
+        "master": "outbound_logistics.unit_price",
+        "rows": "customer",
+        "domain": "positive",
+        "empty_default": None,
+        "empty_note": "the product's sell price",
+        "transform": "per unit, > 0. Order: the Customer-stage row -> outbound_logistics."
+                     "unit_price -> the product's sell price. What revenue_max orders rows by "
+                     "and what values a row's fill rate",
+    },
+    {
+        "key": "sla_fill_floor_pct",
+        "scopes": ("customer",),
+        "family": "fulfillment",
+        "target": "customer_allocation.row_floor_pct",
+        "catalog_ref": None,
+        "master": "customers.sla_fill_floor_pct",
+        "rows": "customer",
+        "domain": "percent",
+        "empty_default": None,
+        "empty_note": "no contracted floor — the segment's tier floor applies, else none",
+        "transform": "% of the row's demand guaranteed first, 0-100. Order: the Customer-stage "
+                     "row -> customers.sla_fill_floor_pct of the row's customer -> the "
+                     "segment's tier floor. Read under the sla_tier rule",
+    },
 )
 
 
@@ -975,9 +1058,14 @@ class _SourceTally:
         self.counts: dict[str, dict[str, int]] = {}
         self.by_entity: dict[str, dict[str, dict[str, Any]]] = {}
 
-    def add(self, field: str, source: str, entity: Optional[str] = None) -> None:
-        row = self.counts.setdefault(field, {})
-        row[source] = row.get(source, 0) + 1
+    def add(self, field: str, source: str, entity: Optional[str] = None,
+            count: bool = True) -> None:
+        """``count=False`` records the entity's answer (page-equals-run) without
+        a run-log line — for a value the run does not use, so a project that
+        sets none of a feature logs exactly as before it existed."""
+        if count:
+            row = self.counts.setdefault(field, {})
+            row[source] = row.get(source, 0) + 1
         if entity is not None:
             self.by_entity.setdefault(field, {})[entity] = {"source": source}
 
@@ -1011,6 +1099,8 @@ def _override_num(
         ok = ok and n > 0
     elif domain == "fraction":
         ok = ok and n <= 1.0
+    elif domain == "percent":
+        ok = ok and n <= 100.0
     if not ok:
         w.append(MappingWarning(
             "warn", entity, field,
@@ -1329,6 +1419,42 @@ _ROW_RESOLVED = {
 }
 
 
+def _tally_row_allocation(
+    tally: "_SourceTally", row_keys: frozenset[str], row_priority: dict[str, float],
+    row_floor: dict[str, float], masters: dict[str, dict[str, Any]],
+    rule: Optional[str] = None,
+) -> None:
+    """The Customer row's priority and service target as the engine resolves
+    them (page-equals-run, WP 14.3): the row's override → its customer's master
+    value → the engine default (priority 1.0; no floor, so the segment's tier
+    floor applies). Recorded per ROW, whatever the rule — the grid shows the
+    column only under a rule that reads it, and the cell must still be honest.
+    Counted in the run log only under the rule that reads the value."""
+    cp = rule in ("priority", "sla_tier")
+    cf = rule == "sla_tier"
+    for rid in sorted(row_keys):
+        cid = rid.partition("::")[0]
+        m = masters.get(cid, {})
+        if rid in row_priority:
+            tally.add("customers.priority_weight", "override", rid, count=cp)
+            tally.value("customers.priority_weight", rid, row_priority[rid])
+        elif m.get("priority_weight") is not None:
+            tally.add("customers.priority_weight", "master", rid, count=cp)
+            tally.value("customers.priority_weight", rid, float(m["priority_weight"]))
+        else:
+            tally.add("customers.priority_weight", "default", rid, count=cp)
+            tally.value("customers.priority_weight", rid, 1.0)
+        if rid in row_floor:
+            tally.add("customers.sla_fill_floor_pct", "override", rid, count=cf)
+            tally.value("customers.sla_fill_floor_pct", rid, row_floor[rid])
+        elif m.get("sla_fill_floor_pct") is not None:
+            tally.add("customers.sla_fill_floor_pct", "master", rid, count=cf)
+            tally.value("customers.sla_fill_floor_pct", rid, float(m["sla_fill_floor_pct"]))
+        else:
+            tally.add("customers.sla_fill_floor_pct", "default", rid, count=cf)
+            tally.value("customers.sla_fill_floor_pct", rid, None)
+
+
 def _apply_row_demand_overrides(
     row_spec: dict[tuple[str, str], dict[str, Any]], policies: dict,
     tally: "_SourceTally", w: list[MappingWarning],
@@ -1604,8 +1730,11 @@ def from_project_data(data: ProjectData) -> MappingResult:
     customers: set[str] = set(data.customers)
     cust_share: dict[tuple[str, str], float] = {}  # (product, customer) → weekly volume
     row_spec: dict[tuple[str, str], dict[str, Any]] = {}  # WP 14.1: the row's demand spec
+    row_price: dict[tuple[str, str], float] = {}  # WP 14.3: the row's own unit price
     for o in data.outbound:
         customers.add(o.customer_id)
+        if o.unit_price is not None and float(o.unit_price) > 0:
+            row_price[(o.product_id, o.customer_id)] = float(o.unit_price)
         weekly = _rate_to_weekly(float(o.volume or 0.0), o.time_unit)
         out_demand[o.product_id] = out_demand.get(o.product_id, 0.0) + weekly
         key = (o.product_id, o.customer_id)
@@ -1863,11 +1992,37 @@ def from_project_data(data: ProjectData) -> MappingResult:
         )
 
     prod_ids = {p.id for p in products}
+    # WP 14.3 — the row's price: the Customer row's `price` override → the
+    # outbound row's unit price → its product's (engine default). Read by
+    # `revenue_max` and by the per-row, per-customer fill rates.
+    clinks = _customer_links(cust_share, row_spec, prod_ids, w)
+    row_keys = frozenset(f"{cl.customer_id}::{cl.product_id}" for cl in clinks)
+    count_price = str(((data.policies.get("default") or {}).get("fulfillment") or {})
+                      .get("allocation") or "") == "revenue_max"
+    price_by_prod = {p.id: p.unit_price for p in products}
+    for i, cl in enumerate(clinks):
+        rid = f"{cl.customer_id}::{cl.product_id}"
+        patch = (data.policies.get(f"node:{rid}") or {}).get("fulfillment") or {}
+        v = patch.get("price")
+        n = (_override_num(v, entity=f"customer_row:{rid}", field="price", domain="positive", w=w)
+             if v not in (None, "") else None)
+        if n is not None:
+            price, src = n, "override"
+        elif (cl.product_id, cl.customer_id) in row_price:
+            price, src = row_price[(cl.product_id, cl.customer_id)], "master"
+        else:
+            price, src = None, "default"
+        if price is not None:
+            clinks[i] = cl.model_copy(update={"unit_price": price})
+        tally.add("outbound_logistics.unit_price", src, rid,
+                  count=count_price or src == "override")
+        tally.value("outbound_logistics.unit_price", rid,
+                    price if price is not None else price_by_prod.get(cl.product_id))
     network = Network(
         suppliers=suppliers, materials=materials, products=products,
         bom=bom, supplier_links=links,
         customers=_build_customers(customers, data.customer_rows, w),
-        customer_links=_customer_links(cust_share, row_spec, prod_ids, w),
+        customer_links=clinks,
     )
 
     settings = _build_settings(sc, w)
@@ -1887,7 +2042,10 @@ def from_project_data(data: ProjectData) -> MappingResult:
     policies = _map_policies(data.policies, w, n_customers=len(customers),
                              sups_by_mat=sups_by_mat,
                              has_mts=(FulfillmentMode.MTS in product_modes),
-                             prod_ids=prod_ids)
+                             prod_ids=prod_ids, row_keys=row_keys, tally=tally,
+                             row_masters={c.id: {"priority_weight": c.priority_weight,
+                                                 "sla_fill_floor_pct": c.sla_fill_floor_pct}
+                                          for c in data.customer_rows if c.id})
 
     # Every override the user typed should reach SOME entity. A key whose
     # components name no supplier, material, product or customer joins
@@ -2078,6 +2236,8 @@ def _map_events(
 _ALLOCATION_RULE = {  # UI fulfillment.allocation → P-C.2 rule (engineBridge.json mirror)
     "priority": "priority", "fair_share": "fair_share",
     "proportional": "proportional", "sla_tier": "sla_tier",
+    # WP 14.3: real, by row price (the outbound row's unit price, else the product's).
+    "revenue_max": "revenue_max",
 }
 
 
@@ -2125,16 +2285,35 @@ def _multi_sourcing_weights(
     return weights
 
 
-# Fulfillment fields the engine consumes at the PROJECT default scope only
-# (P-C.1 unmet_demand_handling + P-C.2 customer_allocation). A per-node override
+# Fulfillment fields the engine does NOT consume on a node row (P-C.1
+# unmet_demand_handling + P-C.2 customer_allocation). A per-node override
 # carrying any of these is not applied — warned rather than dropped silently (doc §6).
 # (primary_source / sourcing_firm are firm-routing hints, never engine params, so
 # they are deliberately excluded here and never trigger the warning.)
+#
+# Since WP 14.3 (PLAN.md §24, ADR 0002 decisions 4–5) the six `_FULFILLMENT_ROW`
+# fields ARE consumed on a Customer row `node:<customer>::<product>` that names
+# an existing row — backorder, its window and cost, and the row's priority,
+# price and service target. The allocation RULE stays one per project.
 _FULFILLMENT_DEFAULT_ONLY = frozenset({
     "backorder_allowed", "max_backorder_days", "backorder_cost_per_day",
     "lost_sales_cost_per_unit", "allocation", "tier_overrides",
     "service_level_alpha", "service_level_beta", "price",
+    "row_priority", "sla_fill_floor_pct",
 })
+_FULFILLMENT_ROW = frozenset({
+    "backorder_allowed", "max_backorder_days", "backorder_cost_per_day",
+    "price", "row_priority", "sla_fill_floor_pct",
+})
+
+
+def _backorder_weeks(days: float, *, w: list["MappingWarning"], entity: str) -> int:
+    """Max backorder DAYS → whole WEEKS, rounded HALF UP (3 → 0, 4 → 1, 10 → 1,
+    11 → 2, 14 → 2), clamped to P-C.1's 0–26. One rule for the project default
+    and every row (WP 14.3) — it was Python's banker's ``round`` until then,
+    which differed only at a half week (3.5 days → 0, now 1)."""
+    weeks = math.floor(float(days) / 7.0 + 0.5)
+    return int(_clamp(weeks, 0, 26, w=w, entity=entity, field="max_backorder_days", unit=" wk"))
 
 
 def _build_customers(
@@ -2192,6 +2371,10 @@ def _build_customers(
             kwargs["segment"] = row.segment
         if row.priority_weight is not None:
             kwargs["priority_weight"] = float(row.priority_weight)
+        if row.sla_fill_floor_pct is not None:
+            kwargs["sla_fill_floor_pct"] = _clamp(
+                float(row.sla_fill_floor_pct), 0.0, 100.0, w=w, entity=f"customer:{cid}",
+                field="sla_fill_floor_pct", unit=" %")
         out.append(Customer(**kwargs))
     # ONLY WHEN THE COVERAGE IS PARTIAL, and the E1 gate is what settled that.
     #
@@ -2220,6 +2403,9 @@ def _map_policies(
     sups_by_mat: Optional[dict[str, set[str]]] = None,
     has_mts: bool = False,
     prod_ids: Optional[set[str]] = None,
+    row_keys: frozenset[str] = frozenset(),
+    tally: Optional["_SourceTally"] = None,
+    row_masters: Optional[dict[str, dict[str, Any]]] = None,
 ) -> dict[str, dict]:
     out: dict[str, dict] = {}
     default = policies.get("default") or {}
@@ -2229,17 +2415,25 @@ def _map_policies(
     recovery = default.get("recovery") or {}
     sups_by_mat = sups_by_mat or {}
 
-    # Surface per-node fulfillment overrides the engine will not apply.
+    # Surface per-node fulfillment overrides the engine will not apply: any of
+    # these fields on a node that is not an existing Customer row, and the
+    # project-only ones (the rule, tier floors, service levels) on any node.
+    def _unread(k: str, fams: dict) -> bool:
+        patch = fams.get("fulfillment") or {}
+        is_row = k[len("node:"):] in row_keys
+        return any(f in patch and (f not in _FULFILLMENT_ROW or not is_row)
+                   for f in _FULFILLMENT_DEFAULT_ONLY)
     dropped_fulfil = sum(
         1 for k, fams in policies.items()
-        if isinstance(k, str) and k.startswith("node:")
-        and any(f in (fams.get("fulfillment") or {}) for f in _FULFILLMENT_DEFAULT_ONLY)
+        if isinstance(k, str) and k.startswith("node:") and isinstance(fams, dict)
+        and _unread(k, fams)
     )
     if dropped_fulfil:
         w.append(MappingWarning(
             "warn", "policy:unmet_demand_handling", "fulfillment",
-            f"{dropped_fulfil} per-node fulfillment override(s) not applied — backorder, "
-            "allocation and service level are consumed at the project default scope only"))
+            f"{dropped_fulfil} per-node fulfillment override(s) not applied — the allocation "
+            "rule, tier floors and service levels are project-wide, and backorder, priority, "
+            "price and service target apply on a Customer row only"))
 
     type_map = {
         "min_max": "min_max", "s_S": "min_max", "continuous_review": "min_max",
@@ -2383,26 +2577,52 @@ def _map_policies(
             f"{len(row_ss_days)} material(s) carry a Supplier-stage safety-stock "
             "days value — applied per material, over the project-wide method"))
 
-    if bool(fulfil.get("backorder_allowed", False)):
+    project_allows = bool(fulfil.get("backorder_allowed", False))
+    project_days = fulfil.get("max_backorder_days", 14)
+    project_cost = fulfil.get("backorder_cost_per_day", 0.0)
+    if project_allows:
         out["unmet_demand_handling"] = {
             "rule": "backorder",
-            "backorder_horizon": int(_clamp(
-                round(float(fulfil.get("max_backorder_days", 14)) / 7.0), 0, 26, w=w,
-                entity="policy:default", field="max_backorder_days", unit=" wk")),
-            "backorder_penalty": float(fulfil.get("backorder_cost_per_day", 0.0)) * 7.0,
+            "backorder_horizon": _backorder_weeks(project_days, w=w, entity="policy:default"),
+            "backorder_penalty": float(project_cost) * 7.0,
         }
     else:
         out["unmet_demand_handling"] = {"rule": "lost_sales"}
+
+    # Per-row fulfillment (WP 14.3, ADR 0002 decisions 4–5): a Customer row's
+    # backorder setting, window and cost. A row that names any of them gets ALL
+    # three resolved — row → project default → the defaults above — so the
+    # engine never falls to a parameter default the page does not show.
+    row_bo: dict[str, dict[str, Any]] = {}
+    row_patches = {k[len("node:"):]: ((policies.get(k) or {}).get("fulfillment") or {})
+                   for k in policies
+                   if isinstance(k, str) and k.startswith("node:") and k[len("node:"):] in row_keys}
+    for rid in sorted(row_patches):
+        patch = row_patches[rid]
+        ent = f"customer_row:{rid}"
+        allowed = patch.get("backorder_allowed")
+        days = patch.get("max_backorder_days")
+        cost = patch.get("backorder_cost_per_day")
+        if allowed is None and days is None and cost is None:
+            continue
+        waits = bool(allowed) if allowed is not None else project_allows
+        ov: dict[str, Any] = {"backorder_allowed": waits}
+        if waits:
+            ov["backorder_horizon"] = _backorder_weeks(
+                days if days is not None else project_days, w=w, entity=ent)
+            ov["backorder_penalty"] = float(cost if cost is not None else project_cost) * 7.0
+        row_bo[rid] = ov
+    if row_bo:
+        out["unmet_demand_handling"]["row_overrides"] = row_bo
 
     # P-C.2 customer allocation — the UI's fulfillment.allocation enum finally
     # reaches the engine. Inert (skipped) below two customers.
     alloc = str(fulfil.get("allocation", "") or "")
     if alloc and n_customers >= 2:
         if alloc == "revenue_max":
-            w.append(MappingWarning("warn", "policy:customer_allocation", "allocation",
-                                    "revenue_max needs per-customer pricing (deferred) — "
-                                    "mapped to priority"))
-            out["customer_allocation"] = {"rule": "priority"}
+            # The row price is CustomerLink.unit_price (override → the outbound
+            # row's unit price), else the product's — no param needed here.
+            out["customer_allocation"] = {"rule": "revenue_max"}
         elif alloc == "sla_tier":
             # G1 closure: the UI's tier fill floors (fractions) reach P-C.2.
             out["customer_allocation"] = {
@@ -2415,6 +2635,33 @@ def _map_policies(
             }
         elif alloc in _ALLOCATION_RULE:
             out["customer_allocation"] = {"rule": _ALLOCATION_RULE[alloc]}
+    # The row's priority and service target (WP 14.3): an override on the
+    # Customer row beats the customer's master value. Read only by the rules
+    # that use them; the grid shows each column only under those rules.
+    # The row's value is resolved whatever the rule (the cell shows it); the
+    # engine receives it only under a rule that reads it.
+    rule = (out.get("customer_allocation") or {}).get("rule")
+    row_priority: dict[str, float] = {}
+    row_floor: dict[str, float] = {}
+    for rid in sorted(row_patches):
+        patch = row_patches[rid]
+        ent = f"customer_row:{rid}"
+        v = patch.get("row_priority")
+        if v not in (None, ""):
+            n = _override_num(v, entity=ent, field="row_priority", domain="nonnegative", w=w)
+            if n is not None:
+                row_priority[rid] = n
+        v = patch.get("sla_fill_floor_pct")
+        if v not in (None, ""):
+            n = _override_num(v, entity=ent, field="sla_fill_floor_pct", domain="percent", w=w)
+            if n is not None:
+                row_floor[rid] = n
+    if row_priority and rule in ("priority", "sla_tier"):
+        out["customer_allocation"]["row_priority"] = row_priority
+    if row_floor and rule == "sla_tier":
+        out["customer_allocation"]["row_floor_pct"] = row_floor
+    if tally is not None:
+        _tally_row_allocation(tally, row_keys, row_priority, row_floor, row_masters or {}, rule)
 
     # P-S.2 proactive multi-sourcing — sourcing.ratios finally reach the
     # engine (G1's flagship loss). Empty weights are valid: the plugin

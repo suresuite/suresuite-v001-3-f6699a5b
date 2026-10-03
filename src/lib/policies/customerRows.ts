@@ -14,6 +14,8 @@
  * grid shows beside it, with its source.
  */
 
+import { backorderWeeksNote } from "./backorderWeeks";
+
 export type Row = Record<string, unknown>;
 
 /** A forecast bucket as `get_project_demand_forecasts` returns it. */
@@ -90,4 +92,10 @@ export function variationMeaning(distribution: unknown): string {
  *  triangularAV). Undefined for any other column. */
 export function demandCellNote(field: string, rowDistribution: unknown): string | undefined {
   return field === "row_demand_variation" ? `Variation here is: ${variationMeaning(rowDistribution)}.` : undefined;
+}
+
+/** The note a Customer row's fulfillment cell carries (PLAN.md §24 WP 14.3):
+ *  the backorder window in the whole weeks the run uses. */
+export function fulfillmentCellNote(field: string, value: unknown): string | undefined {
+  return field === "max_backorder_days" ? backorderWeeksNote(value) : undefined;
 }

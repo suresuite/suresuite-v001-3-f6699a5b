@@ -80,3 +80,19 @@ demand**, and **the plan never reads the realized future demand draws** (gate
   `sim_worker/datamap.py::forecast_series` (week 0 = the project's earliest
   `period_start`; design doc §9, point 5). The mapper reads the Customer
   table's row overrides (`row_demand_*`, `_apply_row_demand_overrides`).
+* **WP 14.3** (engine 0.3.0 → **0.4.0**, Tier 3: P-C.1's hook now reads
+  `demand_rows`) — per-row fulfillment. P-C.1 takes `row_overrides`
+  (backorder allowed, horizon, penalty per `<customer>::<product>`) and, when
+  a row carries any or the project's rule needs per-row inputs, keeps the
+  backlog per row (`[rows × (max horizon + 1)]`, each row expiring at its own
+  horizon), splits each product's supply with `core/allocation.py`, and writes
+  `ctx.fulfilled_rows` / `served_new_rows` / `lost_rows` and
+  `ctx.backlog_rows` (Σ = `ctx.backlog`, which every existing reader keeps).
+  P-C.2 publishes the rule and per-row priority / price / floor at setup
+  (`ctx.row_allocation`); `revenue_max` is a real rule. New entity fields
+  `Customer.sla_fill_floor_pct`, `CustomerLink.unit_price`. KPIs per row and per
+  customer only on the per-row path. **Declared behaviour changes:** a project
+  whose rule is `revenue_max` (ran as `priority`), a project under `sla_tier`
+  whose customers state `sla_fill_floor_pct`, and a max-backorder value at a
+  half week (3.5 days → 1 week, was 0) run differently. Golden digests (engine
+  and worker) unchanged.

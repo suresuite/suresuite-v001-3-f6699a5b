@@ -28,6 +28,6 @@
     "fair_share": "fair_share",
     "proportional": "proportional",
     "sla_tier": "sla_tier",
-    "revenue_max": "priority"
+    "revenue_max": "revenue_max"
   }
 }

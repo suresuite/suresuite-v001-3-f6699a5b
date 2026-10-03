@@ -1680,6 +1680,201 @@ export const CHAINS: PolicyChain[] = [
     "breaks": [],
     "breakClass": null,
     "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "backorder_allowed",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `backorder_allowed` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → unmet_demand_handling.rule / row_overrides[row].backorder_allowed (P-C.1). Transform: boolean. Project: backorder (else lost_sales). Row: whether this customer × product row waits; empty = the project's setting",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "max_backorder_days",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `max_backorder_days` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → unmet_demand_handling.backorder_horizon / row_overrides[row].backorder_horizon (P-C.1). Transform: days -> whole weeks rounded HALF UP (3 -> 0, 4 -> 1, 10 -> 1, 11 -> 2), clamped 0-26; empty = the project's, else 14 days. Read only for a project or row that backorders",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "backorder_cost_per_day",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `backorder_cost_per_day` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → unmet_demand_handling.backorder_penalty / row_overrides[row].backorder_penalty (P-C.1). Transform: per unit per day x 7 -> per unit per week; empty = the project's, else 0. Read only for a project or row that backorders",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_priority",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_priority` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`customers.priority_weight` (item master, keyed from `customer_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "P-C.2 customer_allocation — Customer.priority_weight, the default priority of each of the customer's rows under the `priority` and `sla_tier` rules wherever the `priority_weights` param does not name the customer and no Customer-row override (`row_priority`, WP 14.3) does",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "price",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `price` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.unit_price` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`currency per unit of product`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset; and (WP 14.3) CustomerLink.unit_price, the row's own price under `revenue_max` and in its fill rates",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "sla_fill_floor_pct",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `sla_fill_floor_pct` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`customers.sla_fill_floor_pct` (item master, keyed from `customer_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_build_customers -> Customer.sla_fill_floor_pct; P-C.2 customer_allocation — each of the customer's rows' default service target under the `sla_tier` rule",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   }
 ];
 
@@ -2247,7 +2442,7 @@ export const UPLOAD_ASSETS: UploadAsset[] = [
   {
     "id": "item_master_customers",
     "name": "Customers Master",
-    "description": "Per-customer segment and allocation priority the simulation reads under scarcity",
+    "description": "Per-customer segment, allocation priority and contracted fill floor the simulation reads under scarcity",
     "templateFile": "/template/customers.csv",
     "guideFile": "/docs/csv-upload-guide.md"
   },
@@ -4259,5 +4454,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 49;
+export const CHAIN_COUNT = 55;
 export const BROKEN_COUNT = 5;

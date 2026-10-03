@@ -348,8 +348,9 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
     # renders (`columnSpecs`), and a bundle key with no column is not door 3's
     # subject — door 3 is about CELLS whose only evidence is this file.
     not_rendered = {
-        "ratios", "strategy", "safety_stock_method", "backorder_allowed",
-        "max_backorder_days", "backorder_cost_per_day", "allocation",
+        # (backorder_allowed / max_backorder_days / backorder_cost_per_day left
+        # this list in WP 14.3: they are Customer-stage cells now, declared.)
+        "ratios", "strategy", "safety_stock_method", "allocation",
         "tier_overrides", "fulfillment_strategy",
         "min_share_pct", "review_period_days",
         "material_price",
@@ -483,12 +484,16 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         "row_demand_variation": ("outbound_logistics.demand_variation", "customer"),
         "row_demand_min": ("outbound_logistics.demand_min", "customer"),
         "row_demand_max": ("outbound_logistics.demand_max", "customer"),
+        # PLAN.md §24 WP 14.3 — the row's price, priority and service target.
+        "price": ("outbound_logistics.unit_price", "customer"),
+        "row_priority": ("customers.priority_weight", "customer"),
+        "sla_fill_floor_pct": ("customers.sla_fill_floor_pct", "customer"),
     }
     for k in POLICY_BUNDLE_KEYS:
         assert bool(k.get("master")) == bool(k.get("rows")) == bool(k.get("domain")), k
         # One ENUM domain joined in WP 14.2 for the Customer row's
         # distribution; the numeric three are the mapper's `_override_num`.
-        assert k.get("domain") in (None, "positive", "nonnegative", "fraction",
+        assert k.get("domain") in (None, "positive", "nonnegative", "fraction", "percent",
                                    "distribution"), k
         assert k["catalog_ref"] is None or not k.get("master"), k
 
@@ -539,6 +544,12 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "fg_safety_stock_days": {"inventory": {"fg_safety_stock": "fixed_days"}},
         "allocation_priority_weight": {"recovery": {"response": ["allocate_materials"]}},
         "rop_q_quantity": {"inventory": {"type": "rop"}},
+        # WP 14.3: a window and a cost are read only for something that backorders;
+        # a priority and a floor only under the rules that use them.
+        "max_backorder_days": {"fulfillment": {"backorder_allowed": True}},
+        "backorder_cost_per_day": {"fulfillment": {"backorder_allowed": True}},
+        "row_priority": {"fulfillment": {"allocation": "priority"}},
+        "sla_fill_floor_pct": {"fulfillment": {"allocation": "sla_tier"}},
     }
     value = {
         "supply_share": 0.3, "type": "rop", "safety_stock_days": 21, "holding_cost_pct": 0.4,
@@ -550,6 +561,8 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "sell_price": 7, "production_capacity": 66, "demand_mean": 20, "demand_cv": 0.9,
         "row_demand_mode": "model", "row_demand_distribution": "poisson", "row_demand_mean": 25,
         "row_demand_variation": 0.5, "row_demand_min": 5, "row_demand_max": 500,
+        "backorder_allowed": True, "max_backorder_days": 21, "backorder_cost_per_day": 3,
+        "row_priority": 4, "price": 55, "sla_fill_floor_pct": 70,
     }
     keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1",
             "customer": "node:C1::P1"}

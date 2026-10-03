@@ -1,7 +1,7 @@
 {
   "$generator": "scripts/data-contract/generate.mjs",
   "$doc": "The data contract: the introspected schema merged with the authored sidecars and the engine registry snapshot. Generated — do not edit; `npm run contract:check` fails on drift.",
-  "engine_version": "0.3.0",
+  "engine_version": "0.4.0",
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
@@ -11,7 +11,7 @@
     },
     "sidecars": 76,
     "registry": {
-      "engine_version": "0.3.0",
+      "engine_version": "0.4.0",
       "policies": 23
     }
   },
@@ -3760,14 +3760,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:216",
+          "evidence": "src/hooks/useItemMasters.tsx:230",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:216",
+          "evidence": "src/hooks/useItemMasters.tsx:230",
           "confirmed": true
         }
       ],
@@ -4824,7 +4824,7 @@
           "grain": "rate",
           "computed_by": null,
           "engine": {
-            "consumed_by": "P-C.2 customer_allocation — Customer.priority_weight, the fallback ordering under the `priority` rule wherever the `priority_weights` param does not name the customer",
+            "consumed_by": "P-C.2 customer_allocation — Customer.priority_weight, the default priority of each of the customer's rows under the `priority` and `sla_tier` rules wherever the `priority_weights` param does not name the customer and no Customer-row override (`row_priority`, WP 14.3) does",
             "transform": null,
             "missing_default": "1.0 (Customer.priority_weight's own default) — every customer equal, so the `priority` rule cannot order anything"
           },
@@ -4861,19 +4861,25 @@
           "grain": "rate",
           "computed_by": null,
           "engine": {
-            "consumed_by": null,
-            "transform": null,
-            "missing_default": null
+            "consumed_by": "project_map.py::_build_customers -> Customer.sla_fill_floor_pct; P-C.2 customer_allocation — each of the customer's rows' default service target under the `sla_tier` rule",
+            "transform": "clamped 0-100 (warned); a Customer-row override on /policies (`sla_fill_floor_pct`) beats it for that row",
+            "missing_default": "no floor — the segment's `sla_tiers` floor applies, else none"
           },
           "substitutions": [],
           "ingest": {
-            "csv_header": null,
+            "csv_header": "sla_fill_floor_pct",
             "required": false,
-            "validate": null
+            "validate": "optional; 0-100 (a percentage of the row's demand). Blank lands nothing — no floor, not 0",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "max": 100,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
-          "note": "NOT TRACED, and the REASON is now different from `priority_weight`'s — the two were given the same one and only this column's survives (§4 D69, D94). `P-C.2 customer_allocation` IS implemented, and it does guarantee fill floors: `sla_tiers`, keyed BY SEGMENT. This column is per CUSTOMER, and `Customer` has no field for it at all, so there is nothing to carry it into. Mapping per-customer floors onto a per-segment param needs a rule for what happens when two customers in one segment disagree, and inventing that rule is not a reader change. Declared gap, not a silent one.",
+          "note": "CONSUMED SINCE PLAN.md §24 WP 14.3 (§4 D284 c). The floor is per CUSTOMER × PRODUCT ROW now, not per segment, so this column is the default service target of each of the customer's rows under `sla_tier`, and the segment's `sla_tiers` floor applies only where it is empty. The question that kept it out — two customers of one segment disagreeing — has no answer to invent once the floor belongs to the row. UPLOADABLE SINCE WP 14.3 too: the customers template withheld it on purpose while nothing read it (§4 D18), and offers it now that the engine does. Before WP 14.3: NOT TRACED — `Customer` had no field for it and the per-segment param could not hold a per-customer floor (§4 D69, D94).",
           "engine_requirement": null
         },
         {
@@ -11035,14 +11041,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:216",
+          "evidence": "src/hooks/useItemMasters.tsx:230",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:216",
+          "evidence": "src/hooks/useItemMasters.tsx:230",
           "confirmed": true
         }
       ],
@@ -23064,14 +23070,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:216",
+          "evidence": "src/hooks/useItemMasters.tsx:230",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:216",
+          "evidence": "src/hooks/useItemMasters.tsx:230",
           "confirmed": true
         }
       ],
@@ -23533,8 +23539,8 @@
           "grain": "level",
           "computed_by": null,
           "engine": {
-            "consumed_by": "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset",
-            "transform": "demand-weighted mean across this product's outbound arcs",
+            "consumed_by": "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset; and (WP 14.3) CustomerLink.unit_price, the row's own price under `revenue_max` and in its fill rates",
+            "transform": "demand-weighted mean across this product's outbound arcs (the product's price); as is for the row's price, which a Customer-row `price` override beats",
             "missing_default": "the engine's ENGINE_DEFAULT_PRICE"
           },
           "substitutions": [
@@ -43556,5 +43562,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "14629b47bab9"
+  "contract_version": "2cea4e23e233"
 }

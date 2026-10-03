@@ -57,7 +57,7 @@ export const GATE_ROW_CEILING = 50_000;
 
 // deno-lint-ignore no-explicit-any
 export async function loadGateDataset(sb: any, projectId: string): Promise<GradingDataset> {
-  const [materials, products, suppliers, inbound, outbound, bomSingle, bomMulti, overrides, forecasts] = await Promise.all([
+  const [materials, products, suppliers, inbound, outbound, bomSingle, bomMulti, overrides, forecasts, customers] = await Promise.all([
     // `name` rides along for the B8 v2 IO-coefficient sector match
     // (estimators.ts::matchIoCoefficient) — the grader itself ignores it.
     sb.from("materials").select("material_id,name,cost,moq,holding_cost_pct").eq("project_id", projectId).limit(GATE_ROW_CEILING),
@@ -76,6 +76,8 @@ export async function loadGateDataset(sb: any, projectId: string): Promise<Gradi
     sb.from("policy_overrides").select("scope,target_key,family,patch").eq("project_id", projectId).limit(GATE_ROW_CEILING),
     // PLAN.md §24 WP 14.2 — the per-row forecast buckets.
     sb.from("demand_forecasts").select("customer_id,product_id,period_start,period_end,weekly_quantity").eq("project_id", projectId).limit(GATE_ROW_CEILING),
+    // PLAN.md §24 WP 14.3 — priority and contracted floor per customer.
+    sb.from("customers").select("customer_id,segment,priority_weight,sla_fill_floor_pct").eq("project_id", projectId).limit(GATE_ROW_CEILING),
   ]);
   // Multi-level rows win when they exist — the same rule the engine's
   // datamap and the frontend lanes apply. Rows pass through RAW: shape
@@ -92,7 +94,7 @@ export async function loadGateDataset(sb: any, projectId: string): Promise<Gradi
     ["materials", materials], ["products", products], ["suppliers", suppliers],
     ["inbound_logistics", inbound], ["outbound_logistics", outbound],
     ["bom_single_level", bomSingle], ["bom_multi_level", bomMulti],
-    ["policy_overrides", overrides], ["demand_forecasts", forecasts],
+    ["policy_overrides", overrides], ["demand_forecasts", forecasts], ["customers", customers],
     // deno-lint-ignore no-explicit-any
   ] as Array<[string, any]>)
     .filter(([, r]) => (r?.data?.length ?? 0) >= GATE_ROW_CEILING)
@@ -106,6 +108,7 @@ export async function loadGateDataset(sb: any, projectId: string): Promise<Gradi
     bom,
     overrides: overrides.data ?? [],
     demandForecasts: forecasts?.data ?? [],
+    customers: customers?.data ?? [],
     ...(truncated.length > 0 ? { truncated } : {}),
   };
 }
@@ -143,6 +146,7 @@ export function gateDatasetFromSnapshot(
     bom: multi.length > 0 ? multi : rows("bom"),
     overrides,
     demandForecasts: rows("demand_forecasts"),
+    customers: rows("customers"),
   };
 }
 

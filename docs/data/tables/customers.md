@@ -77,7 +77,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `name` | `name` | `text` | — | no | The customer's display name. Nullable; never a join key (G1). |
 | `segment` | `segment` | `text` | — | no | The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the set a CHECK would name is the user's own segmentation and inventing it before anybody can write the table is how a column gets a constraint nobody can satisfy. |
 | `priority_weight` | `priority_weight` | `numeric` | — | no | Relative allocation priority when demand exceeds supply. Dimensionless and relative — only the RATIO between two customers means anything, so a row at 1.0 is not "one unit" of anything. |
-| `sla_fill_floor_pct` | — | `numeric` | — | — | The minimum fill rate the customer is contracted to receive, as a percentage. NULLABLE, and the null means "no contracted floor" — not zero. A reader that coerces it to 0 turns "unconstrained" into "no service required", which is D17's error in the other direction. |
+| `sla_fill_floor_pct` | `sla_fill_floor_pct` | `numeric` | — | no | The minimum fill rate the customer is contracted to receive, as a percentage. NULLABLE, and the null means "no contracted floor" — not zero. A reader that coerces it to 0 turns "unconstrained" into "no service required", which is D17's error in the other direction. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row was last modified. Server-stamped. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the row was first inserted. Server-stamped. |
 | `ingest_run_id` | — | `uuid` | — | — | The ingestion run that last wrote this row (WP 6.2, §4 D108), and through it the file, the uploader and who approved the promotion. NULL for every row that predates the CSV landing path — and on THIS table that is every row written before `20260919000001`, because until then nothing in the product wrote it at all: the only way a row got here was a hand at the database. A null means the provenance is unknown, never that there was none. |
@@ -154,7 +154,7 @@ Relative allocation priority when demand exceeds supply. Dimensionless and relat
 | Grain | `rate` |
 | Unit | dimensionless |
 | Added by | `20260916000003_adopt_customers_drop_product_code_map.sql` |
-| Read by the engine | `P-C.2 customer_allocation — Customer.priority_weight, the fallback ordering under the `priority` rule wherever the `priority_weights` param does not name the customer` |
+| Read by the engine | `P-C.2 customer_allocation — Customer.priority_weight, the default priority of each of the customer's rows under the `priority` and `sla_tier` rules wherever the `priority_weights` param does not name the customer and no Customer-row override (`row_priority`, WP 14.3) does` |
 | When NULL, the engine uses | 1.0 (Customer.priority_weight's own default) — every customer equal, so the `priority` rule cannot order anything |
 | Validated at ingest | optional; >= 0. ZERO IS ALLOWED AND MEANS SOMETHING: only the ratio between two customers matters, so 0 is the lowest priority there is — served last, and only out of what is left. `exclusive_min` would reject a value the engine reads correctly. Blank lands nothing and the DEFAULT 1.0 stands in, which makes the `priority` rule inert for that customer. |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -171,11 +171,13 @@ The minimum fill rate the customer is contracted to receive, as a percentage. NU
 | Grain | `rate` |
 | Unit | dimensionless |
 | Added by | `20260916000003_adopt_customers_drop_product_code_map.sql` |
-| Read by the engine | **not traced** |
-| Validated at ingest | — |
+| Read by the engine | `project_map.py::_build_customers -> Customer.sla_fill_floor_pct; P-C.2 customer_allocation — each of the customer's rows' default service target under the `sla_tier` rule` |
+| Transform | clamped 0-100 (warned); a Customer-row override on /policies (`sla_fill_floor_pct`) beats it for that row |
+| When NULL, the engine uses | no floor — the segment's `sla_tiers` floor applies, else none |
+| Validated at ingest | optional; 0-100 (a percentage of the row's demand). Blank lands nothing — no floor, not 0 |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> NOT TRACED, and the REASON is now different from `priority_weight`'s — the two were given the same one and only this column's survives (§4 D69, D94). `P-C.2 customer_allocation` IS implemented, and it does guarantee fill floors: `sla_tiers`, keyed BY SEGMENT. This column is per CUSTOMER, and `Customer` has no field for it at all, so there is nothing to carry it into. Mapping per-customer floors onto a per-segment param needs a rule for what happens when two customers in one segment disagree, and inventing that rule is not a reader change. Declared gap, not a silent one.
+> CONSUMED SINCE PLAN.md §24 WP 14.3 (§4 D284 c). The floor is per CUSTOMER × PRODUCT ROW now, not per segment, so this column is the default service target of each of the customer's rows under `sla_tier`, and the segment's `sla_tiers` floor applies only where it is empty. The question that kept it out — two customers of one segment disagreeing — has no answer to invent once the floor belongs to the row. UPLOADABLE SINCE WP 14.3 too: the customers template withheld it on purpose while nothing read it (§4 D18), and offers it now that the engine does. Before WP 14.3: NOT TRACED — `Customer` had no field for it and the per-segment param could not hold a per-customer floor (§4 D69, D94).
 
 ### `updated_at`
 
@@ -236,6 +238,6 @@ The tier-1 staged row this was promoted from (WP 6.2). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `14629b47bab9`, engine `0.3.0`,
+*Generated from data contract `2cea4e23e233`, engine `0.4.0`,
 sidecar `supabase/contract/customers.contract.yaml`, table created by `20260916000003_adopt_customers_drop_product_code_map.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

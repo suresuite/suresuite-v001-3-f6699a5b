@@ -274,6 +274,6 @@ The organization's NAME at write time, DEFAULT 'default_org'. Legacy tenancy tex
 
 ---
 
-*Generated from data contract `14629b47bab9`, engine `0.3.0`,
+*Generated from data contract `2cea4e23e233`, engine `0.4.0`,
 sidecar `supabase/contract/simulation_cache.contract.yaml`, table created by `20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

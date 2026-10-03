@@ -18,7 +18,8 @@
 // and imported by relative path from the browser.
 
 export type Row = Record<string, unknown>;
-export type OverrideDomain = "positive" | "nonnegative" | "fraction" | "distribution" | "demand_mode";
+export type OverrideDomain =
+  | "positive" | "nonnegative" | "fraction" | "percent" | "distribution" | "demand_mode";
 /** `row` (PLAN.md §24 WP 14.2) is a customer × product row of
  *  `outbound_logistics`, keyed exactly as the Customer stage keys it,
  *  `<customer>::<product>`. */
@@ -54,6 +55,9 @@ const ENTITY_OF_TABLE: Record<string, OverrideEntity> = {
   suppliers: "supplier",
   products: "product",
   outbound_logistics: "row",
+  // WP 14.3 — a row's priority / service target override sits over its
+  // CUSTOMER's master value, but is keyed by the row like every Customer cell.
+  customers: "row",
 };
 
 /** The override declarations among the registry's `policy_bundle_keys`. */
@@ -90,6 +94,7 @@ export function isUsableOverride(v: unknown, domain: OverrideDomain): boolean {
   if (!Number.isFinite(n) || n < 0) return false;
   if (domain === "positive") return n > 0;
   if (domain === "fraction") return n <= 1;
+  if (domain === "percent") return n <= 100;
   return true;
 }
 

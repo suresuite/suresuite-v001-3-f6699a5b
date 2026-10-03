@@ -40,8 +40,10 @@ export interface ColSpec {
      * `outbound_logistics` (PLAN.md §24 WP 14.2) is the customer × product row's
      * own demand spec — the base under the Customer stage's demand cells, joined
      * on a COMPOSITE `idFrom` (`customer_id::product_id`), as the engine keys it.
+     * `customers` (WP 14.3) is the base under a row's priority and service
+     * target — per CUSTOMER, so `idFrom` is `customer_id`; the override is per row.
      */
-    table: "materials" | "products" | "suppliers" | "outbound_logistics";
+    table: "materials" | "products" | "suppliers" | "outbound_logistics" | "customers";
     field: string;
     /** The stage row's id field — or several joined by `::` for a composite key. */
     idFrom: string;
@@ -123,6 +125,16 @@ const pendingCol = (field: string, family: PolicyFamily): ColSpec => {
 };
 
 // ---------- gating helpers ----------
+
+/** WP 14.3 — a Customer row's per-row inputs are shown under the project rule
+ *  that reads them (the rule is one per project, decision 4). */
+const ruleIs =
+  (...rules: string[]): ColSpec["visibleWhen"] =>
+  ({ effective }) =>
+    rules.includes(String(effective?.allocation ?? ""));
+/** A row's window and cost matter only when the row backorders. */
+const rowBackorders: ColSpec["visibleWhen"] = ({ effective, draft }) =>
+  (draft?.backorder_allowed ?? effective?.backorder_allowed) === true;
 const plantNeedsInventory: ColSpec["visibleWhen"] = ({ fulfillmentStrategy }) =>
   fulfillmentStrategy === "make_to_stock" ||
   fulfillmentStrategy === "assemble_to_order" ||
@@ -372,10 +384,14 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
     // exactly the order every master-backed cell follows (§23 WP 13.1). The
     // forecast series itself is uploaded in Project manager and shown read-only.
     //
-    // The fulfillment family (allocation, backorder, service level) is still
-    // consumed at the PROJECT default scope only — per-row fulfillment is WP
-    // 14.3's — so those are edited in the fulfillment defaults card. The
-    // firm-routing choice for a customer × product lane stays per row.
+    // FULFILLMENT PER ROW (PLAN.md §24 WP 14.3, ADR 0002 decisions 4–5). The
+    // allocation RULE is one per project and stays on the Customer allocation
+    // card; a row carries its own backorder setting, window and cost (an empty
+    // cell is the project's), and the per-row inputs the project's rule reads —
+    // priority (priority, sla_tier), price (revenue_max), service target
+    // (sla_tier) — each shown only under the rule that reads it. Priority and
+    // target sit over the customer's master values, price over the outbound
+    // row's unit price. The firm-routing choice for a lane stays per row too.
     cols: [
       col("primary_source", "fulfillment"),
       col("sourcing_firm", "fulfillment"),
@@ -401,6 +417,22 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       }),
       col("row_demand_max", "demand", {
         master: { table: "outbound_logistics", field: "demand_max", idFrom: "customer_id::product_id" },
+      }),
+      // WP 14.3 — backorder per row. Empty = the project's setting.
+      col("backorder_allowed", "fulfillment"),
+      col("max_backorder_days", "fulfillment", { visibleWhen: rowBackorders }),
+      col("backorder_cost_per_day", "fulfillment", { visibleWhen: rowBackorders }),
+      col("row_priority", "fulfillment", {
+        visibleWhen: ruleIs("priority", "sla_tier"),
+        master: { table: "customers", field: "priority_weight", idFrom: "customer_id" },
+      }),
+      col("price", "fulfillment", {
+        visibleWhen: ruleIs("revenue_max"),
+        master: { table: "outbound_logistics", field: "unit_price", idFrom: "customer_id::product_id" },
+      }),
+      col("sla_fill_floor_pct", "fulfillment", {
+        visibleWhen: ruleIs("sla_tier"),
+        master: { table: "customers", field: "sla_fill_floor_pct", idFrom: "customer_id" },
       }),
     ],
     targetKey: (r) => `${r.customer_id}::${r.product_id ?? ""}`,
@@ -542,6 +574,13 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   row_demand_variation: { sub: "CV (normal) · ± (triangularAV)", w: 96, kind: "num", dec: 2, prio: 5 },
   row_demand_min: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
   row_demand_max: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
+  // ---- customer · fulfillment per row (WP 14.3)
+  backorder_allowed: { sub: "this row waits", w: 76, kind: "toggle", keep: true, filterable: false, align: "center" },
+  max_backorder_days: { sub: "days → whole wk", w: 84, kind: "int", unit: "d", prio: 6 },
+  backorder_cost_per_day: { sub: "€ / unit / day", w: 92, kind: "num", dec: 2, unit: "€", prio: 5 },
+  row_priority: { sub: "weight · priority, sla_tier", w: 88, kind: "num", dec: 2, prio: 6 },
+  price: { sub: "€ / unit · revenue_max", w: 92, kind: "num", dec: 2, unit: "€", prio: 6 },
+  sla_fill_floor_pct: { sub: "% · sla_tier", w: 84, kind: "num", dec: 1, unit: "%", prio: 6 },
 };
 
 /** Fallback so a new engine field renders sanely before it gets metadata. */
@@ -586,6 +625,12 @@ export const SHORT_LABEL: Record<string, string> = {
   row_demand_variation: "Variation",
   row_demand_min: "Min",
   row_demand_max: "Max",
+  backorder_allowed: "Backorder",
+  max_backorder_days: "Max backorder",
+  backorder_cost_per_day: "Backorder cost",
+  row_priority: "Priority",
+  price: "Price",
+  sla_fill_floor_pct: "Service target",
 };
 
 /** Per-stage label overrides — same field, different meaning by context. */

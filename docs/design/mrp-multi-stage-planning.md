@@ -361,6 +361,25 @@ Found by WP 14.2 (defaults shipped; the owner may overrule):
    override `row_demand_mode = model` on /policies sets the series aside and the row runs on
    its mean + distribution. There is no stored mode column a second upload could contradict.
 
+Found by WP 14.3 (defaults shipped; the owner may overrule):
+
+8. **When fulfillment runs per row.** Only when a row carries its own backorder setting,
+   window or cost, or the project's rule needs a per-row input (`revenue_max`; a row
+   priority; a row or customer floor under `sla_tier`). Otherwise the product path runs
+   unchanged — a backlog per product, oldest first — which is what "project-wide settings
+   are byte-identical" requires: with several rows per product and a `priority` rule, a
+   per-row backlog would serve a high-priority row's new demand before a low-priority
+   row's old backlog, and the product path does not.
+9. **A row's window of 0 weeks** (e.g. 3 days) means the row's shortfall may be served the
+   next week and is lost after that. (The project-wide path keeps its old degenerate
+   behaviour for a 0-week horizon, unchanged.)
+10. **A row's fill rate** is the engine's β-service: units of THIS week's demand served this
+    week. A backorder row whose supply clears its backlog first can show a low fill rate
+    while losing nothing — its lost units and backorder cost are reported beside it.
+11. **An implicit row** (a product no customer row names) belongs to no customer and no
+    segment: it is served and reported per row, and left out of the per-customer and
+    per-segment fill rates.
+
 
 ---
 

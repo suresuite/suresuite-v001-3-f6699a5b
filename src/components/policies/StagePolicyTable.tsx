@@ -93,7 +93,7 @@ import { ValueChainPopover, type ValueChainTarget } from "@/components/policies/
 import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters } from "@/hooks/useItemMasters";
-import { customerRowMasters, demandCellNote } from "@/lib/policies/customerRows";
+import { customerRowMasters, demandCellNote, fulfillmentCellNote } from "@/lib/policies/customerRows";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
@@ -335,8 +335,10 @@ export function StagePolicyTable({
       // PLAN.md §24 WP 14.2 — the Customer stage's base: each row's own demand
       // spec and its forecast series, keyed `<customer>::<product>`.
       outbound_logistics: customerRowMasters(lanes.outbound, lanes.forecasts),
+      // WP 14.3 — the base under a Customer row's priority and service target.
+      customers: new Map((lanes.customers ?? []).map((c) => [String(c.customer_id), c])),
     }),
-    [materials, products, suppliers, lanes.outbound, lanes.forecasts],
+    [materials, products, suppliers, lanes.outbound, lanes.forecasts, lanes.customers],
   );
   const masterColByField = useMemo(() => {
     const m = new Map<string, ColSpec>();
@@ -1835,8 +1837,9 @@ export function StagePolicyTable({
               ? getEffective(rowKey, r, "row_demand_distribution", "demand")
               : undefined,
           );
+          const fulfilNote = fulfillmentCellNote(col.field, cellValue ?? liveDefault);
           const substitution =
-            [substitutionNote(resolved), demandNote].filter(Boolean).join(" ") || undefined;
+            [substitutionNote(resolved), demandNote, fulfilNote].filter(Boolean).join(" ") || undefined;
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);

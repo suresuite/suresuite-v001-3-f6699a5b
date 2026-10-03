@@ -76,8 +76,8 @@ partially or get corrected — the write fails.
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:421` | yes |
-| `ProjectPolicies.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:216` | yes |
-| `SimulationLab.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:216` | yes |
+| `ProjectPolicies.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:230` | yes |
+| `SimulationLab.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:230` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -283,8 +283,8 @@ What the customer pays for one unit of this product.
 | Grain | `level` |
 | Unit | `currency per unit of product` — fixed |
 | Added by | `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql` |
-| Read by the engine | `project_map.py::_map_demand -> ProductRow.sell_price when the master is unset` |
-| Transform | demand-weighted mean across this product's outbound arcs |
+| Read by the engine | `project_map.py::_map_demand -> ProductRow.sell_price when the master is unset; and (WP 14.3) CustomerLink.unit_price, the row's own price under `revenue_max` and in its fill rates` |
+| Transform | demand-weighted mean across this product's outbound arcs (the product's price); as is for the row's price, which a Customer-row `price` override beats |
 | When NULL, the engine uses | the engine's ENGINE_DEFAULT_PRICE |
 | Validated at ingest | numeric > 0 |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -459,6 +459,6 @@ A triangular row's upper bound — a rate in the row's `time_unit`, weekly after
 
 ---
 
-*Generated from data contract `14629b47bab9`, engine `0.3.0`,
+*Generated from data contract `2cea4e23e233`, engine `0.4.0`,
 sidecar `supabase/contract/outbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

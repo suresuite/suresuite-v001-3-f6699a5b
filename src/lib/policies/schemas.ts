@@ -195,6 +195,12 @@ export const FulfillmentPolicy = z.object({
   sourcing_firm: z.string().default(""),
   primary_source: z.boolean().default(false),
   price: z.number().min(0).default(0),
+  // WP 14.3 — the row's inputs to the project's allocation rule. OPTIONAL, not
+  // defaulted: each is a Customer-row override over a master value (the
+  // customer's priority / contracted floor), so the project bundle — and the
+  // defaults a policy version stores — carries neither.
+  row_priority: z.number().min(0).optional(),
+  sla_fill_floor_pct: z.number().min(0).max(100).optional(),
 });
 
 // ---------- Production ----------
@@ -633,7 +639,10 @@ export const FIELD_LABELS: Record<string, string> = {
   row_demand_max: "Demand max (units/wk, triangular)",
   // fulfillment extensions
   sourcing_firm: "Sourcing firm",
-  price: "Price",
+  price: "Price (€/unit, this row)",
+  // customer · fulfillment per row (PLAN.md §24 WP 14.3)
+  row_priority: "Priority (this row)",
+  sla_fill_floor_pct: "Service target (% fill floor)",
   // transport distribution params
   lead_time_shape: "Lead time shape (k)",
   lead_time_scale: "Lead time scale (θ)",

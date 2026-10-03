@@ -13,17 +13,33 @@ Resident at PH-60. MTO: production Q_p is allocated FIFO to existing
 backlog first, then to this week's demand; the rule decides what happens
 to the remainder. Backorders age in weekly buckets and expire to lost
 sales after ``backorder_horizon`` weeks.
+
+PER ROW (WP 14.3, ADR 0002 decisions 4–5). A customer × product row may
+carry its own backorder setting, horizon and cost (``row_overrides``, keyed
+``<customer>::<product>``), and the project's ONE allocation rule may need
+per-row inputs (``revenue_max``; row priorities or service targets, published
+by P-C.2 at setup). Then the backlog is kept PER ROW — age buckets
+``[rows × (max horizon + 1)]``, each row expiring at its own horizon — and
+each product's supply (MTO: production output; MTS: what PH-30 shipped from
+stock) is split across its rows by ``core/allocation.py``, oldest backlog
+first within a row. ``ctx.backlog`` stays the product sum for every existing
+reader, ``ctx.backlog_rows`` carries the rows, and the per-row fill rate,
+lost units and backorder cost are reported. Without either, nothing changes:
+the product-level path below runs exactly as before, and ``backlog_rows`` is
+the product backlog split by share.
 """
 from __future__ import annotations
 
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Optional
 
 import numpy as np
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from scsim.core.allocation import allocate_batched
 from scsim.core.context import SimContext
 from scsim.core.phases import (
     DEMAND,
+    DEMAND_ROWS,
     FG_FULFILLMENT,
     FULFILLMENT,
     PRODUCTION_OUTPUT,
@@ -55,6 +71,27 @@ class UnmetDemandParams(PolicyParams):
         0.5, ge=0.0, le=1.0,
         json_schema_extra={"unit": "-", "scope": "P", "notes": "Share of unmet demand that waits."},
     )
+    row_overrides: dict[str, "RowFulfillment"] = Field(
+        default_factory=dict,
+        json_schema_extra={"unit": "row → settings", "scope": "PC",
+                           "notes": "Per customer × product row, keyed '<customer>::<product>': "
+                                    "backorder allowed, horizon (weeks), penalty (€/unit/wk). "
+                                    "Any row here runs fulfillment per row (WP 14.3)."},
+    )
+
+
+class RowFulfillment(BaseModel):
+    """One customer × product row's fulfillment settings (WP 14.3). A field left
+    None takes the project's value."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    backorder_allowed: Optional[bool] = None
+    backorder_horizon: Optional[int] = Field(None, ge=0, le=26)
+    backorder_penalty: Optional[float] = Field(None, ge=0)
+
+
+UnmetDemandParams.model_rebuild()
 
 
 @register_plugin
@@ -78,7 +115,7 @@ class UnmetDemandHandling(PolicyPlugin):
         return [
             Hook(
                 phase=PhaseId.PH60, priority=50,
-                reads={DEMAND, PRODUCTION_OUTPUT, FG_FULFILLMENT},
+                reads={DEMAND, DEMAND_ROWS, PRODUCTION_OUTPUT, FG_FULFILLMENT},
                 writes={FULFILLMENT, ST_BACKLOG, ST_LOST_SALES, ST_COST_LEDGER},
             ),
         ]
@@ -92,6 +129,12 @@ class UnmetDemandHandling(PolicyPlugin):
             }
 
     def on_phase(self, phase: PhaseId, ctx: SimContext) -> None:
+        rows = ctx.policy_state.get(self._ROWS)
+        if rows is None:
+            rows = ctx.policy_state[self._ROWS] = self._row_setup(ctx)
+        if rows["active"]:
+            self._on_phase_rows(ctx, rows)
+            return
         p: UnmetDemandParams = self.params
         Q = ctx.production_output
         D = ctx.demand
@@ -133,6 +176,133 @@ class UnmetDemandHandling(PolicyPlugin):
 
         ctx.write_fulfillment(fulfilled, served_new, lost)
         ctx.set_backlog(new_backlog)
+
+    # ------------------------------------------------------------ per row
+
+    _ROWS: ClassVar[str] = "unmet_demand_handling.rows"
+
+    def _row_setup(self, ctx: SimContext) -> dict:
+        """Decide once, at the first PH-60, whether fulfillment runs per row.
+
+        Read lazily rather than in ``setup`` because P-C.2 publishes the
+        project's rule and row inputs in ITS setup, whose order relative to
+        this one is the portfolio's, not a contract."""
+        p: UnmetDemandParams = self.params
+        m = ctx.model
+        alloc = ctx.row_allocation
+        active = bool(p.row_overrides) or bool(alloc and alloc.get("row_level"))
+        if not active:
+            return {"active": False}
+        R = m.n_rows
+        index = {rid: r for r, rid in enumerate(m.row_ids)}
+        project_waits = 0.0 if p.rule == "lost_sales" else (
+            1.0 if p.rule == "backorder" else p.partial_accept_prob)
+        accept = np.full(R, project_waits)
+        horizon = np.full(R, p.backorder_horizon, dtype=int)
+        penalty = np.full(R, p.backorder_penalty if p.rule != "lost_sales" else 0.0)
+        for rid, ov in p.row_overrides.items():
+            r = index.get(rid)
+            if r is None:
+                continue  # the mapper only names rows that exist; a test may not
+            if ov.backorder_allowed is not None:
+                accept[r] = 1.0 if ov.backorder_allowed else 0.0
+            if ov.backorder_horizon is not None:
+                horizon[r] = ov.backorder_horizon
+            if ov.backorder_penalty is not None:
+                penalty[r] = ov.backorder_penalty
+        waits = accept > 0
+        penalty = np.where(waits, penalty, 0.0)
+        H = int(horizon[waits].max()) if waits.any() else 0
+        if alloc is None:
+            # No P-C.2: the project rule is P-C.2's own default (fcfs), which at
+            # weekly buckets is the equal-fill-rate split.
+            alloc = {"rule": "fair_share", "priority": m.row_cust_priority.copy(),
+                     "price": m.row_price.copy(), "floor_pct": np.zeros(R)}
+        T = m.settings.horizon
+        return {
+            "active": True, "alloc": alloc, "accept": accept, "horizon": horizon,
+            "penalty": penalty, "buckets": np.zeros((R, H + 1)),
+            "cols": np.arange(H + 1)[None, :],
+            # KPI accumulators, one column per week.
+            "demand": np.zeros((R, T)), "served_new": np.zeros((R, T)),
+            "lost": np.zeros((R, T)), "cost": np.zeros((R, T)),
+        }
+
+    def _on_phase_rows(self, ctx: SimContext, st: dict) -> None:
+        m = ctx.model
+        P = m.n_prods
+        rp = m.row_prod
+        # Supply per product: MTO ships production output; MTS ships what PH-30
+        # took from finished-goods stock (backlog first at product level — the
+        # rows re-split that total below, oldest backlog first within a row).
+        supply = np.where(m.mts_mask, ctx.fg_served_backlog + ctx.fg_served_new,
+                          ctx.production_output)
+        alloc = st["alloc"]
+        buckets = st["buckets"]
+        d_rows = np.maximum(ctx.demand_rows, 0.0)
+        sb_age, s_new = allocate_batched(
+            supply, buckets, d_rows, m.row_ptr, alloc["rule"],
+            priority=alloc["priority"], price=alloc["price"], floor_pct=alloc["floor_pct"])
+        buckets -= sb_age
+        np.maximum(buckets, 0.0, out=buckets)
+        unmet_new = np.maximum(d_rows - s_new, 0.0)
+        waiting = unmet_new * st["accept"]
+        lost = unmet_new - waiting
+        # Each row expires at ITS horizon: the bucket of age h_r goes to lost
+        # sales, then everything ages one week and the new waiting enters age 0.
+        horizon = st["horizon"]
+        expire_col = buckets[np.arange(m.n_rows), np.minimum(horizon, buckets.shape[1] - 1)]
+        lost = lost + expire_col
+        buckets[st["cols"] >= horizon[:, None]] = 0.0
+        if buckets.shape[1] > 1:
+            buckets[:, 1:] = buckets[:, :-1].copy()
+        buckets[:, 0] = waiting
+        backlog_rows = buckets.sum(axis=1)
+
+        cost_rows = backlog_rows * st["penalty"]
+        if st["penalty"].any():
+            ctx.cost.add("backorder_penalty", float(cost_rows.sum()))
+
+        fulfilled_rows = sb_age.sum(axis=1) + s_new
+
+        def by_prod(x: np.ndarray) -> np.ndarray:
+            return np.bincount(rp, weights=x, minlength=P)
+
+        ctx.write_fulfillment(by_prod(fulfilled_rows), by_prod(s_new), by_prod(lost))
+        ctx.write_fulfillment_rows(fulfilled_rows, s_new, lost)
+        ctx.set_backlog(by_prod(backlog_rows), rows=backlog_rows)
+        t = ctx.week
+        st["demand"][:, t] = d_rows
+        st["served_new"][:, t] = s_new
+        st["lost"][:, t] = lost
+        st["cost"][:, t] = cost_rows
+
+    def kpi_contribution(self, ctx: SimContext, t_w: int, window_end: int) -> dict[str, float]:
+        """Per row and per customer, only when fulfillment ran per row: a
+        project-wide run reports exactly what it reported before WP 14.3."""
+        st = ctx.policy_state.get(self._ROWS)
+        if not st or not st.get("active"):
+            return {}
+        m = ctx.model
+        w = slice(t_w, window_end)
+        dem = st["demand"][:, w].sum(axis=1)
+        srv = st["served_new"][:, w].sum(axis=1)
+        out: dict[str, float] = {}
+        for r, rid in enumerate(m.row_ids):
+            out[f"fill_rate_row_{rid}"] = float(srv[r] / dem[r]) if dem[r] > 0 else 1.0
+            out[f"lost_units_row_{rid}"] = float(st["lost"][r, w].sum())
+            out[f"backorder_cost_row_{rid}"] = float(st["cost"][r, w].sum())
+        # Per customer: value-weighted at each row's price (the engine's fill
+        # rate convention); an implicit row has no customer and no entry.
+        price = m.row_price
+        for c, cid in enumerate(m.cust_ids):
+            sel = m.row_cust == c
+            if not sel.any():
+                continue
+            d = float((dem[sel] * price[sel]).sum())
+            s = float((srv[sel] * price[sel]).sum())
+            out[f"fill_rate_customer_{cid}"] = s / d if d > 0 else 1.0
+        return out
 
     @staticmethod
     def _drain_fifo(buckets: np.ndarray, served: np.ndarray) -> None:

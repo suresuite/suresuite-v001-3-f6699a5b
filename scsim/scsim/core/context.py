@@ -304,6 +304,18 @@ class CompiledModel:
         self.row_to_prod = sparse.csr_matrix(
             (np.ones(R), (self.row_prod, np.arange(R))), shape=(self.n_prods, R))
         specs = [l for _, _, l in rows]
+        # Per-row fulfillment inputs (WP 14.3, ADR 0002 decision 4): the row's
+        # price (its own, else the product's), its customer's priority and its
+        # customer's contracted floor (NaN = none). An implicit row has no
+        # customer: priority 1.0, no floor.
+        self.row_price = np.array([
+            float(l.unit_price) if l is not None and l.unit_price is not None
+            else float(self.unit_price[j]) for j, _c, l in rows])
+        self.row_cust_priority = np.array([
+            float(self.cust_priority[c]) if c >= 0 else 1.0 for _j, c, _l in rows])
+        floors = [c.sla_fill_floor_pct for c in net.customers]
+        self.row_cust_floor = np.array([
+            np.nan if c < 0 or floors[c] is None else float(floors[c]) for _j, c, _l in rows])
         self.row_has_spec = np.array([l is not None and l.has_demand_spec for l in specs])
         self.has_row_demand = bool(self.row_has_spec.any())
         self.row_forecast_short: list[dict] = []
@@ -801,6 +813,17 @@ class SimContext:
         self.week: int = 0
         self.demand = np.zeros(model.n_prods)
         self.demand_rows = np.zeros(model.n_rows)   # PH-10 (WP 14.1): Σ by product = demand
+        # Per-row fulfillment (WP 14.3). `backlog_rows` is the per-row backlog,
+        # Σ by product = `backlog`: TRACKED when P-C.1 runs per row, otherwise
+        # the product backlog split by row share (a view). The `*_rows`
+        # fulfillment outputs are None unless P-C.1 runs per row.
+        self.backlog_rows = np.zeros(model.n_rows)
+        self.fulfilled_rows: Optional[np.ndarray] = None
+        self.served_new_rows: Optional[np.ndarray] = None
+        self.lost_rows: Optional[np.ndarray] = None
+        # The project's ONE allocation rule and its per-row inputs, published by
+        # P-C.2 at setup (the P-C.6 publish-at-setup pattern); None = no P-C.2.
+        self.row_allocation: Optional[dict] = None
         self.forecast = model.mean_demand_p.copy()
         self.fg_served_backlog = np.zeros(model.n_prods)  # PH-30 (MTS)
         self.fg_served_new = np.zeros(model.n_prods)
@@ -967,9 +990,14 @@ class SimContext:
         self.pipeline[link_idx, src] -= take
         self.pipeline[link_idx, dst] += take
 
-    def set_backlog(self, backlog: np.ndarray) -> None:
+    def set_backlog(self, backlog: np.ndarray, rows: Optional[np.ndarray] = None) -> None:
+        """Product backlog; ``rows`` is the per-row backlog when P-C.1 tracks it
+        (WP 14.3), else the rows are the product backlog split by share."""
         self._check_write(ST_BACKLOG)
         self.backlog = np.maximum(backlog, 0.0)
+        m = self.model
+        self.backlog_rows = (np.maximum(rows, 0.0) if rows is not None
+                             else self.backlog[m.row_prod] * m.row_share)
 
     def write_fg_target(self, target: np.ndarray) -> None:
         """S^FG_p — MTS stock target, consumed by next week's PH-40 (ADR 0001)."""
@@ -990,3 +1018,13 @@ class SimContext:
         self.fulfillment = fulfilled
         self.served_new_week = np.clip(served_new, 0.0, None)
         self.lost_units_week = np.maximum(lost_units, 0.0)
+
+    def write_fulfillment_rows(
+        self, fulfilled: np.ndarray, served_new: np.ndarray, lost_units: np.ndarray
+    ) -> None:
+        """Per customer × product row (WP 14.3): Σ by product equals what
+        ``write_fulfillment`` wrote. Same contract key, same single writer."""
+        self._check_write(FULFILLMENT)
+        self.fulfilled_rows = np.maximum(fulfilled, 0.0)
+        self.served_new_rows = np.clip(served_new, 0.0, None)
+        self.lost_rows = np.maximum(lost_units, 0.0)

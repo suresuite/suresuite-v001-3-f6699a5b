@@ -57,6 +57,10 @@ export interface GradingDataset {
    * buckets, each with `period_start`, `period_end` and `weekly_quantity`.
    * Optional; absent grades exactly as before. */
   demandForecasts?: Row[];
+  /** `customers` rows (PLAN.md §24 WP 14.3) — priority and contracted floor,
+   * the base under each Customer row's priority and service target. Optional;
+   * absent, the customer fields grade over no rows, as before. */
+  customers?: Row[];
 }
 
 export interface FallbackStep {
@@ -652,6 +656,14 @@ const FIELD_BINDINGS: Record<string, FieldBinding> = {
   "inbound_logistics.volume": { rows: (d) => d.inbound, id: arcId, master: (r) => num(r.volume) },
   "outbound_logistics.volume": { rows: (d) => d.outbound, id: laneId, master: (r) => num(r.volume) },
   "outbound_logistics.unit_price": { rows: (d) => d.outbound, id: laneId, master: (r) => num(r.unit_price) },
+  // WP 14.3 (closes contract:check R13 for it). A STATED weight is set, 0
+  // included — 0 is the lowest priority there is, not an empty cell — so the
+  // binding tests presence rather than `> 0`.
+  "customers.priority_weight": {
+    rows: (d) => d.customers ?? [],
+    id: (r) => String(r.customer_id ?? ""),
+    master: (r) => (r.priority_weight === null || r.priority_weight === undefined || r.priority_weight === "" ? 0 : 1),
+  },
 };
 
 /** Per-product `production` patches, resolved the way the engine resolves them.

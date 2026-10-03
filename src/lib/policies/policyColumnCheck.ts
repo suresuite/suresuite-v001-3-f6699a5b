@@ -476,6 +476,48 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     verdict: "conditional",
     note: "Read only when the row's distribution is triangular.",
   },
+  // PLAN.md §24 WP 14.3 — fulfillment per customer × product row.
+  "customer:backorder_allowed": {
+    shows: "your override, else the project's setting (Customer allocation card)",
+    savedTo: "override fulfillment.backorder_allowed (Customer row)",
+    engine: "P-C.1: this row waits (backorder) or loses (lost sales); its own backlog",
+    verdict: "works",
+  },
+  "customer:max_backorder_days": {
+    shows: "your override, else the project's; the note says the whole weeks the run uses",
+    savedTo: "override fulfillment.max_backorder_days (Customer row)",
+    engine: "the row's horizon in weeks — days ÷ 7 rounded half up, clamped 0–26",
+    verdict: "conditional",
+    note: "Read only for a row that backorders.",
+  },
+  "customer:backorder_cost_per_day": {
+    shows: "your override, else the project's",
+    savedTo: "override fulfillment.backorder_cost_per_day (Customer row)",
+    engine: "× 7 → the row's backorder penalty per unit per week",
+    verdict: "conditional",
+    note: "Read only for a row that backorders.",
+  },
+  "customer:row_priority": {
+    shows: "your override → customers.priority_weight of the row's customer → 1.0",
+    savedTo: "override fulfillment.row_priority (per row — /policies never writes the customer)",
+    engine: "P-C.2 row priority: higher serves first",
+    verdict: "conditional",
+    note: "Read under the priority and sla_tier rules; the cell is shown only then.",
+  },
+  "customer:price": {
+    shows: "your override → outbound_logistics.unit_price → the product's sell price",
+    savedTo: "override fulfillment.price (per row)",
+    engine: "the row's price: what revenue_max serves first, and what values its fill rate",
+    verdict: "works",
+    note: "Shown under revenue_max, the rule that orders by it.",
+  },
+  "customer:sla_fill_floor_pct": {
+    shows: "your override → customers.sla_fill_floor_pct of the row's customer → empty (the segment's tier floor)",
+    savedTo: "override fulfillment.sla_fill_floor_pct (per row)",
+    engine: "P-C.2 sla_tier: this % of the row's demand is served first",
+    verdict: "conditional",
+    note: "Read under the sla_tier rule; the cell is shown only then.",
+  },
 };
 
 /** Header label + sub-label exactly as the grid renders them. */
@@ -525,7 +567,7 @@ export const FULFILLMENT_CARD_CHECK: Record<string, ColumnCheck> = {
   max_backorder_days: {
     shows: "saved value; never saved → 14 (visible when backorder is on)",
     savedTo: "policy_defaults.fulfillment",
-    engine: "backorder horizon in weeks (days ÷ 7, clamped 0–26); never saved → 14",
+    engine: "backorder horizon in weeks (days ÷ 7 rounded half up, clamped 0–26); never saved → 14",
     verdict: "works",
   },
   backorder_cost_per_day: {

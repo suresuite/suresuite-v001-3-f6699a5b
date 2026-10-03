@@ -2353,12 +2353,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:216"
+        "evidence": "src/hooks/useItemMasters.tsx:230"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:216"
+        "evidence": "src/hooks/useItemMasters.tsx:230"
       }
     ],
     "governance": {
@@ -2996,7 +2996,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "engineChain": null,
         "engineLevel": null,
         "blank": "null",
-        "engineField": "P-C.2 customer_allocation — Customer.priority_weight, the fallback ordering under the `priority` rule wherever the `priority_weights` param does not name the customer",
+        "engineField": "P-C.2 customer_allocation — Customer.priority_weight, the default priority of each of the customer's rows under the `priority` and `sla_tier` rules wherever the `priority_weights` param does not name the customer and no Customer-row override (`row_priority`, WP 14.3) does",
         "engineMissingDefault": "1.0 (Customer.priority_weight's own default) — every customer equal, so the `priority` rule cannot order anything",
         "engineTransform": null,
         "unitColumn": null,
@@ -3009,9 +3009,9 @@ export const REFERENCE_TABLES: RefTable[] = [
         "type": "numeric",
         "nullable": true,
         "unit": null,
-        "csvHeader": null,
+        "csvHeader": "sla_fill_floor_pct",
         "required": false,
-        "validate": null,
+        "validate": "optional; 0-100 (a percentage of the row's demand). Blank lands nothing — no floor, not 0",
         "meaning": "The minimum fill rate the customer is contracted to receive, as a percentage. NULLABLE, and the null means \"no contracted floor\" — not zero. A reader that coerces it to 0 turns \"unconstrained\" into \"no service required\", which is D17's error in the other direction.",
         "primaryKey": false,
         "unique": false,
@@ -3019,10 +3019,10 @@ export const REFERENCE_TABLES: RefTable[] = [
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null,
-        "blank": null,
-        "engineField": null,
-        "engineMissingDefault": null,
-        "engineTransform": null,
+        "blank": "null",
+        "engineField": "project_map.py::_build_customers -> Customer.sla_fill_floor_pct; P-C.2 customer_allocation — each of the customer's rows' default service target under the `sla_tier` rule",
+        "engineMissingDefault": "no floor — the segment's `sla_tiers` floor applies, else none",
+        "engineTransform": "clamped 0-100 (warned); a Customer-row override on /policies (`sla_fill_floor_pct`) beats it for that row",
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "rate",
@@ -7116,12 +7116,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:216"
+        "evidence": "src/hooks/useItemMasters.tsx:230"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:216"
+        "evidence": "src/hooks/useItemMasters.tsx:230"
       }
     ],
     "governance": {
@@ -15102,12 +15102,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:216"
+        "evidence": "src/hooks/useItemMasters.tsx:230"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:216"
+        "evidence": "src/hooks/useItemMasters.tsx:230"
       }
     ],
     "governance": {
@@ -15363,9 +15363,9 @@ export const REFERENCE_TABLES: RefTable[] = [
         "engineChain": null,
         "engineLevel": null,
         "blank": "reject",
-        "engineField": "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset",
+        "engineField": "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset; and (WP 14.3) CustomerLink.unit_price, the row's own price under `revenue_max` and in its fill rates",
         "engineMissingDefault": "the engine's ENGINE_DEFAULT_PRICE",
-        "engineTransform": "demand-weighted mean across this product's outbound arcs",
+        "engineTransform": "demand-weighted mean across this product's outbound arcs (the product's price); as is for the row's price, which a Customer-row `price` override beats",
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",

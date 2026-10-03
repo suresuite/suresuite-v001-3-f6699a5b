@@ -397,19 +397,18 @@ const UploadWizard = ({
       // declared them. It was right: this is the missing surface, not a gate to
       // relax.
       //
-      // `sla_fill_floor_pct` is DELIBERATELY NOT OFFERED. The column exists and
-      // no engine field carries it — `scsim`'s `Customer` has no per-customer
-      // floor and `sla_tiers` is keyed by SEGMENT (§4 D95) — so a header for it
-      // would be a column a user fills that changes nothing, which is exactly
-      // the defect §4 D18 is. It comes back when the engine has somewhere to put
-      // it.
+      // `sla_fill_floor_pct` was deliberately NOT offered until PLAN.md §24 WP
+      // 14.3: no engine field carried it (§4 D95), so a header for it would have
+      // been a column that changes nothing (§4 D18). The engine has somewhere to
+      // put it now — `Customer.sla_fill_floor_pct`, each of the customer's rows'
+      // default service target under the sla_tier rule — so it is offered.
       id: 'item_master_customers',
       name: 'Customers Master',
-      description: 'Per-customer segment and allocation priority the simulation reads under scarcity',
+      description: 'Per-customer segment, allocation priority and contracted fill floor the simulation reads under scarcity',
       templateFile: '/template/customers.csv',
       guideFile: '/docs/csv-upload-guide.md',
       expectedHeaders: ['customer_id'],
-      optionalHeaders: ['name', 'segment', 'priority_weight'],
+      optionalHeaders: ['name', 'segment', 'priority_weight', 'sla_fill_floor_pct'],
       category: 'item-master',
     },
     {

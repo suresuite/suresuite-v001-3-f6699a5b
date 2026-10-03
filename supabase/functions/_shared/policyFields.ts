@@ -212,12 +212,16 @@ export const FAMILY_FIELDS: Record<PolicyFamily, Record<string, PolicyFieldSpec>
     // run-readiness: primary sourcing firm per customer×product (grid)
     sourcing_firm: s(true),
     primary_source: b(true),
+    // Customer-row inputs to the project's allocation rule (PLAN.md §24 WP 14.3):
+    // the row's price (revenue_max), priority and service target.
+    price: n(0, undefined, true),
+    row_priority: n(0, undefined, true),
+    sla_fill_floor_pct: n(0, 100, true),
     // stored, pending
     lost_sales_cost_per_unit: n(0),
     service_level_alpha: n(0, 1),
     service_level_beta: n(0, 1),
     order_batching_window_hours: n(0),
-    price: n(0),
   },
   production: {
     capacity_units_per_day: n(0, undefined, true),
@@ -259,6 +263,14 @@ export const FAMILY_FIELDS: Record<PolicyFamily, Record<string, PolicyFieldSpec>
     cost_cap: { ...n(0), pendingPolicy: "recovery_playbook" },
   },
   demand: {
+    // Customer-row demand (PLAN.md §24 WP 14.2), editable on /policies — added
+    // in WP 14.3, which found the agent surface did not know them.
+    row_demand_mode: en(["forecast", "model"], true),
+    row_demand_distribution: en(["deterministic", "normal", "triangular", "triangular_av", "poisson"], true),
+    row_demand_mean: n(0, undefined, true),
+    row_demand_variation: n(0, undefined, true),
+    row_demand_min: n(0, undefined, true),
+    row_demand_max: n(0, undefined, true),
     // Demand shape comes from product/graph data; the family is stored and
     // pending P-C.3 demand shaping (fieldStatus.ts::PENDING_FAMILY_POLICY).
     pattern: { ...en(["stationary", "trend", "seasonal", "intermittent", "lumpy"]), pendingPolicy: "demand_shaping" },

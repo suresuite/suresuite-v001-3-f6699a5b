@@ -16,12 +16,14 @@ export default function CustomerStage() {
     <>
       <PageTitle lead={stage.role}>Customer stage</PageTitle>
 
-      <Callout tone="note" title="Demand is set here, row by row">
+      <Callout tone="note" title="Demand and fulfilment are set here, row by row">
         <p>
-          Since demand can be stated per customer and product, this stage carries the row's own
-          demand: its mode (forecast or model), distribution, mean, variation and — for a triangular
-          row — its bounds, with the uploaded forecast shown beside them. The supplier stage has{" "}
-          {supplierCols} columns and the plant stage {plantCols}; this one has {cols.length}.
+          Each customer and product row carries its own demand — mode (forecast or model),
+          distribution, mean, variation and, for a triangular row, its bounds, with the uploaded
+          forecast beside them — and its own fulfilment: whether it backorders, for how long and at
+          what cost, and the priority, price or service target the project's allocation rule reads.
+          The supplier stage has {supplierCols} columns and the plant stage {plantCols}; this one
+          has {cols.length}.
         </p>
       </Callout>
 
@@ -71,33 +73,69 @@ export default function CustomerStage() {
                 cell's note says which, for its row.
               </>
             ),
+            backorder_allowed: (
+              <>
+                Whether this row waits for supply (backorder) or loses what cannot be shipped this
+                week. Empty is the project's setting.
+              </>
+            ),
+            max_backorder_days: (
+              <>
+                How long the row's backlog may wait before it is lost. The engine steps in weeks,
+                so the days become whole weeks, rounded half up — 3 days is 0 weeks, 4 is 1, 10 is
+                1, 11 is 2 — and the cell's note shows the weeks the run will use.
+              </>
+            ),
+            backorder_cost_per_day: <>Per unit per day the row's backlog waits; the run charges it weekly (× 7).</>,
+            row_priority: (
+              <>
+                Under the <Term>priority</Term> and <Term>sla_tier</Term> rules: higher is served
+                first. Empty is the customer's priority weight, else 1.
+              </>
+            ),
+            price: (
+              <>
+                Under <Term>revenue_max</Term>: the highest-priced row is served first. Empty is the
+                outbound row's unit price, else the product's sell price.
+              </>
+            ),
+            sla_fill_floor_pct: (
+              <>
+                Under <Term>sla_tier</Term>: this share of the row's demand is served before the
+                rest is split by priority. Empty is the customer's contracted floor, else the
+                segment's tier floor.
+              </>
+            ),
           }}
         />
       </Section>
 
-      <Section id="where-the-decisions-are" title="Where the demand-side decisions actually are">
+      <Section id="where-the-decisions-are" title="What is per row, and what is per project">
         <Key>
-          Almost everything about the demand end is a project-wide decision, not a per-customer one.
+          One allocation rule per project; everything that rule reads, and every backorder setting,
+          per row.
         </Key>
         <P>
-          How unmet demand is handled — lost, backordered, or split — how orders are allocated when
-          there is not enough to go round, and what service level you are aiming at: all of these
-          are set <strong>once for the project</strong>, in the fulfilment defaults on{" "}
-          <AppLink to="/policies">/policies</AppLink>, and not per customer and product.
+          The <strong>allocation rule</strong> — priority, fair share, proportional, revenue
+          maximising or SLA tiers — is set once, on the <Term>Customer allocation</Term> card at{" "}
+          <AppLink to="/policies">/policies</AppLink>. Allocating between customers is a rule the
+          chain applies <em>across</em> rows, so a per-row version would be several rules competing
+          to be the rule; the engine reads one.
         </P>
         <P>
-          That is a modelling decision rather than an omission. Allocating between customers is a
-          rule the chain applies <em>across</em> customers, so a per-customer version of it would be
-          several rules competing to be the rule. The engine reads one.
+          What that rule reads is per row: a row's <strong>priority</strong>, its{" "}
+          <strong>price</strong> and its <strong>service target</strong>. Each column appears only
+          under the rule that reads it. So is <strong>backorder</strong>: one row can wait for supply
+          while another of the same product loses what cannot be shipped, each with its own backlog,
+          window and cost. When supply falls short, each product's units are split across its rows
+          by the project's rule, a row's oldest backlog first. A project that sets none of this per
+          row runs exactly as before, with the card's settings for every row.
         </P>
         <P>
-          The parts of a customer that <em>are</em> per row — what they buy, how much and how it
-          varies, at what price and lead time — are your{" "}
-          <DocLink to="outbound-logistics">Outbound Logistics</DocLink> upload, with the demand
-          cells above as overrides on top. And
-          the customer attributes the engine reads on top of that, priority weight and segment, live
-          on a table with no upload and no screen at all; <DocLink to="known-limits">Known
-          limits</DocLink> records that.
+          The base under these cells is your data: the{" "}
+          <DocLink to="outbound-logistics">Outbound Logistics</DocLink> row (demand, price) and the
+          customer's own row in the customers upload (priority weight, segment, contracted floor).
+          An edit here is an override on the row; the upload is never changed.
         </P>
       </Section>
 

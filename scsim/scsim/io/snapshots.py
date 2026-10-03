@@ -60,6 +60,8 @@ class WarmState:
     policy_state: dict
     trace_cols: dict[str, np.ndarray]
     cost_weekly: np.ndarray
+    # WP 14.3: the per-row backlog, read before PH-60 of the resume week.
+    backlog_rows: Optional[np.ndarray] = None
 
 
 class SnapshotInvalid(RuntimeError):
@@ -107,6 +109,7 @@ class SnapshotStore:
                 "fg_value": tr.fg_value[:t_w].copy(),
             },
             cost_weekly=ctx.cost.weekly[:, :t_w].copy(),
+            backlog_rows=ctx.backlog_rows.copy(),
         )
 
     def restore(self, digest: str, model_rep: int, ctx: SimContext) -> Optional[int]:
@@ -118,6 +121,8 @@ class SnapshotStore:
         ctx.pipeline = ws.pipeline.copy()
         ctx.queue = ws.queue.copy()
         ctx.backlog = ws.backlog.copy()
+        if ws.backlog_rows is not None:
+            ctx.backlog_rows = ws.backlog_rows.copy()
         ctx.fg_on_hand = ws.fg_on_hand.copy()
         ctx.fg_target = ws.fg_target.copy()
         ctx.demand_history = ws.demand_history.copy()

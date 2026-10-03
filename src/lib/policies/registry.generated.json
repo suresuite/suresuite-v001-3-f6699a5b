@@ -1,4 +1,48 @@
 {
+  "backorder": {
+    "days_per_week": 7,
+    "examples": [
+      {
+        "days": 0,
+        "weeks": 0
+      },
+      {
+        "days": 3,
+        "weeks": 0
+      },
+      {
+        "days": 3.5,
+        "weeks": 1
+      },
+      {
+        "days": 4,
+        "weeks": 1
+      },
+      {
+        "days": 10,
+        "weeks": 1
+      },
+      {
+        "days": 10.5,
+        "weeks": 2
+      },
+      {
+        "days": 11,
+        "weeks": 2
+      },
+      {
+        "days": 14,
+        "weeks": 2
+      },
+      {
+        "days": 200,
+        "weeks": 26
+      }
+    ],
+    "max_weeks": 26,
+    "min_weeks": 0,
+    "rounding": "half_up"
+  },
   "base_data_requirements": [
     {
       "condition": null,
@@ -146,7 +190,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.3.0",
+  "engine_version": "0.4.0",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -202,6 +246,23 @@
           "title": "Segment",
           "type": "string",
           "unit": "-"
+        },
+        "sla_fill_floor_pct": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Default per-row service target under sla_tier; None = the segment floor.",
+          "scope": "C",
+          "title": "Sla Fill Floor Pct",
+          "unit": "%"
         }
       },
       "required": [
@@ -1342,6 +1403,7 @@
           "priority": 50,
           "reads": [
             "demand",
+            "demand_rows",
             "fg_fulfillment",
             "production_output"
           ],
@@ -1357,6 +1419,55 @@
       "id": "unmet_demand_handling",
       "milestone": null,
       "params_schema": {
+        "$defs": {
+          "RowFulfillment": {
+            "additionalProperties": false,
+            "description": "One customer \u00d7 product row's fulfillment settings (WP 14.3). A field left\nNone takes the project's value.",
+            "properties": {
+              "backorder_allowed": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Backorder Allowed"
+              },
+              "backorder_horizon": {
+                "anyOf": [
+                  {
+                    "maximum": 26,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Backorder Horizon"
+              },
+              "backorder_penalty": {
+                "anyOf": [
+                  {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Backorder Penalty"
+              }
+            },
+            "title": "RowFulfillment",
+            "type": "object"
+          }
+        },
         "additionalProperties": false,
         "properties": {
           "backorder_horizon": {
@@ -1386,6 +1497,16 @@
             "title": "Partial Accept Prob",
             "type": "number",
             "unit": "-"
+          },
+          "row_overrides": {
+            "additionalProperties": {
+              "$ref": "#/$defs/RowFulfillment"
+            },
+            "notes": "Per customer \u00d7 product row, keyed '<customer>::<product>': backorder allowed, horizon (weeks), penalty (\u20ac/unit/wk). Any row here runs fulfillment per row (WP 14.3).",
+            "scope": "PC",
+            "title": "Row Overrides",
+            "type": "object",
+            "unit": "row \u2192 settings"
           },
           "rule": {
             "default": "lost_sales",
@@ -1469,6 +1590,36 @@
             "type": "object",
             "unit": "weight per customer"
           },
+          "row_floor_pct": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "notes": "'<customer>::<product>' \u2192 the row's service target under sla_tier; beats Customer.sla_fill_floor_pct and sla_tiers.",
+            "scope": "PC",
+            "title": "Row Floor Pct",
+            "type": "object",
+            "unit": "row \u2192 fill floor %"
+          },
+          "row_price": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "notes": "'<customer>::<product>' \u2192 price revenue_max orders by; beats the row's own unit price.",
+            "scope": "PC",
+            "title": "Row Price",
+            "type": "object",
+            "unit": "\u20ac/unit per row"
+          },
+          "row_priority": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "notes": "'<customer>::<product>' \u2192 priority; beats priority_weights and Customer.priority_weight for that row.",
+            "scope": "PC",
+            "title": "Row Priority",
+            "type": "object",
+            "unit": "weight per row"
+          },
           "rule": {
             "default": "fcfs",
             "enum": [
@@ -1476,9 +1627,10 @@
               "proportional",
               "fair_share",
               "priority",
-              "sla_tier"
+              "sla_tier",
+              "revenue_max"
             ],
-            "notes": "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata); priority and sla_tier reorder.",
+            "notes": "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata); priority, sla_tier and revenue_max (by row price) reorder.",
             "scope": "C",
             "title": "Rule",
             "type": "string",
@@ -3717,6 +3869,83 @@
       ],
       "target": "CustomerLink.demand_max",
       "transform": "units per week, triangular only. Order: the Customer-stage row -> outbound_logistics.demand_max"
+    },
+    {
+      "catalog_ref": "P-C.1",
+      "family": "fulfillment",
+      "key": "backorder_allowed",
+      "scopes": [
+        "default",
+        "customer"
+      ],
+      "target": "unmet_demand_handling.rule / row_overrides[row].backorder_allowed",
+      "transform": "boolean. Project: backorder (else lost_sales). Row: whether this customer \u00d7 product row waits; empty = the project's setting"
+    },
+    {
+      "catalog_ref": "P-C.1",
+      "family": "fulfillment",
+      "key": "max_backorder_days",
+      "scopes": [
+        "default",
+        "customer"
+      ],
+      "target": "unmet_demand_handling.backorder_horizon / row_overrides[row].backorder_horizon",
+      "transform": "days -> whole weeks rounded HALF UP (3 -> 0, 4 -> 1, 10 -> 1, 11 -> 2), clamped 0-26; empty = the project's, else 14 days. Read only for a project or row that backorders"
+    },
+    {
+      "catalog_ref": "P-C.1",
+      "family": "fulfillment",
+      "key": "backorder_cost_per_day",
+      "scopes": [
+        "default",
+        "customer"
+      ],
+      "target": "unmet_demand_handling.backorder_penalty / row_overrides[row].backorder_penalty",
+      "transform": "per unit per day x 7 -> per unit per week; empty = the project's, else 0. Read only for a project or row that backorders"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": 1.0,
+      "family": "fulfillment",
+      "key": "row_priority",
+      "master": "customers.priority_weight",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "customer_allocation.row_priority",
+      "transform": "weight, >= 0; higher serves first. Order: the Customer-stage row -> customers.priority_weight of the row's customer -> 1.0. Read under the priority and sla_tier rules"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "empty_default": null,
+      "empty_note": "the product's sell price",
+      "family": "fulfillment",
+      "key": "price",
+      "master": "outbound_logistics.unit_price",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.unit_price",
+      "transform": "per unit, > 0. Order: the Customer-stage row -> outbound_logistics.unit_price -> the product's sell price. What revenue_max orders rows by and what values a row's fill rate"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "percent",
+      "empty_default": null,
+      "empty_note": "no contracted floor \u2014 the segment's tier floor applies, else none",
+      "family": "fulfillment",
+      "key": "sla_fill_floor_pct",
+      "master": "customers.sla_fill_floor_pct",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "customer_allocation.row_floor_pct",
+      "transform": "% of the row's demand guaranteed first, 0-100. Order: the Customer-stage row -> customers.sla_fill_floor_pct of the row's customer -> the segment's tier floor. Read under the sla_tier rule"
     }
   ],
   "run_window": {

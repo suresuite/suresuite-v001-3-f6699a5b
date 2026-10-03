@@ -43,12 +43,12 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "rpc ensure_item_masters"
     grain: table
-    evidence: "src/hooks/useItemMasters.tsx:216"
+    evidence: "src/hooks/useItemMasters.tsx:230"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc ensure_item_masters"
     grain: table
-    evidence: "src/hooks/useItemMasters.tsx:216"
+    evidence: "src/hooks/useItemMasters.tsx:230"
     confirmed: true
 
 governance:
@@ -268,8 +268,8 @@ fields:
       What the customer pays for one unit of this product.
     grain: level
     engine:
-      consumed_by: "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset"
-      transform: "demand-weighted mean across this product's outbound arcs"
+      consumed_by: "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset; and (WP 14.3) CustomerLink.unit_price, the row's own price under `revenue_max` and in its fill rates"
+      transform: "demand-weighted mean across this product's outbound arcs (the product's price); as is for the row's price, which a Customer-row `price` override beats"
       missing_default: "the engine's ENGINE_DEFAULT_PRICE"
     substitutions:
       - when: "`products.sell_price` is unset for this product"

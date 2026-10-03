@@ -152,6 +152,15 @@
     "quantity": 55,
     "weekly_quantity": 55
    }
+  ],
+  "customers": [
+   {
+    "customer_id": "C1",
+    "name": "Key account",
+    "segment": "key",
+    "priority_weight": 3,
+    "sla_fill_floor_pct": 90
+   }
   ]
  },
  "plant": "Plant",
@@ -334,6 +343,26 @@
      "row_demand_distribution": "poisson",
      "row_demand_mean": 25
     }
+   },
+   {
+    "scope": "node",
+    "target_key": "C2::P2",
+    "family": "fulfillment",
+    "patch": {
+     "row_priority": 2,
+     "price": 95,
+     "backorder_allowed": false
+    }
+   },
+   {
+    "scope": "node",
+    "target_key": "C1::P1",
+    "family": "fulfillment",
+    "patch": {
+     "sla_fill_floor_pct": 95,
+     "backorder_allowed": true,
+     "max_backorder_days": 10
+    }
    }
   ]
  },
@@ -345,6 +374,34 @@
   "warmup_mode": "auto"
  },
  "engine": {
+  "customers.priority_weight": {
+   "C1::P1": {
+    "source": "master",
+    "value": 3.0
+   },
+   "C1::P2": {
+    "source": "master",
+    "value": 3.0
+   },
+   "C2::P2": {
+    "source": "override",
+    "value": 2.0
+   }
+  },
+  "customers.sla_fill_floor_pct": {
+   "C1::P1": {
+    "source": "override",
+    "value": 95.0
+   },
+   "C1::P2": {
+    "source": "master",
+    "value": 90.0
+   },
+   "C2::P2": {
+    "source": "default",
+    "value": null
+   }
+  },
   "materials.cost": {
    "M1": {
     "source": "override",
@@ -455,6 +512,20 @@
    "C2::P2": {
     "source": "default",
     "value": null
+   }
+  },
+  "outbound_logistics.unit_price": {
+   "C1::P1": {
+    "source": "master",
+    "value": 110.0
+   },
+   "C1::P2": {
+    "source": "master",
+    "value": 80.0
+   },
+   "C2::P2": {
+    "source": "override",
+    "value": 95.0
    }
   },
   "products.demand_cv": {

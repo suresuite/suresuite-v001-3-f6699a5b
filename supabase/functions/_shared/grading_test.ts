@@ -440,3 +440,26 @@ Deno.test("WP 14.2: a forecast shorter than the run, or with a gap, warns", () =
   // A deterministic row with a series needs no mean: the series is its centre.
   assertEquals(demandRowFindings(outbound, forecasts).filter((x) => x.severity === "block").length, 0, "no block");
 });
+
+Deno.test("WP 14.3: customers.priority_weight is graded — a stated 0 is set, a blank is not", () => {
+  const ds: GradingDataset = {
+    ...DATASET,
+    // Two customers on the lanes, so P-C.2 is active and grades its requirements.
+    outbound: [
+      ...DATASET.outbound,
+      { customer_id: "C1", product_id: "P-X", volume: 1, unit_price: 1 },
+      { customer_id: "C3", product_id: "P-X", volume: 1, unit_price: 1 },
+    ],
+    customers: [
+      { customer_id: "C1", priority_weight: 0 },
+      { customer_id: "C2", priority_weight: null },
+      { customer_id: "C3", priority_weight: 4 },
+    ],
+  };
+  const g = gradeManifest(ds, { ...DEFAULTS, fulfillment: { allocation: "priority" } }, REG, BRIDGE)
+    .find((f) => f.field === "customers.priority_weight");
+  if (!g) throw new Error("priority rule with ≥ 2 customers must grade customers.priority_weight");
+  assertEquals(g.evaluable, true, "the binding exists (contract:check R13)");
+  assertEquals(g.set.sort(), ["C1", "C3"], "0 is the lowest priority, not an empty cell");
+  assertEquals(g.set.includes("C2"), false, "a blank falls to the default");
+});

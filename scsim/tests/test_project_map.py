@@ -449,20 +449,64 @@ def test_fg_safety_stock_skipped_when_no_mts_product_despite_strategy():
     assert any(w.level == "warn" and w.field == "fulfillment_strategy" for w in res.warnings)
 
 
-def test_per_node_fulfillment_override_is_warned_not_dropped_silently():
-    """Fulfillment is consumed at the project default scope only; a per-node
-    backorder override must surface a warning (doc §4/§6)."""
+def _fulfillment_warned(res) -> bool:
+    return any(w.level == "warn" and w.entity == "policy:unmet_demand_handling"
+               and w.field == "fulfillment" for w in res.warnings)
+
+
+def test_a_customer_row_backorder_override_is_applied_not_warned():
+    """PLAN.md §24 WP 14.3 (D284 c): backorder, its window and cost are per
+    customer × product row. Until then this override was dropped with a
+    warning — the test that pinned the warning now pins its absence and the
+    row's resolved settings (the project's window and the row's cost × 7)."""
     d = _base()
     d.policies = {
         "default": {"fulfillment": {"backorder_allowed": True}},
         "node:c1::p1": {"fulfillment": {"backorder_cost_per_day": 5.0}},
     }
     res = from_project_data(d)
-    assert any(
-        w.level == "warn" and w.entity == "policy:unmet_demand_handling"
-        and w.field == "fulfillment"
-        for w in res.warnings
-    )
+    assert not _fulfillment_warned(res)
+    assert res.scenario.policies["unmet_demand_handling"]["row_overrides"] == {
+        "c1::p1": {"backorder_allowed": True, "backorder_horizon": 2, "backorder_penalty": 35.0}}
+
+
+def test_a_row_may_backorder_in_a_lost_sales_project_and_vice_versa():
+    d = _base()
+    d.policies = {"node:c1::p1": {"fulfillment": {"backorder_allowed": True,
+                                                  "max_backorder_days": 10}}}
+    pol = from_project_data(d).scenario.policies["unmet_demand_handling"]
+    assert pol["rule"] == "lost_sales"
+    assert pol["row_overrides"]["c1::p1"] == {"backorder_allowed": True, "backorder_horizon": 1,
+                                              "backorder_penalty": 0.0}
+    d.policies = {"default": {"fulfillment": {"backorder_allowed": True}},
+                  "node:c1::p1": {"fulfillment": {"backorder_allowed": False}}}
+    pol = from_project_data(d).scenario.policies["unmet_demand_handling"]
+    assert pol["rule"] == "backorder"
+    assert pol["row_overrides"]["c1::p1"] == {"backorder_allowed": False}
+
+
+def test_per_node_fulfillment_override_is_warned_not_dropped_silently():
+    """What stays project-wide still warns on a node: the allocation RULE (one
+    per project, decision 4), and any fulfillment field on a node that is not
+    an existing Customer row (doc §4/§6)."""
+    d = _base()
+    d.policies = {"node:c1::p1": {"fulfillment": {"allocation": "priority"}}}
+    assert _fulfillment_warned(from_project_data(d))
+    d.policies = {"node:Plant::p1": {"fulfillment": {"backorder_allowed": True}}}
+    res = from_project_data(d)
+    assert _fulfillment_warned(res)
+    assert "row_overrides" not in res.scenario.policies["unmet_demand_handling"]
+
+
+@pytest.mark.parametrize("days,weeks", [(3, 0), (4, 1), (10, 1), (11, 2), (14, 2), (3.5, 1)])
+def test_max_backorder_days_round_half_up_to_weeks(days, weeks):
+    d = _base()
+    d.policies = {"default": {"fulfillment": {"backorder_allowed": True,
+                                              "max_backorder_days": days}},
+                  "node:c1::p1": {"fulfillment": {"max_backorder_days": days}}}
+    pol = from_project_data(d).scenario.policies["unmet_demand_handling"]
+    assert pol["backorder_horizon"] == weeks
+    assert pol["row_overrides"]["c1::p1"]["backorder_horizon"] == weeks
 
 
 def test_per_node_routing_hint_does_not_trigger_fulfillment_warning():

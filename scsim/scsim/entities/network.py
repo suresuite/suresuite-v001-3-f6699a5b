@@ -305,6 +305,12 @@ class Customer(BaseModel):
     name: str = ""
     segment: str = Field("default", json_schema_extra=_meta("-", "C", "≤10 segments."))
     priority_weight: float = Field(1.0, ge=0)
+    # WP 14.3 (ADR 0002 decision 4): the customer's contracted fill floor, the
+    # default service target of each of its rows under the `sla_tier` rule.
+    # None = no contracted floor (NOT 0): the segment's `sla_tiers` floor applies.
+    sla_fill_floor_pct: Optional[float] = Field(
+        None, ge=0, le=100, json_schema_extra=_meta(
+            "%", "C", "Default per-row service target under sla_tier; None = the segment floor."))
 
 
 class CustomerLink(BaseModel):
@@ -346,6 +352,12 @@ class CustomerLink(BaseModel):
         None, ge=0, json_schema_extra=_meta("units/wk", "PC", "triangular only: the lower bound."))
     demand_max: Optional[float] = Field(
         None, ge=0, json_schema_extra=_meta("units/wk", "PC", "triangular only: the upper bound."))
+    # WP 14.3 (ADR 0002 decision 4): the row's own price — what `revenue_max`
+    # orders rows by and what values the row's fill rate. None = the product's
+    # unit_price.
+    unit_price: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "€/unit", "PC", "The row's sell price; None = the product's unit_price."))
     forecast: Optional[list[float]] = Field(
         None, json_schema_extra=_meta(
             "units/wk", "PC",

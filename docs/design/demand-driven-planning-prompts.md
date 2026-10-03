@@ -404,6 +404,12 @@ DO:
    ingestion template, snapshot simulation scope, and Plant-table cells on /policies as
    overrides (scope declared in POLICY_BUNDLE_KEYS). Close RFC 4 in PLAN.md §14.
 6. Inspection series per product: projected demand, requirement, planned, built.
+   Inherited from WP 14.3: per-row backorder settings are in P-C.1's row_overrides and
+   in ctx.policy_state["unmet_demand_handling.rows"] (accept, horizon) after its first
+   PH-60. ctx.backlog_rows is TRACKED only on the per-row path (else a share-split view),
+   and P-C.1 decides "per row or not" lazily at PH-60 — the plan at PH-40 needs that
+   decision earlier (design doc §9 point 8): move it where both can read it. The rule and
+   row inputs are ctx.row_allocation (P-C.2 setup), else fair share.
    Inherited from WP 14.2: uploaded per-row specs and dated forecasts reach the engine
    (design doc §9 point 5 is the calendar). A new products column copies the outbound
    demand columns' route: rate conversion at promotion, jsonb_strip_nulls in

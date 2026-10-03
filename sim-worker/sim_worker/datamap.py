@@ -241,6 +241,9 @@ def build_project_data(
                 id=str(r["customer_id"]), name=r.get("name"),
                 segment=r.get("segment"),
                 priority_weight=_num(r.get("priority_weight")),
+                # WP 14.3 — the customer's contracted floor, its rows' default
+                # service target under sla_tier. Null = no floor, never 0.
+                sla_fill_floor_pct=_num(r.get("sla_fill_floor_pct")),
             )
             for r in (customers or []) if r.get("customer_id")
         ],
@@ -388,7 +391,7 @@ async def load_project_data(
         # would leave every customer on the engine defaults and look exactly
         # like the defect being fixed. `sla_fill_floor_pct` is not selected —
         # `Customer` has no field for it (§16).
-        customers=await rows("customers", "customer_id,name,segment,priority_weight"),
+        customers=await rows("customers", "customer_id,name,segment,priority_weight,sla_fill_floor_pct"),
         policies=policies,
         scenario=scenario,
         project_model=project_model,

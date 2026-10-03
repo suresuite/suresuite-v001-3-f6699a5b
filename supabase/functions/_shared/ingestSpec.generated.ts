@@ -229,6 +229,20 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
           "blank": "null"
         },
         "validate": "optional; >= 0. ZERO IS ALLOWED AND MEANS SOMETHING: only the ratio between two customers matters, so 0 is the lowest priority there is — served last, and only out of what is left. `exclusive_min` would reject a value the engine reads correctly. Blank lands nothing and the DEFAULT 1.0 stands in, which makes the `priority` rule inert for that customer."
+      },
+      {
+        "column": "sla_fill_floor_pct",
+        "csvHeader": "sla_fill_floor_pct",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "max": 100,
+          "blank": "null"
+        },
+        "validate": "optional; 0-100 (a percentage of the row's demand). Blank lands nothing — no floor, not 0"
       }
     ],
     "normalize": []

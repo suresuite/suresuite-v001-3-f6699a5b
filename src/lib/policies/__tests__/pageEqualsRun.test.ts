@@ -42,7 +42,7 @@ import { familiesForStage } from "../columnSpecs";
 type Row = Record<string, unknown>;
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const FX = JSON.parse(readFileSync(join(ROOT, "scripts", "example_project", "page_equals_run.json"), "utf8")) as {
-  tables: Record<"suppliers" | "materials" | "products" | "inbound" | "outbound" | "bom" | "demand_forecasts", Row[]>;
+  tables: Record<"suppliers" | "materials" | "products" | "inbound" | "outbound" | "bom" | "demand_forecasts" | "customers", Row[]>;
   plant: string;
   policy: { defaults: PolicyBundle; overrides: OverrideRow[] };
   engine: Record<string, Record<string, { source: string; value: number | string | null }>>;
@@ -58,6 +58,8 @@ const masters: MasterRowMaps = {
   suppliers: new Map(T.suppliers.map((s) => [String(s.supplier_id), s])),
   // PLAN.md §24 WP 14.2 — the Customer stage's base: the rows' own demand spec.
   outbound_logistics: customerRowMasters(T.outbound, (T.demand_forecasts ?? []) as unknown as ForecastBucket[]),
+  // WP 14.3 — the base under a Customer row's priority and service target.
+  customers: new Map((T.customers ?? []).map((c) => [String(c.customer_id), c])),
 };
 const derived: DerivedMaps = {
   materialCost: derivedMaterialCost(T.inbound),
@@ -90,7 +92,9 @@ function cells() {
     const masterColByField = new Map<string, ColSpec>(cols.map((c) => [c.field, c]));
     for (const row of ROWS[stage]) {
       for (const col of cols) {
-        const id = masterIdOf(col, row);
+        // The engine reports a Customer cell per ROW, whatever its master's
+        // grain (WP 14.3: a row's priority sits over its customer's value).
+        const id = stage === "customer" ? String(row.key) : masterIdOf(col, row);
         const engine = FX.engine[`${col.master!.table}.${col.master!.field}`]?.[id];
         const cell = resolveCell({
           rowKey: String(row.key), row, col, families: familiesForStage(stage) as PolicyFamily[],

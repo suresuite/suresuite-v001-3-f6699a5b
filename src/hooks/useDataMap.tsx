@@ -95,7 +95,7 @@ export function useDataMap(projectId: string | null | undefined) {
       // The engine reads `customers` (§4 D69); production grants anon read.
       const cq = await (supabase as unknown as {
         from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => Promise<{ data: unknown; error: unknown }> } };
-      }).from("customers").select("customer_id,segment,priority_weight").eq("project_id", projectId);
+      }).from("customers").select("customer_id,segment,priority_weight,sla_fill_floor_pct").eq("project_id", projectId);
       if (cancelled) return;
       setCustomers(cq.error ? null : ((cq.data ?? []) as Array<Record<string, unknown>>));
       const fq = await fetchProjectForecasts(projectId, user);
@@ -273,7 +273,7 @@ export function useDataMap(projectId: string | null | undefined) {
       },
       customer_segment: customerField("segment", "every customer in segment 'default'"),
       customer_priority: customerField("priority_weight", "priority 1.0"),
-      customer_sla_floor: { status: "unused", detail: "engine does not read it" },
+      customer_sla_floor: customerField("sla_fill_floor_pct", "no contracted floor — the segment's tier floor applies"),
       plant_ignored: { status: "unused", detail: "not read by the engine" },
       name: { status: "ok", detail: "display only" },
     };

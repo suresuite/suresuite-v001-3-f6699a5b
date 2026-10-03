@@ -45,6 +45,9 @@ export interface MasterRowMaps {
    *  (`customerRowMasters` builds them, with each row's derived `demand_mode`).
    *  Optional: a stage that renders no Customer cell does not need it. */
   outbound_logistics?: Map<string, Record<string, unknown>>;
+  /** PLAN.md §24 WP 14.3 — the `customers` master, keyed by customer id: the
+   *  base under a Customer row's priority and service target. */
+  customers?: Map<string, Record<string, unknown>>;
 }
 
 /** True for a master-backed cell whose values are ENUM tokens (the Customer
@@ -120,7 +123,10 @@ export function masterOverrideFor(
   if (!col.master) return undefined;
   const rule = masterOverrideRule(col.family, col.field);
   if (!rule) return undefined;
-  const id = masterIdOf(col, row);
+  // A Customer-row override is keyed by the ROW (`<customer>::<product>`) even
+  // when its master is per customer (WP 14.3: priority, service target).
+  const id =
+    rule.entity === "row" ? `${String(row.customer_id ?? "")}::${String(row.product_id ?? "")}` : masterIdOf(col, row);
   const productIds =
     rule.entity === "product" ? new Set([...(masterRowById.products?.keys() ?? []), id]) : undefined;
   return entityOverride(overrides, rule, id, productIds);
@@ -158,7 +164,7 @@ export function derivedValueFor(
   // A customer × product row's spec has no lane-derived fallback: an empty cell
   // runs on the product's distribution × share, which the cell SAYS (the key's
   // declared `empty_note`) rather than computing a number here (WP 14.2).
-  if (col.master.table === "outbound_logistics") return undefined;
+  if (col.master.table === "outbound_logistics" || col.master.table === "customers") return undefined;
   const id = masterIdOf(col, row);
   if (col.master.table === "materials" && col.master.field === "cost") return derived.materialCost.get(id);
   if (col.master.field === "sell_price") return derived.sellPrice.get(id);
@@ -192,7 +198,7 @@ function derivedStepFor(
   row: Record<string, unknown>,
   derived: DerivedMaps,
 ): DerivedValue | undefined {
-  if (!col.master || col.master.table === "outbound_logistics") return undefined;
+  if (!col.master || col.master.table === "outbound_logistics" || col.master.table === "customers") return undefined;
   const id = masterIdOf(col, row);
   if (col.master.field === "production_capacity") return derived.productionCapacity?.get(id);
   // §23 WP 13.4 — every lane-derived value is shown with its source. The cost
