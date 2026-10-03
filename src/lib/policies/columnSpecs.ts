@@ -3,6 +3,7 @@ import { fieldEngineStatus } from "./fieldStatus";
 import type { StageKey } from "./stages";
 import type { FitCol } from "./columnFit";
 import { emptyMeansFor } from "./registryAccess";
+import { engineWholeWeeks } from "../../../supabase/functions/_shared/grading";
 
 export interface ColSpecCtx {
   fulfillmentStrategy?: string;
@@ -52,6 +53,13 @@ export interface ColSpec {
   /** Formatter for read-only values (e.g. append "%" for share_pct). */
   format?: (n: number) => string;
   /**
+   * What the ENGINE does to a typed number before it uses it, applied at entry
+   * so the cell shows the value that runs rather than one the mapper rounds
+   * away (page-equals-run). Only where the engine itself rounds: the lane lead
+   * time is a whole number of weeks, 1–51.
+   */
+  round?: (n: number) => number;
+  /**
    * "Which gap in which policy" (G1 visibility): fields the engine does not
    * consume yet are shown DISABLED with the milestone of the catalog policy
    * that will consume them — never silently hidden or silently dropped.
@@ -71,8 +79,12 @@ export interface ColSpec {
      * on a COMPOSITE `idFrom` (`customer_id::product_id`), as the engine keys it.
      * `customers` (WP 14.3) is the base under a row's priority and service
      * target — per CUSTOMER, so `idFrom` is `customer_id`; the override is per row.
+     * `inbound_logistics` is the Supplier row's own LANE (supplier × material) —
+     * the base under its lead time, keyed `supplier_id::material_id` as the
+     * engine's arc loop keys it. Its map (`supplierLaneMasters`) carries the
+     * value as the engine builds the link: weeks, by unit, whole, 1–51.
      */
-    table: "materials" | "products" | "suppliers" | "outbound_logistics" | "customers";
+    table: "materials" | "products" | "suppliers" | "outbound_logistics" | "customers" | "inbound_logistics";
     field: string;
     /** The stage row's id field — or several joined by `::` for a composite key. */
     idFrom: string;
@@ -140,6 +152,7 @@ const col = (
     defaultWhenMissing?: ColSpec["defaultWhenMissing"];
     readOnly?: boolean;
     format?: ColSpec["format"];
+    round?: ColSpec["round"];
     master?: ColSpec["master"];
     vectorGroup?: ColSpec["vectorGroup"];
     synthetic?: ColSpec["synthetic"];
@@ -331,13 +344,24 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // engine registry (registryPolicyTypes / inventory_control). s, S and R,Q
       // are stored + versioned now and consumed once the Quantity basis lands
       // (§II.4) — the info button (6.B) discloses this per parameter.
-      // The effective inbound lead time (weeks in the engine, shown in days
-      // like every other duration cell) — the T_s of the level formulas
-      // s = E[D]·T_s and S = E[D]·(T_s+κ). Read-only: the engine reads it
-      // from the uploaded inbound lane, so an editable copy here would be a
-      // second author for one fact (the same reason the transport band keeps
-      // no lead-time column, see the note below).
-      col("lead_time_days", "sourcing", { readOnly: true, label: "Lead time (days)" }),
+      // The lane's lead time — the T_s of the level formulas s = E[D]·T_s and
+      // S = E[D]·(T_s+κ). An OVERRIDE of the uploaded lane, like every other
+      // master-backed cell: the upload (`inbound_logistics.lead_time` ×
+      // `lead_time_unit`) is what the cell suggests, and a value typed here is
+      // saved on this row (`sourcing.lead_time_weeks`) and is what the engine
+      // reads for THIS supplier × material link — /policies never writes the
+      // lane. It was read-only until the engine had a key to read it by; an
+      // editable cell with no reader would have been a second author for one
+      // fact (the trap `material_price` documents above).
+      //
+      // In WEEKS, the engine's unit and the planning unit, and whole: the
+      // mapper rounds half to even and clamps 1–51, so the cell does the same
+      // at entry. An empty lane shows the engine's 2 weeks, not an average of
+      // other lanes (§4 D189 (a), for this column).
+      col("lead_time_weeks", "sourcing", {
+        master: { table: "inbound_logistics", field: "lead_time", idFrom: "supplier_id::material_id" },
+        round: engineWholeWeeks,
+      }),
       col("type", "inventory"),
       // Type-specific level/lot params render inside this one dynamic vector cell
       // (§II.3) — only the params the chosen type needs; the discrete gated
@@ -662,6 +686,7 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   material_moq: { sub: "units · master", w: 84, kind: "int", prio: 5 },
   capacity_per_week: { sub: "units / wk · master", w: 96, kind: "int", prio: 4 },
   reliability_score: { sub: "0–1 · master", w: 84, kind: "num", dec: 2, prio: 3 },
+  lead_time_weeks: { sub: "weeks · lane · 1–51", w: 84, kind: "int", keep: true },
   // ---- inventory (shared by supplier + plant)
   type: { sub: "s,S · S · R,Q · T,S", w: 152, kind: "type", keep: true, filterable: false, align: "left" },
   __inv_params: { sub: "levels & lot sizes", w: 184, kind: "vector", keep: true, filterable: false, align: "left" },
@@ -722,6 +747,7 @@ export const SHORT_LABEL: Record<string, string> = {
   material_moq: "MOQ",
   capacity_per_week: "Capacity",
   reliability_score: "Reliability",
+  lead_time_weeks: "Lead time",
   type: "Policy type",
   __inv_params: "Replenishment",
   initial_on_hand: "Initial stock",

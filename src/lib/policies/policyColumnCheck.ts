@@ -215,14 +215,12 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     verdict: "ignored",
     shouldBe: "remove, or let the backup rule be chosen so this value matters",
   },
-  "supplier:lead_time_days": {
-    shows: "uploaded inbound lead_time, in weeks, NOT converted by lead_time_unit; a blank shows an AVERAGE (imputed)",
-    savedTo: "— (read-only; change it in the inbound file)",
-    engine: "lead_time × lead_time_unit → weeks, rounded, clamped 1–51; blank or 0 → 2 weeks",
-    verdict: "differs",
-    note: "284 blank lead times (Project 2: 134, Project AA: 150) show an average and run at 2 weeks. No lane stores a non-week unit today.",
-    shouldBe: "show the engine's rounded weeks, a blank as 'default 2 wk'",
-    refs: ["D189"],
+  "supplier:lead_time_weeks": {
+    shows: "your override → the uploaded inbound lead_time × lead_time_unit, as the engine builds the link (whole weeks, 1–51); a blank lane shows the engine's 2 weeks",
+    savedTo: "override sourcing.lead_time_weeks (per row = per supplier × material lane — /policies never writes the lane)",
+    engine: "override → lead_time × lead_time_unit → weeks, rounded half to even, clamped 1–51; blank or 0 → 2 weeks",
+    verdict: "works",
+    note: "A typed value is rounded to whole weeks at entry, as the engine rounds it. The grid's suggested primary still breaks an exact cost tie on the UPLOADED lead time; a saved primary is unaffected.",
   },
   "supplier:type": {
     shows: "override → project default → min_max",

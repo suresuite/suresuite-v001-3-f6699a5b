@@ -319,22 +319,32 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "supplier",
-    "field": "lead_time_days",
+    "field": "lead_time_weeks",
     "family": "sourcing",
     "hops": [
       {
         "kind": "hook",
-        "detail": "rendered by the supplier grid as `lead_time_days` (family `sourcing`)",
+        "detail": "rendered by the supplier grid as `lead_time_weeks` (family `sourcing`)",
         "evidence": "src/lib/policies/columnSpecs.ts"
       },
       {
         "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "detail": "`inbound_logistics.lead_time` (item master, keyed from `supplier_id::material_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`weeks`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_map_supply -> SupplierLink.lead_time_weeks",
         "evidence": null
       },
       {
         "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
         "evidence": null
       }
     ],
@@ -1151,12 +1161,12 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:770, src/hooks/useStageRows.tsx:785."
+      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:765, src/hooks/useStageRows.tsx:780."
     ],
     "breakClass": "app-routing",
     "breakEvidence": [
-      "src/hooks/useStageRows.tsx:770",
-      "src/hooks/useStageRows.tsx:785"
+      "src/hooks/useStageRows.tsx:765",
+      "src/hooks/useStageRows.tsx:780"
     ]
   },
   {

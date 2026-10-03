@@ -27,6 +27,7 @@ import { join } from "node:path";
 import { STAGE_TABLE_SPEC, type ColSpec } from "../columnSpecs";
 import { masterIdOf, resolveCell, type DerivedMaps, type MasterRowMaps } from "../resolveEffective";
 import { customerRowMasters, type ForecastBucket } from "../customerRows";
+import { supplierLaneMasters } from "../supplierLanes";
 import {
   derivedMaterialCost,
   derivedMaterialCostDetails,
@@ -60,6 +61,8 @@ const masters: MasterRowMaps = {
   outbound_logistics: customerRowMasters(T.outbound, (T.demand_forecasts ?? []) as unknown as ForecastBucket[]),
   // WP 14.3 — the base under a Customer row's priority and service target.
   customers: new Map((T.customers ?? []).map((c) => [String(c.customer_id), c])),
+  // The Supplier row's lane: the base under its lead time.
+  inbound_logistics: supplierLaneMasters(T.inbound),
 };
 const derived: DerivedMaps = {
   materialCost: derivedMaterialCost(T.inbound),

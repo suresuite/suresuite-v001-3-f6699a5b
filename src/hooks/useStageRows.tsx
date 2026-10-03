@@ -179,7 +179,6 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
         for (const r of inbound) {
           inboundByKey.set(`${r.supplier_id}::${r.material_id}`, {
             ...r,
-            lead_time_days: weeksToDays(r.lead_time),
             volume_per_day: ratePerDay(Number(r.volume), r.time_unit),
           });
         }
@@ -420,15 +419,12 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               enrich.unit_price,
               impute(inPriceByMaterial, String(material), inPriceGlobal),
             );
-            // The lane's effective lead time — the T_s of the level formulas.
-            // Same resolve/impute contract as material_price: uploaded lane
-            // value first, per-material average, then the project average.
-            const lead_time_days = resolveField(
-              prov,
-              "lead_time_days",
-              enrich.lead_time_days,
-              impute(inLeadByMaterial, String(material), inLeadGlobal),
-            );
+            // NO LEAD TIME ON THE ROW. The lane's lead time is a master-backed
+            // cell (`lead_time_weeks` over `inbound_logistics.lead_time`): the
+            // grid reads it from the lane as the engine builds the link
+            // (`supplierLaneMasters`) and a /policies override beats it. It used
+            // to be put here in days, with a blank lane imputed as the average
+            // of other lanes — a number the run never used (§4 D189 (a)).
             const primary_source = count === 1 ? true : isSuggested;
             seen.set(key, {
               key,
@@ -436,7 +432,6 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               material_id: material,
               // Real uploaded data where available, else smart-average imputed.
               material_price,
-              lead_time_days,
               __mat_demand_per_week: matDemandPerWeek.get(String(material)),
               // NOTE (D1/D16): no constants are written here. A row carries a
               // field ONLY when the project data says something about it —

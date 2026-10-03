@@ -237,13 +237,29 @@ export function cheapestInboundCost(inbound: Row[]): Map<string, number> {
   return out;
 }
 
+/** A lead time in weeks as a supplier link carries it: `int(_clamp(round(w), 1, 51))`. */
+export function engineWholeWeeks(weeks: number): number {
+  return Math.min(51, Math.max(1, pyRound(weeks)));
+}
+
 /** Python's `round` — half to EVEN (`round(2.5) == 2`), which `Math.round` is not. */
-function pyRound(x: number): number {
+export function pyRound(x: number): number {
   const f = Math.floor(x);
   const d = x - f;
   if (d > 0.5) return f + 1;
   if (d < 0.5) return f;
   return f % 2 === 0 ? f : f + 1;
+}
+
+export interface EngineSupplierLink {
+  supplier: string;
+  material: string;
+  cost: number;
+  leadWeeks: number;
+  /** Where `leadWeeks` came from — the mapper's `inbound_logistics.lead_time`
+   *  source: the Supplier row's override, the uploaded lane, or the 2-week
+   *  default for a blank one. */
+  leadSource: "override" | "master" | "default";
 }
 
 /**
@@ -255,21 +271,26 @@ function pyRound(x: number): number {
  */
 export function engineSupplierLinks(
   inbound: Row[],
-): Map<string, { supplier: string; material: string; cost: number; leadWeeks: number }> {
-  const out = new Map<string, { supplier: string; material: string; cost: number; leadWeeks: number }>();
+  /** The Supplier rows' saved `lead_time_weeks`, keyed `<supplier>::<material>`
+   *  — usable values only. The engine reads one ahead of the lane's own. */
+  leadOverrides?: ReadonlyMap<string, number>,
+): Map<string, EngineSupplierLink> {
+  const out = new Map<string, EngineSupplierLink>();
   for (const arc of inbound) {
     const supplier = String(arc.supplier_id ?? "");
     const material = String(arc.material_id ?? "");
     if (!supplier || !material) continue;
     let cost = num(arc.unit_price);
     if (cost <= 0) cost = ENGINE_DEFAULT_PRICE;
-    const lt = num(arc.lead_time);
-    const weeks = lt ? (lt * (unitDays(arc.lead_time_unit as string | null) ?? 7)) / 7 : 2;
-    const leadWeeks = Math.min(51, Math.max(1, pyRound(weeks)));
     const key = `${supplier}::${material}`;
+    const lt = num(arc.lead_time);
+    const ov = leadOverrides?.get(key);
+    const weeks = ov !== undefined ? ov : lt ? (lt * (unitDays(arc.lead_time_unit as string | null) ?? 7)) / 7 : 2;
+    const leadWeeks = engineWholeWeeks(weeks);
+    const leadSource: EngineSupplierLink["leadSource"] = ov !== undefined ? "override" : lt ? "master" : "default";
     const prev = out.get(key);
     if (!prev || cost < prev.cost || (cost === prev.cost && leadWeeks < prev.leadWeeks)) {
-      out.set(key, { supplier, material, cost, leadWeeks });
+      out.set(key, { supplier, material, cost, leadWeeks, leadSource });
     }
   }
   return out;
@@ -282,9 +303,12 @@ export function engineSupplierLinks(
  * A saved `sourcing.primary_source` beats it (§4 D188); the Supplier grid
  * suggests THIS, so an unsaved suggestion is what the run does.
  */
-export function enginePrimarySupplier(inbound: Row[]): Map<string, string> {
+export function enginePrimarySupplier(
+  inbound: Row[],
+  leadOverrides?: ReadonlyMap<string, number>,
+): Map<string, string> {
   const best = new Map<string, { supplier: string; cost: number; leadWeeks: number }>();
-  for (const l of engineSupplierLinks(inbound).values()) {
+  for (const l of engineSupplierLinks(inbound, leadOverrides).values()) {
     const b = best.get(l.material);
     if (
       !b ||
@@ -652,7 +676,13 @@ const FIELD_BINDINGS: Record<string, FieldBinding> = {
   "suppliers.capacity_per_week": { rows: (d) => d.suppliers, id: (r) => String(r.supplier_id ?? ""), master: (r) => num(r.capacity_per_week), policy: overridden("suppliers.capacity_per_week") },
   "suppliers.reliability_score": { rows: (d) => d.suppliers, id: (r) => String(r.supplier_id ?? ""), master: (r) => num(r.reliability_score), policy: overridden("suppliers.reliability_score") },
   "inbound_logistics.unit_price": { rows: (d) => d.inbound, id: arcId, master: (r) => num(r.unit_price) },
-  "inbound_logistics.lead_time": { rows: (d) => d.inbound, id: arcId, master: (r) => num(r.lead_time) },
+  // The Supplier row's `lead_time_weeks` beats the lane, per lane — so a blank
+  // lane with an override is set. The grader's id is `S→M`; the override's,
+  // like the grid row's, is `S::M`.
+  "inbound_logistics.lead_time": {
+    rows: (d) => d.inbound, id: arcId, master: (r) => num(r.lead_time),
+    policy: (id, c) => c.policyMasterOverrides?.get("inbound_logistics.lead_time")?.has(id.replace("→", "::")) === true,
+  },
   "inbound_logistics.volume": { rows: (d) => d.inbound, id: arcId, master: (r) => num(r.volume) },
   "outbound_logistics.volume": { rows: (d) => d.outbound, id: laneId, master: (r) => num(r.volume) },
   "outbound_logistics.unit_price": { rows: (d) => d.outbound, id: laneId, master: (r) => num(r.unit_price) },
@@ -747,6 +777,11 @@ export function buildReducerCtx(
       ...idsOf(dataset.inbound, "supplier_id"),
     ]),
     product: idsOf(dataset.products, "product_id"),
+    lane: new Set(
+      dataset.inbound
+        .filter((r) => r.supplier_id != null && r.material_id != null)
+        .map((r) => `${String(r.supplier_id)}::${String(r.material_id)}`),
+    ),
   });
   const demandOverride = policyMasterOverrides.get("products.demand_mean");
   const effectiveDemand = new Map<string, number>();
