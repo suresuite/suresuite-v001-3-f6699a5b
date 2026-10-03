@@ -477,6 +477,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D286** | **Demand had two authors on /policies: the Customer rows and the Plant row.** Since WP 14.2 a product's demand is authored per customer × product row; the product's own `demand_mean` / `demand_cv` is only what a row with no demand of its own inherits (× its volume share, `context.py`'s row centre). The Plant grid still carried Demand mean and Demand CV as Plant-row overrides of `products.demand_mean` / `demand_cv` (`POLICY_BUNDLE_KEYS`, scope `plant`), so one fact — "how much of this product is demanded" — could be typed in two places that combined invisibly. Reported by the owner from the WP 14.8 Plant grid: "demand of product can only be defined in page customer" | `scsim/scsim/io/project_map.py` (`demand_mean`, `demand_cv` keys and the product loop's `_ovr` reads, before WP 14.8); `src/lib/policies/columnSpecs.ts` (the two Plant columns) | **✅ CLOSED by §24 WP 14.8 (2026-10-03)** — owner decision: the engine no longer reads a Plant-row demand override and names one in the run log ("no longer read"); the two keys left `POLICY_BUNDLE_KEYS` and the two columns left the Plant grid; a run-check finding about product demand now walks to the Customer stage. **Consequence, stated:** a project that saved a Plant-row demand override simulates on its item-master / outbound-volume demand from the next run. Not measured — a §15 probe of `policy_overrides` where `family = 'production'` and the patch has `demand_mean` or `demand_cv` would count them |
 | **D287** | **Every master-backed Customer cell was badged "not simulated", and the run read every one.** `cellEngineRead` asked `masterOverrideRule` with `stage === "plant" ? "plant" : "supplier"`, so a Customer master cell — distribution, mean, variation, min, max, priority, price, service target — was looked up among the SUPPLIER rows, found nothing, and told the planner the engine ignored the number it reads. Found by the owner from the WP 14.8 Customer grid | `src/lib/policies/cellEngineRead.ts` (the master branch, before WP 14.8) | **✅ CLOSED by §24 WP 14.8 (2026-10-03)** — the real stage is passed; `customerDemandGates.test.ts` fails if any Customer master cell is badged again |
 | **D288** | **The replenishment cells on /policies were not what the run used.** A Supplier-row s or S was meant to be the material's level, and P-P.3 added its safety stock ON TOP of it at PH-70, so a typed s = 400 ran as 400 + SS — while the greyed placeholder for an EMPTY level showed the bare formula without the safety stock the run adds. A formula s above a typed S raised S to it. The periodic type's T (`review_period_days`) was read by no scsim mapping: every periodic material was reviewed every 4 weeks whatever the row said. An (R,Q) row with a lot still sized its S — and so its opening stock — from κ, so the grid showed κ on rows where it should not matter; a value stored under an earlier type (an S left on a row switched to (R,Q), an s on a base-stock row) reached the engine although the page no longer showed it; Eq. 21 read the project κ, not the row's; a project Q was ignored unless the project's own type was (R,Q); and an MRP row rendered dead s / S / κ inputs. Found by the owner from the Replenishment column ("what is κ?") | `scsim/scsim/policies/strategic/p_p3_safety_stock.py` (`on_phase`, Eq. 21), `scsim/scsim/policies/builtin/p_p1_inventory_control.py` (`_set_levels`, `_release`), `scsim/scsim/io/project_map.py` (the inventory branch of `_map_policies`), `src/components/policies/policyGridUi.tsx` (`ReplenishmentCell`), all before this fix | **✅ CLOSED (2026-10-03, engine 0.6.1)** — a stated level is the level (no buffer added, never raised); T reaches `periodic_review_weeks` per material and at the project default; (R,Q) with a lot has S = R + Q; a row applies only the parameters its type shows (warned); κ is shown only where the run reads it (`kappaIsRead`) — never on (R,Q), whose Q is required (`rowNeedsLot` flags a row without one); the level placeholders include the days-based safety stock. `scsim/tests/test_stated_levels.py` (13, twelve of which fail on 0.6.0), `kappaIsRead.test.ts` |
+| **D289** | **A policy version's Export was neither readable nor the engine's input.** The version-history Export wrote the stored bundle one column per family key, every value row followed by a "provenance" row, JSON in cells — and it re-parsed the stored families through the page's Zod schemas, so a key the version did not store was written as the page's default rather than as stored. More important, a run reads the policy version TOGETHER WITH a dataset version through the mapper (`run_from_snapshots`, §23 WP 13.2), and the file carried neither the dataset nor the mapping: a cost, MOQ, capacity or demand in it was the policy override, never the number the run used when the override was empty, and nothing in the file tied its content to the `policy_hash` it printed. Reported by the owner ("super hard to read … not 100% the single source of truth for the data and the hash") | `src/hooks/usePolicies.tsx` (`exportVersion`, before this fix); `src/lib/policies/verifiableExports.ts` (`buildPolicyVersionWorkbook`, removed) | **✅ CLOSED (2026-10-03, no migration, engine unchanged)** — the Export is now the engine's own input: `sim_worker.local.engine_input_from_snapshots` runs the same two calls a run makes (`project_data_from_snapshots` → `from_project_data`) and stops before simulating, in the browser engine (`_inputs` in `engine.worker.ts`), on the version and the dataset version its latest run read (else the project's data as a run would freeze it now — the file says which). `engineInputWorkbook.ts` lays it out as Read me (both versions, both hashes, the hash RE-CHECKED from `snapshot::text` in the browser), one sheet per network list with units in the header and a source column beside every value the mapper resolved, Policies (every parameter, "this version" vs "engine default"), Settings, Disruptions, Where values came from, Mapping notes, Field guide, Policy as saved and Policy JSON (hashed). `sim-worker/tests/test_engine_input.py` captures the `Scenario` a real run hands `run_scenario` and requires the export's to equal it, worker and browser driver both (mutation-tested: dropping the overrides turns it red); `engineInputWorkbook.test.ts` requires every field of every row, every policy parameter and every setting to be in the file unchanged |
 
 ### 4.1 Code map — the data layer
 
@@ -23253,6 +23254,42 @@ no longer mapped (`_TYPE_SHOWS`), and Q is REQUIRED: an (R,Q) Supplier row with 
 (its own or the project's) needs input (`rowNeedsLot` in `lineNeedsInput`, so the Supplier step
 counts it) and its Q cell carries the reason. A run dispatched anyway keeps the engine's declared
 fallback, now warned per material in the run log rather than only at project scope.
+
+### D289 — the policy version's Export is the engine's input · 2026-10-03 · no migration · engine unchanged
+
+**What the previous package promised.** The B0 follow-on (blueprint §13, W2/G17) made the version
+Export "verifiable": per-cell provenance against the schema default and a `_meta` sheet stamped
+with the policy hash. Phase 13 then made the run read the frozen policy version AND the frozen
+dataset version through the mapper — and the Export was never moved to match.
+
+**What this found (§4 D289).** The file described the stored bundle, not the run: no dataset, no
+mapping, so every master-backed value (cost, MOQ, capacity, price, demand) showed only an override
+or nothing; families re-parsed through Zod, so a key a legacy version never stored was printed as
+the page's default; and the policy hash was printed beside content that was not the hashed text.
+Laid out as one column per bundle key with a provenance row under every value row.
+
+**What it did.**
+- `sim_worker/engine_input.py` (`describe`) + `local.engine_input_from_snapshots`: the mapped
+  `Scenario`, every field's unit and meaning (the scsim models' own metadata), where each
+  master-backed value came from (`resolved`, placed on its row by the bundle key's `target`),
+  every applied policy with its parameters validated as the engine validates them, and the
+  mapper's notes. The browser engine exposes it as `_inputs`; the wheel is rebuilt.
+- `engineInputExport.ts` reads the version as `snapshot::text`, re-hashes it (SHA-256, the
+  database's own rule) and says MATCHES / DOES NOT MATCH / not checked and why; takes the dataset
+  version and scenario of the version's latest run (seed and schedule as stamped on the run), else
+  the project's data now and no scenario — and the Read me says which.
+- `engineInputWorkbook.ts` lays it out for a person; `buildPolicyVersionWorkbook` is removed.
+
+**Gap check.** `test_engine_input.py` (7) proves the export's `Scenario` is the one a run hands
+`run_scenario`, in the worker pipeline and in the browser driver; `engineInputWorkbook.test.ts`
+(12) proves nothing the engine receives is missing from or different in the file.
+`scripts/example_project/engine_input.json` is the shared fixture (`REGEN=1`). `sim-worker` 174
+passed, vitest 1704 passed, typecheck 15 of 15 held, `audit:ui` and `check:docs` clean, eslint
+294 errors / 110 warnings — the base's count exactly, none in the files this changed. **Not covered**:
+a scenario's settings other than seed and disruption schedule are read as the scenario holds them
+NOW (a run does not freeze them); server runs merge a recovery playbook over `DEFAULT_RECOVERY`
+and this, like a browser run, does not — identical for every version saved since D204 (a), which
+stores all recovery keys. The first Export in a session loads the browser engine (~20 s).
 
 ## 17. Sequencing
 

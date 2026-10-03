@@ -11,11 +11,13 @@
 // Protocol — main → worker:
 //   { type: "warm", manifestUrl }              preload runtime + engine
 //   { type: "run",  manifestUrl, payload }     run one simulation (payload = JSON string)
+//   { type: "inputs", manifestUrl, payload }   map only: the engine's input, no simulation
 // Protocol — worker → main:
 //   { type: "phase", phase }                   LoadPhase during boot
 //   { type: "warmed" }                         warm complete
 //   { type: "replication", rep, done, total }  one replication finished (live)
 //   { type: "result", result }                 { engine_version, run_update, replications }
+//   { type: "inputs", result }                 sim_worker.local.engine_input_from_snapshots
 //   { type: "error", error }                   any failure (string)
 
 /// <reference lib="webworker" />
@@ -46,7 +48,7 @@ let ready: Promise<void> | null = null;
 // and `capacity_binding` (§4 D273). It now only adapts the message protocol.
 const PY_DRIVER = `
 import json
-from sim_worker.local import run_from_snapshots
+from sim_worker.local import engine_input_from_snapshots, run_from_snapshots
 
 def _run(payload_json, on_rep=None):
     b = json.loads(payload_json)
@@ -72,6 +74,14 @@ def _run(payload_json, on_rep=None):
         "run_update": out["run_update"], "replications": reps,
         "item_series": out["item_series"],
     })
+
+def _inputs(payload_json):
+    # PLAN.md §4 D289 — the policy version's Export: what a run of these frozen
+    # inputs hands the engine, from the same two calls, stopped before simulating.
+    b = json.loads(payload_json)
+    return json.dumps(engine_input_from_snapshots(
+        b.get("dataset") or {}, b.get("snapshot") or {}, b.get("scenario") or {},
+        project_model=b.get("project_model")))
 `;
 
 async function ensure(manifestUrl: string): Promise<void> {
@@ -128,6 +138,18 @@ self.onmessage = async (e: MessageEvent) => {
         runFn?.destroy?.();
       }
       post({ type: "result", result: JSON.parse(out) });
+      return;
+    }
+    if (msg.type === "inputs") {
+      await ensure(msg.manifestUrl);
+      const fn = pyodide.globals.get("_inputs");
+      let out: string;
+      try {
+        out = fn(msg.payload) as string;
+      } finally {
+        fn?.destroy?.();
+      }
+      post({ type: "inputs", result: JSON.parse(out) });
       return;
     }
   } catch (err) {

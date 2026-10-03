@@ -202,6 +202,69 @@ export function runInBrowser(
   });
 }
 
+/**
+ * What the engine RECEIVES for these frozen inputs, without simulating
+ * (PLAN.md §4 D289): `sim_worker.local.engine_input_from_snapshots`, the same
+ * mapping a run performs. The policy version's Export is built from this, so the
+ * file shows the run's input and not a second reading of the snapshot.
+ */
+export function engineInputInBrowser(
+  args: Pick<RunArgs, "snapshot" | "projectModel" | "dataset"> & { scenario: Record<string, unknown> },
+  onPhase?: (p: LoadPhase) => void,
+): Promise<EngineInput> {
+  const w = getWorker();
+  const payload = JSON.stringify({
+    snapshot: args.snapshot,
+    scenario: args.scenario,
+    project_model: args.projectModel,
+    dataset: args.dataset,
+  });
+  return new Promise<EngineInput>((resolve, reject) => {
+    const handler = (e: MessageEvent) => {
+      const m = e.data as { type: string; phase?: LoadPhase; result?: EngineInput; error?: string };
+      if (m.type === "phase") onPhase?.(m.phase as LoadPhase);
+      else if (m.type === "inputs") {
+        cleanup();
+        resolve(m.result as EngineInput);
+      } else if (m.type === "error") {
+        cleanup();
+        reject(new Error(m.error));
+      }
+    };
+    const cleanup = () => w.removeEventListener("message", handler);
+    w.addEventListener("message", handler);
+    w.postMessage({ type: "inputs", manifestUrl: manifestUrl(), payload });
+  });
+}
+
+/** `sim_worker/engine_input.py::describe` — the shape `_inputs` returns. */
+export interface EngineInput {
+  engine_version: string;
+  /** The mapped scsim `Scenario` (`model_dump(mode="json")`): network, settings,
+   *  events, policies — what `run_scenario` simulates. */
+  scenario: {
+    name?: string;
+    network: Record<string, unknown>;
+    settings: Record<string, unknown>;
+    events: Record<string, unknown>[];
+    policies: Record<string, Record<string, unknown>>;
+  };
+  /** Unit and meaning per field, keyed by network list / `settings` / `events`. */
+  fields: Record<string, Record<string, { label: string; unit: string; notes: string }>>;
+  /** network list → row index → field → where the value came from. */
+  row_sources: Record<string, Record<string, Record<string, { source: string; value: unknown; master: string }>>>;
+  sources: Array<{ target: string; master: string; entity: string; source: string; value: unknown }>;
+  policies: Array<{
+    id: string;
+    catalog_ref: string;
+    name: string;
+    summary: string;
+    in_mapping: boolean;
+    params: Array<{ path: string[]; display: string[]; value: unknown; label: string; unit: string; notes: string; set_by_mapping: boolean }>;
+  }>;
+  warnings: Array<{ level: string; entity: string; field: string; reason: string }>;
+}
+
 /** One-click self-test result — a single flat shape (not a discriminated union)
  *  so callers narrow on `ok` without depending on strictNullChecks. */
 export interface SelfTestResult {

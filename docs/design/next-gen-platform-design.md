@@ -1186,7 +1186,11 @@ Four items, delivered together:
    (`src/lib/policies/verifiableExports.ts`, wired into the version-history sheet): (a) the
    policy export gains per-cell **provenance** (values equal to the schema default are marked
    as such — placeholders are no longer mistakable for data) and a `_meta` scope statement
-   ("policy snapshot only"); (b) a **dataset export** — the exact canonical rows of the six
+   ("policy snapshot only") — **superseded by PLAN.md §4 D289 (2026-10-03): the version Export
+   is now the engine's own input** (`sim_worker.local.engine_input_from_snapshots`, run in the
+   browser engine on the version and the dataset version its latest run read), laid out for a
+   person by `src/lib/policies/engineInputWorkbook.ts` with a source per value and the policy
+   hash re-checked from the stored text; (b) a **dataset export** — the exact canonical rows of the six
    engine-read tables that `graph_hash` was computed over (`dataset_versions.snapshot`),
    stamped with the hash; (c) a **results export per run** — run metadata (the full
    provenance triple, seed spec, complete `disruption_schedule`, `code_version`), aggregate

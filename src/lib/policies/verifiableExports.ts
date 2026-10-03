@@ -2,9 +2,11 @@
 // workbooks that make a model version externally checkable — by a reviewer,
 // an auditor, or an AI — without access to the app:
 //
-//   1. Policy snapshot   — the saved version's families + overrides, every
-//      cell annotated with provenance (explicitly-divergent vs. equal to the
-//      schema default), stamped with the policy_hash.
+//   1. Simulation input  — what the engine receives for a policy version on
+//      its dataset version, mapped by the engine itself (§4 D289): built in
+//      `engineInputWorkbook.ts`. Until D289 it was the stored policy bundle
+//      with the page's defaults filled in, which was neither readable nor the
+//      engine's input.
 //   2. Dataset           — the EXACT canonical rows the graph_hash was
 //      computed over (dataset_versions.snapshot), one sheet per engine-read
 //      table, stamped with the graph_hash.
@@ -18,118 +20,12 @@
 import { replicationLabel } from "@/lib/sim/replicationLabel";
 import * as XLSX from "xlsx";
 import { recordRows, type ReproducibilityRecord } from "@/lib/trust/reproducibilityRecord";
-import {
-  DEFAULT_BUNDLE,
-  FIELD_LABELS,
-  type PolicyBundle,
-  type PolicyFamily,
-} from "./schemas";
-import type { OverrideRow } from "./resolve";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 
 function normalize(v: unknown): string | number | boolean | null {
   if (v == null) return "";
   if (typeof v === "object") return JSON.stringify(v);
   return v as string | number | boolean;
-}
-
-function sameValue(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-}
-
-// ── 1. Policy snapshot with per-cell provenance ─────────────────────────────
-
-export interface PolicyVersionMeta {
-  id: string;
-  label: string | null;
-  notes?: string | null;
-  author_email?: string | null;
-  author_name?: string | null;
-  policy_hash: string | null;
-  created_at: string;
-}
-
-/**
- * One sheet per family. Under every value row sits a `provenance` row grading
- * each cell: `set (differs from schema default)` when the stored value
- * diverges from the schema default, `= schema default` when it equals it
- * (untouched OR deliberately set to the default — storage cannot distinguish
- * the two, and the export says so honestly), and for override rows
- * `override` vs `inherited from defaults`.
- */
-export function buildPolicyVersionWorkbook(
-  version: PolicyVersionMeta,
-  families: PolicyFamily[],
-  bundle: PolicyBundle,
-  overrides: OverrideRow[],
-  fulfillmentStrategy?: string | null,
-): XLSX.WorkBook {
-  const wb = XLSX.utils.book_new();
-
-  for (const family of families) {
-    const def = bundle[family] as Record<string, unknown>;
-    const schemaDef = DEFAULT_BUNDLE[family] as Record<string, unknown>;
-    const fields = Object.keys(def);
-    const header = ["scope", "target_key", ...fields.map((f) => FIELD_LABELS[f] ?? f)];
-
-    const rows: (string | number | boolean | null)[][] = [];
-    rows.push(["default", "*", ...fields.map((f) => normalize(def[f]))]);
-    rows.push([
-      "provenance",
-      "*",
-      ...fields.map((f) =>
-        sameValue(def[f], schemaDef[f]) ? "= schema default" : "set (differs from schema default)",
-      ),
-    ]);
-
-    for (const o of overrides.filter((x) => x.family === family)) {
-      rows.push([
-        o.scope,
-        o.target_key,
-        ...fields.map((f) => (o.patch[f] !== undefined ? normalize(o.patch[f]) : normalize(def[f]))),
-      ]);
-      rows.push([
-        "provenance",
-        o.target_key,
-        ...fields.map((f) => (o.patch[f] !== undefined ? "override" : "inherited from defaults")),
-      ]);
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    XLSX.utils.book_append_sheet(wb, ws, family.slice(0, 28));
-  }
-
-  const meta: (string | number | null)[][] = [
-    ["SuReSuite verifiable export — POLICY SNAPSHOT ONLY"],
-    [
-      "Scope",
-      "This workbook is the saved policy bundle of one model version. It contains NO network/" +
-        "economics data and NO simulation results — those are separate exports: the dataset " +
-        "export (stamped with its graph_hash) and the per-run results export.",
-    ],
-    [],
-    ["Version id", version.id],
-    ["Label", version.label ?? ""],
-    ["Notes", version.notes ?? ""],
-    ["Author", version.author_name || version.author_email || ""],
-    ["Saved at", version.created_at],
-    ["policy_hash (SHA-256)", version.policy_hash ?? "(not stored — legacy version)"],
-    ["Fulfillment strategy", fulfillmentStrategy ?? ""],
-    [],
-    ["Provenance legend"],
-    ["set (differs from schema default)", "the stored value diverges from the schema default — certainly user/preset-set"],
-    [
-      "= schema default",
-      "the stored value equals the schema default — either untouched or deliberately set to it; " +
-        "the snapshot cannot distinguish the two",
-    ],
-    ["override", "per-node/edge patch value explicitly set for that target"],
-    ["inherited from defaults", "cell shown for readability; the override row does not set this field"],
-    [],
-    ["Generated", new Date().toISOString()],
-  ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(meta), "_meta");
-  return wb;
 }
 
 // ── 2. Dataset (canonical hashed rows) ──────────────────────────────────────
