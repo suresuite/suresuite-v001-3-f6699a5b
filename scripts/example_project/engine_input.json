@@ -1,0 +1,2321 @@
+{
+ "engine_version": "0.6.1",
+ "scenario": {
+  "name": "scenario",
+  "network": {
+   "suppliers": [
+    {
+     "id": "S1",
+     "name": "S1",
+     "capacity_per_week": 500.0,
+     "reliability_score": 0.9,
+     "tier": 1
+    },
+    {
+     "id": "S2",
+     "name": "S2",
+     "capacity_per_week": 250.0,
+     "reliability_score": 0.8,
+     "tier": 1
+    },
+    {
+     "id": "S3",
+     "name": "S3",
+     "capacity_per_week": null,
+     "reliability_score": 1.0,
+     "tier": 1
+    }
+   ],
+   "materials": [
+    {
+     "id": "M1",
+     "name": "M1",
+     "cost": 11.5,
+     "holding_cost_rate": 10.0,
+     "initial_on_hand": 100.0
+    },
+    {
+     "id": "M2",
+     "name": "M2",
+     "cost": 15.0,
+     "holding_cost_rate": 20.0,
+     "initial_on_hand": null
+    },
+    {
+     "id": "M3",
+     "name": "M3",
+     "cost": 7.0,
+     "holding_cost_rate": 20.0,
+     "initial_on_hand": 30.0
+    }
+   ],
+   "products": [
+    {
+     "id": "P1",
+     "name": "P1",
+     "unit_price": 120.0,
+     "demand_model": "triangular",
+     "demand_mode": 50.0,
+     "demand_min": 40.0,
+     "demand_max": 60.0,
+     "demand_floor_factor": null,
+     "demand_history": [],
+     "negbin_dispersion": 1.0,
+     "demand_cv": null,
+     "production_capacity": 200.0,
+     "fulfillment_mode": "mto",
+     "fg_policy": "base_stock",
+     "fg_base_stock": null,
+     "fg_reorder_point": null,
+     "fg_cover_days": null,
+     "fg_initial_on_hand": null,
+     "forecast_model": "ma",
+     "forecast_window": 8,
+     "forecast_bias": 0.0
+    },
+    {
+     "id": "P2",
+     "name": "P2",
+     "unit_price": 82.5,
+     "demand_model": "triangular",
+     "demand_mode": 40.0,
+     "demand_min": 28.0,
+     "demand_max": 52.0,
+     "demand_floor_factor": null,
+     "demand_history": [],
+     "negbin_dispersion": 1.0,
+     "demand_cv": null,
+     "production_capacity": 5950.0,
+     "fulfillment_mode": "mts",
+     "fg_policy": "days_of_cover",
+     "fg_base_stock": null,
+     "fg_reorder_point": null,
+     "fg_cover_days": 10.0,
+     "fg_initial_on_hand": null,
+     "forecast_model": "ma",
+     "forecast_window": 8,
+     "forecast_bias": 0.0
+    }
+   ],
+   "bom": [
+    {
+     "product_id": "P1",
+     "material_id": "M1",
+     "rate": 1.0
+    },
+    {
+     "product_id": "P1",
+     "material_id": "M2",
+     "rate": 2.0
+    },
+    {
+     "product_id": "P2",
+     "material_id": "M3",
+     "rate": 1.0
+    }
+   ],
+   "supplier_links": [
+    {
+     "supplier_id": "S1",
+     "material_id": "M1",
+     "cost": 10.0,
+     "lead_time_weeks": 2,
+     "lead_time_dist": "deterministic",
+     "lead_time_cv": 0.0,
+     "moq": 5.0,
+     "primary": false
+    },
+    {
+     "supplier_id": "S2",
+     "material_id": "M1",
+     "cost": 12.0,
+     "lead_time_weeks": 5,
+     "lead_time_dist": "deterministic",
+     "lead_time_cv": 0.0,
+     "moq": 5.0,
+     "primary": false
+    },
+    {
+     "supplier_id": "S2",
+     "material_id": "M2",
+     "cost": 15.0,
+     "lead_time_weeks": 2,
+     "lead_time_dist": "deterministic",
+     "lead_time_cv": 0.0,
+     "moq": 20.0,
+     "primary": false
+    },
+    {
+     "supplier_id": "S3",
+     "material_id": "M3",
+     "cost": 7.0,
+     "lead_time_weeks": 2,
+     "lead_time_dist": "deterministic",
+     "lead_time_cv": 0.0,
+     "moq": 0.0,
+     "primary": false
+    }
+   ],
+   "customers": [
+    {
+     "id": "C1",
+     "name": "Key account",
+     "segment": "key",
+     "priority_weight": 3.0,
+     "sla_fill_floor_pct": 90.0
+    },
+    {
+     "id": "C2",
+     "name": "C2",
+     "segment": "default",
+     "priority_weight": 1.0,
+     "sla_fill_floor_pct": null
+    }
+   ],
+   "customer_links": [
+    {
+     "product_id": "P1",
+     "customer_id": "C1",
+     "share": 50.0,
+     "demand_model": "normal",
+     "demand_mean": 50.0,
+     "demand_variation": 0.2,
+     "demand_min": null,
+     "demand_max": null,
+     "unit_price": 110.0,
+     "forecast": [
+      50.0,
+      55.0
+     ]
+    },
+    {
+     "product_id": "P2",
+     "customer_id": "C1",
+     "share": 30.0,
+     "demand_model": "poisson",
+     "demand_mean": 25.0,
+     "demand_variation": null,
+     "demand_min": null,
+     "demand_max": null,
+     "unit_price": 80.0,
+     "forecast": null
+    },
+    {
+     "product_id": "P2",
+     "customer_id": "C2",
+     "share": 10.0,
+     "demand_model": "triangular",
+     "demand_mean": 10.0,
+     "demand_variation": null,
+     "demand_min": 5.0,
+     "demand_max": 20.0,
+     "unit_price": 95.0,
+     "forecast": null
+    }
+   ],
+   "lanes": [],
+   "multi_sourcing_threshold_pct": 50.0
+  },
+  "settings": {
+   "time_step": 1,
+   "horizon": 52,
+   "warmup_method": "most_conservative",
+   "warmup_end": null,
+   "analysis_window": 39,
+   "project_seed": 1,
+   "model_seeds": 1,
+   "disruption_event_seeds": 18,
+   "crn_enabled": true,
+   "bootstrap_resamples": 10000,
+   "ci_level": 95,
+   "replication_stopping": "fixed",
+   "ci_halfwidth_target": 0.05,
+   "run_mode": "full",
+   "detection_lag_weeks": 0,
+   "demand_floor_factor": 0.3,
+   "visibility_horizon": 52,
+   "trace_verbosity": "weekly"
+  },
+  "events": [],
+  "policies": {
+   "inventory_control": {
+    "policy_type": "min_max",
+    "periodic_review_weeks": 1,
+    "coverage_weeks": {
+     "nominal": 8.0,
+     "alert": 8.0,
+     "crisis": 8.0
+    }
+   },
+   "safety_stock_materials": {
+    "classification": "fixed_days",
+    "fixed_days_cover": 7.0
+   },
+   "unmet_demand_handling": {
+    "rule": "backorder",
+    "backorder_horizon": 2,
+    "backorder_penalty": 14.0,
+    "row_overrides": {
+     "C1::P1": {
+      "backorder_allowed": true,
+      "backorder_horizon": 1,
+      "backorder_penalty": 14.0
+     },
+     "C2::P2": {
+      "backorder_allowed": false
+     }
+    }
+   },
+   "customer_allocation": {
+    "rule": "priority",
+    "row_priority": {
+     "C2::P2": 2.0
+    }
+   }
+  }
+ },
+ "fields": {
+  "suppliers": {
+   "id": {
+    "label": "ID",
+    "unit": "id",
+    "notes": ""
+   },
+   "name": {
+    "label": "Name",
+    "unit": "-",
+    "notes": ""
+   },
+   "capacity_per_week": {
+    "label": "Capacity per week",
+    "unit": "units/wk",
+    "notes": "None = ∞ (manuscript). Finite required for capacity_reduction events and P-S.3."
+   },
+   "reliability_score": {
+    "label": "Reliability score",
+    "unit": "-",
+    "notes": "Selection-rule input (P-S.1 reliability rule)."
+   },
+   "tier": {
+    "label": "Tier",
+    "unit": "-",
+    "notes": "Reserved extension point; v1 simulates tier 1 only."
+   }
+  },
+  "materials": {
+   "id": {
+    "label": "ID",
+    "unit": "id",
+    "notes": ""
+   },
+   "name": {
+    "label": "Name",
+    "unit": "-",
+    "notes": ""
+   },
+   "cost": {
+    "label": "Cost",
+    "unit": "€/unit",
+    "notes": "c_m at the primary source."
+   },
+   "holding_cost_rate": {
+    "label": "Holding cost rate",
+    "unit": "%/yr of c_m",
+    "notes": "h_m"
+   },
+   "initial_on_hand": {
+    "label": "Initial on hand",
+    "unit": "units",
+    "notes": "None → warm start at t=0: on hand = S_m − E[D_m]·T_s = E[D_m]·κ + safety stock, pipeline primed so position = S_m."
+   }
+  },
+  "products": {
+   "id": {
+    "label": "ID",
+    "unit": "id",
+    "notes": ""
+   },
+   "name": {
+    "label": "Name",
+    "unit": "-",
+    "notes": ""
+   },
+   "unit_price": {
+    "label": "Unit price",
+    "unit": "€/unit",
+    "notes": "u_p"
+   },
+   "demand_model": {
+    "label": "Demand model",
+    "unit": "enum",
+    "notes": ""
+   },
+   "demand_mode": {
+    "label": "Demand mode",
+    "unit": "units/wk",
+    "notes": "b_p — historical median; the average (mode) of the triangularAV demand form."
+   },
+   "demand_min": {
+    "label": "Demand min",
+    "unit": "units/wk",
+    "notes": "a_p; default max{0,(1−ν)·b_p}."
+   },
+   "demand_max": {
+    "label": "Demand max",
+    "unit": "units/wk",
+    "notes": "c_p — historical max; default (1+ν)·b_p."
+   },
+   "demand_floor_factor": {
+    "label": "Demand floor factor",
+    "unit": "-",
+    "notes": "ν override; falls back to the global setting. Acts as the variability of the triangularAV demand form: triangular(b·(1−ν), b, b·(1+ν))."
+   },
+   "demand_history": {
+    "label": "Demand history",
+    "unit": "units/wk",
+    "notes": "Required for demand_model=bootstrap."
+   },
+   "negbin_dispersion": {
+    "label": "Negbin dispersion",
+    "unit": "-",
+    "notes": "k for negbin (variance = b + b²/k)."
+   },
+   "demand_cv": {
+    "label": "Demand CV",
+    "unit": "-",
+    "notes": "Coefficient of variation for demand_model=normal: σ = cv · demand_mode. Negative draws are set to 0 and counted (ADR 0002, decision 8). Read only by normal; triangular uses demand_floor_factor / explicit bounds."
+   },
+   "production_capacity": {
+    "label": "Production capacity",
+    "unit": "units/wk",
+    "notes": "O_p"
+   },
+   "fulfillment_mode": {
+    "label": "Fulfillment mode",
+    "unit": "enum",
+    "notes": ""
+   },
+   "fg_policy": {
+    "label": "FG policy",
+    "unit": "enum",
+    "notes": "base_stock (S) · min_max (s, S) · days_of_cover (D). MTS only."
+   },
+   "fg_base_stock": {
+    "label": "FG base stock",
+    "unit": "units",
+    "notes": "S^FG_p: the order-up-to level (base_stock, min_max); derived if None under base_stock. MTS only."
+   },
+   "fg_reorder_point": {
+    "label": "FG reorder point",
+    "unit": "units",
+    "notes": "s: min_max only — produce up to S when the stock left after this week's demand falls below s."
+   },
+   "fg_cover_days": {
+    "label": "FG cover days",
+    "unit": "days",
+    "notes": "D: days_of_cover only — target = D/7 × projected weekly demand; moves with the forecast."
+   },
+   "fg_initial_on_hand": {
+    "label": "FG initial on hand",
+    "unit": "units",
+    "notes": "FG opening stock (engine RFC 4). None = start at the policy target."
+   },
+   "forecast_model": {
+    "label": "Forecast model",
+    "unit": "enum",
+    "notes": "MTS plans to forecast."
+   },
+   "forecast_window": {
+    "label": "Forecast window",
+    "unit": "weeks",
+    "notes": ""
+   },
+   "forecast_bias": {
+    "label": "Forecast bias",
+    "unit": "%",
+    "notes": "Experimental mis-forecast lever."
+   }
+  },
+  "bom": {
+   "product_id": {
+    "label": "Product ID",
+    "unit": "",
+    "notes": ""
+   },
+   "material_id": {
+    "label": "Material ID",
+    "unit": "",
+    "notes": ""
+   },
+   "rate": {
+    "label": "Rate",
+    "unit": "units m / unit p",
+    "notes": "r_{p,m}"
+   }
+  },
+  "supplier_links": {
+   "supplier_id": {
+    "label": "Supplier ID",
+    "unit": "",
+    "notes": ""
+   },
+   "material_id": {
+    "label": "Material ID",
+    "unit": "",
+    "notes": ""
+   },
+   "cost": {
+    "label": "Cost",
+    "unit": "€/unit",
+    "notes": "c_{m,s}"
+   },
+   "lead_time_weeks": {
+    "label": "Lead time weeks",
+    "unit": "weeks",
+    "notes": "T_s; includes transport in v1."
+   },
+   "lead_time_dist": {
+    "label": "Lead time dist",
+    "unit": "enum",
+    "notes": "Stochastic lead times are pre-drawn per (link, week) from the world leadtime stream, so CRN pairing holds across policies (docs/statistics.md)."
+   },
+   "lead_time_cv": {
+    "label": "Lead time CV",
+    "unit": "-",
+    "notes": "CV for lognormal/gamma lead-time dists."
+   },
+   "moq": {
+    "label": "MOQ",
+    "unit": "units",
+    "notes": "Q_MOQ — minimum order quantity."
+   },
+   "primary": {
+    "label": "Primary",
+    "unit": "-",
+    "notes": "Chosen primary source for its material (the /policies Supplier stage). False everywhere → the manuscript rule: min cost, then lead time, then id."
+   }
+  },
+  "customers": {
+   "id": {
+    "label": "ID",
+    "unit": "",
+    "notes": ""
+   },
+   "name": {
+    "label": "Name",
+    "unit": "",
+    "notes": ""
+   },
+   "segment": {
+    "label": "Segment",
+    "unit": "-",
+    "notes": "≤10 segments."
+   },
+   "priority_weight": {
+    "label": "Priority weight",
+    "unit": "",
+    "notes": ""
+   },
+   "sla_fill_floor_pct": {
+    "label": "SLA fill floor pct",
+    "unit": "%",
+    "notes": "Default per-row service target under sla_tier; None = the segment floor."
+   }
+  },
+  "customer_links": {
+   "product_id": {
+    "label": "Product ID",
+    "unit": "",
+    "notes": ""
+   },
+   "customer_id": {
+    "label": "Customer ID",
+    "unit": "",
+    "notes": ""
+   },
+   "share": {
+    "label": "Share",
+    "unit": "relative weight",
+    "notes": "Normalized per product at compile."
+   },
+   "demand_model": {
+    "label": "Demand model",
+    "unit": "enum",
+    "notes": "deterministic | normal | triangular | triangular_av | poisson. None = the product's distribution scaled by share."
+   },
+   "demand_mean": {
+    "label": "Demand mean",
+    "unit": "units/wk",
+    "notes": "The row's mean (the mode for triangular). Past the end of a forecast it is the value the plan uses."
+   },
+   "demand_variation": {
+    "label": "Demand variation",
+    "unit": "-",
+    "notes": "Interpreted by model: normal → coefficient of variation (σ = cv · centre); triangular_av → ± fraction of the centre; ignored by deterministic, poisson and triangular (whose bounds are explicit)."
+   },
+   "demand_min": {
+    "label": "Demand min",
+    "unit": "units/wk",
+    "notes": "triangular only: the lower bound."
+   },
+   "demand_max": {
+    "label": "Demand max",
+    "unit": "units/wk",
+    "notes": "triangular only: the upper bound."
+   },
+   "unit_price": {
+    "label": "Unit price",
+    "unit": "€/unit",
+    "notes": "The row's sell price; None = the product's unit_price."
+   },
+   "forecast": {
+    "label": "Forecast",
+    "unit": "units/wk",
+    "notes": "One value per simulated week from week 0: the centre of that week's distribution, and what the plan reads. Past its end the row uses demand_mean if set, else the last value (with a warning)."
+   }
+  },
+  "lanes": {
+   "id": {
+    "label": "ID",
+    "unit": "id",
+    "notes": ""
+   },
+   "supplier_id": {
+    "label": "Supplier ID",
+    "unit": "",
+    "notes": ""
+   },
+   "plant_id": {
+    "label": "Plant ID",
+    "unit": "id",
+    "notes": "v1 single plant."
+   },
+   "mode": {
+    "label": "Mode",
+    "unit": "enum",
+    "notes": ""
+   },
+   "lead_time_weeks": {
+    "label": "Lead time weeks",
+    "unit": "weeks",
+    "notes": "T_E transit leg, added to the supplier link's lead time at compile; 0 = behavior-neutral."
+   },
+   "capacity_per_week": {
+    "label": "Capacity per week",
+    "unit": "units/wk",
+    "notes": "None = ∞."
+   },
+   "cost_per_unit": {
+    "label": "Cost per unit",
+    "unit": "€/unit",
+    "notes": ""
+   }
+  },
+  "network": {
+   "multi_sourcing_threshold_pct": {
+    "label": "Multi sourcing threshold pct",
+    "unit": "",
+    "notes": ""
+   }
+  },
+  "settings": {
+   "time_step": {
+    "label": "Time step",
+    "unit": "week",
+    "notes": "Weekly clock; fixed."
+   },
+   "horizon": {
+    "label": "Horizon",
+    "unit": "weeks",
+    "notes": "T_sim. Manuscript: 156."
+   },
+   "warmup_method": {
+    "label": "Warmup method",
+    "unit": "enum",
+    "notes": "Runs Conway and MSER-5, adopts the later week."
+   },
+   "warmup_end": {
+    "label": "Warmup end",
+    "unit": "week",
+    "notes": "t_w. Required when warmup_method=manual; auto-detected otherwise. Manuscript: 85."
+   },
+   "analysis_window": {
+    "label": "Analysis window",
+    "unit": "weeks",
+    "notes": "KPI window starting at warmup_end."
+   },
+   "project_seed": {
+    "label": "Project seed",
+    "unit": "-",
+    "notes": "Root of the SeedSequence tree (Part VIII)."
+   },
+   "model_seeds": {
+    "label": "Model seeds",
+    "unit": "count",
+    "notes": "Replications over world streams. Study-grade floor is 30 (Part VIII); results below 10 carry a below_replication_floor badge."
+   },
+   "disruption_event_seeds": {
+    "label": "Disruption event seeds",
+    "unit": "count",
+    "notes": "(start, duration, magnitude) draws. Collapses to 1 when all events are fixed."
+   },
+   "crn_enabled": {
+    "label": "CRN enabled",
+    "unit": "-",
+    "notes": "Common random numbers; required for synergy math."
+   },
+   "bootstrap_resamples": {
+    "label": "Bootstrap resamples",
+    "unit": "count",
+    "notes": "Percentile bootstrap on Δ and synergy metrics."
+   },
+   "ci_level": {
+    "label": "CI level",
+    "unit": "%",
+    "notes": "One of {90, 95, 99}."
+   },
+   "replication_stopping": {
+    "label": "Replication stopping",
+    "unit": "enum",
+    "notes": "sequential_ci stops when FR CI half-width ≤ ε."
+   },
+   "ci_halfwidth_target": {
+    "label": "CI halfwidth target",
+    "unit": "-",
+    "notes": "ε for sequential stopping."
+   },
+   "run_mode": {
+    "label": "Run mode",
+    "unit": "enum",
+    "notes": "fast_scan: 10×6 seeds, kpi_only traces, wide-CI badge (Part X). Never silently mixed with full-mode results."
+   },
+   "detection_lag_weeks": {
+    "label": "Detection lag weeks",
+    "unit": "weeks",
+    "notes": "Delay between physical disruption start and firm knowledge (PH-20). Manuscript core uses 0; P-S.4 early_warning_failover governs this lever."
+   },
+   "demand_floor_factor": {
+    "label": "Demand floor factor",
+    "unit": "-",
+    "notes": "ν — partial-observability correction: a_p = max{0,(1−ν)·b_p}."
+   },
+   "visibility_horizon": {
+    "label": "Visibility horizon",
+    "unit": "weeks",
+    "notes": "τ* — MTO order schedule length."
+   },
+   "trace_verbosity": {
+    "label": "Trace verbosity",
+    "unit": "enum",
+    "notes": "Stress tests default to kpi_only (≈100× less IO)."
+   }
+  },
+  "events": {
+   "target_type": {
+    "label": "Target type",
+    "unit": "enum",
+    "notes": "node:supplier ✅; node:plant ✅; edge:lane 🧩."
+   },
+   "target_id": {
+    "label": "Target ID",
+    "unit": "id",
+    "notes": ""
+   },
+   "effect_type": {
+    "label": "Effect type",
+    "unit": "enum",
+    "notes": "LT extension ✅ (Eqs. 11–12) vs capacity throttle."
+   },
+   "capacity_factor": {
+    "label": "Capacity factor",
+    "unit": "-",
+    "notes": "φ — 0 = full outage. capacity_reduction only."
+   },
+   "overflow_rule": {
+    "label": "Overflow rule",
+    "unit": "enum",
+    "notes": "reject logs lost_inbound_units."
+   },
+   "onset_profile": {
+    "label": "Onset profile",
+    "unit": "enum",
+    "notes": "ramp_linear applies to capacity_reduction only."
+   },
+   "recovery_profile": {
+    "label": "Recovery profile",
+    "unit": "enum",
+    "notes": "ramp_linear applies to capacity_reduction only."
+   },
+   "ramp_weeks": {
+    "label": "Ramp weeks",
+    "unit": "weeks",
+    "notes": ""
+   },
+   "start": {
+    "label": "Start",
+    "unit": "week",
+    "notes": "t*. None → auto: U{t_w .. t_w+2} (steady state) from the hazard_start stream."
+   },
+   "duration": {
+    "label": "Duration",
+    "unit": "weeks",
+    "notes": "Δt. int = fixed; range = U{min..max} from the hazard_duration stream."
+   }
+  }
+ },
+ "row_sources": {
+  "materials": {
+   "0": {
+    "cost": {
+     "source": "override",
+     "value": 11.5,
+     "master": "materials.cost"
+    },
+    "initial_on_hand": {
+     "source": "master",
+     "value": 100.0,
+     "master": "materials.initial_on_hand"
+    }
+   },
+   "1": {
+    "cost": {
+     "source": "lanes",
+     "value": 15.0,
+     "master": "materials.cost"
+    },
+    "initial_on_hand": {
+     "source": "default",
+     "value": null,
+     "master": "materials.initial_on_hand"
+    }
+   },
+   "2": {
+    "cost": {
+     "source": "lanes",
+     "value": 7.0,
+     "master": "materials.cost"
+    },
+    "initial_on_hand": {
+     "source": "override",
+     "value": 30.0,
+     "master": "materials.initial_on_hand"
+    }
+   }
+  },
+  "supplier_links": {
+   "0": {
+    "moq": {
+     "source": "master",
+     "value": 5.0,
+     "master": "materials.moq"
+    }
+   },
+   "1": {
+    "moq": {
+     "source": "master",
+     "value": 5.0,
+     "master": "materials.moq"
+    }
+   },
+   "2": {
+    "moq": {
+     "source": "override",
+     "value": 20.0,
+     "master": "materials.moq"
+    }
+   },
+   "3": {
+    "moq": {
+     "source": "default",
+     "value": 0.0,
+     "master": "materials.moq"
+    }
+   }
+  },
+  "customer_links": {
+   "0": {
+    "demand_model": {
+     "source": "master",
+     "value": "normal",
+     "master": "outbound_logistics.demand_distribution"
+    },
+    "demand_max": {
+     "source": "default",
+     "value": null,
+     "master": "outbound_logistics.demand_max"
+    },
+    "demand_mean": {
+     "source": "master",
+     "value": 50.0,
+     "master": "outbound_logistics.demand_mean"
+    },
+    "demand_min": {
+     "source": "default",
+     "value": null,
+     "master": "outbound_logistics.demand_min"
+    },
+    "demand_variation": {
+     "source": "master",
+     "value": 0.2,
+     "master": "outbound_logistics.demand_variation"
+    },
+    "unit_price": {
+     "source": "master",
+     "value": 110.0,
+     "master": "outbound_logistics.unit_price"
+    }
+   },
+   "1": {
+    "demand_model": {
+     "source": "override",
+     "value": "poisson",
+     "master": "outbound_logistics.demand_distribution"
+    },
+    "demand_max": {
+     "source": "default",
+     "value": null,
+     "master": "outbound_logistics.demand_max"
+    },
+    "demand_mean": {
+     "source": "override",
+     "value": 25.0,
+     "master": "outbound_logistics.demand_mean"
+    },
+    "demand_min": {
+     "source": "default",
+     "value": null,
+     "master": "outbound_logistics.demand_min"
+    },
+    "demand_variation": {
+     "source": "default",
+     "value": null,
+     "master": "outbound_logistics.demand_variation"
+    },
+    "unit_price": {
+     "source": "master",
+     "value": 80.0,
+     "master": "outbound_logistics.unit_price"
+    }
+   },
+   "2": {
+    "demand_model": {
+     "source": "master",
+     "value": "triangular",
+     "master": "outbound_logistics.demand_distribution"
+    },
+    "demand_max": {
+     "source": "master",
+     "value": 20.0,
+     "master": "outbound_logistics.demand_max"
+    },
+    "demand_mean": {
+     "source": "master",
+     "value": 10.0,
+     "master": "outbound_logistics.demand_mean"
+    },
+    "demand_min": {
+     "source": "master",
+     "value": 5.0,
+     "master": "outbound_logistics.demand_min"
+    },
+    "demand_variation": {
+     "source": "default",
+     "value": null,
+     "master": "outbound_logistics.demand_variation"
+    },
+    "unit_price": {
+     "source": "override",
+     "value": 95.0,
+     "master": "outbound_logistics.unit_price"
+    }
+   }
+  },
+  "products": {
+   "0": {
+    "fg_base_stock": {
+     "source": "master",
+     "value": 400.0,
+     "master": "products.fg_base_stock"
+    },
+    "fg_cover_days": {
+     "source": "default",
+     "value": null,
+     "master": "products.fg_cover_days"
+    },
+    "fg_initial_on_hand": {
+     "source": "master",
+     "value": 150.0,
+     "master": "products.fg_initial_on_hand"
+    },
+    "fg_policy": {
+     "source": "master",
+     "value": "min_max",
+     "master": "products.fg_policy"
+    },
+    "fg_reorder_point": {
+     "source": "master",
+     "value": 100.0,
+     "master": "products.fg_reorder_point"
+    },
+    "fulfillment_mode": {
+     "source": "master",
+     "value": "mto",
+     "master": "products.fulfillment_mode"
+    },
+    "production_capacity": {
+     "source": "master",
+     "value": 200.0,
+     "master": "products.production_capacity"
+    },
+    "unit_price": {
+     "source": "override",
+     "value": 120.0,
+     "master": "products.sell_price"
+    }
+   },
+   "1": {
+    "fg_base_stock": {
+     "source": "default",
+     "value": null,
+     "master": "products.fg_base_stock"
+    },
+    "fg_cover_days": {
+     "source": "override",
+     "value": 10.0,
+     "master": "products.fg_cover_days"
+    },
+    "fg_initial_on_hand": {
+     "source": "default",
+     "value": null,
+     "master": "products.fg_initial_on_hand"
+    },
+    "fg_policy": {
+     "source": "override",
+     "value": "days_of_cover",
+     "master": "products.fg_policy"
+    },
+    "fg_reorder_point": {
+     "source": "default",
+     "value": null,
+     "master": "products.fg_reorder_point"
+    },
+    "fulfillment_mode": {
+     "source": "override",
+     "value": "mts",
+     "master": "products.fulfillment_mode"
+    },
+    "production_capacity": {
+     "source": "derived",
+     "value": 5950.0,
+     "master": "products.production_capacity"
+    },
+    "unit_price": {
+     "source": "lanes",
+     "value": 82.5,
+     "master": "products.sell_price"
+    }
+   }
+  },
+  "suppliers": {
+   "0": {
+    "capacity_per_week": {
+     "source": "master",
+     "value": 500.0,
+     "master": "suppliers.capacity_per_week"
+    },
+    "reliability_score": {
+     "source": "master",
+     "value": 0.9,
+     "master": "suppliers.reliability_score"
+    }
+   },
+   "1": {
+    "capacity_per_week": {
+     "source": "override",
+     "value": 250.0,
+     "master": "suppliers.capacity_per_week"
+    },
+    "reliability_score": {
+     "source": "override",
+     "value": 0.8,
+     "master": "suppliers.reliability_score"
+    }
+   },
+   "2": {
+    "capacity_per_week": {
+     "source": "default",
+     "value": null,
+     "master": "suppliers.capacity_per_week"
+    },
+    "reliability_score": {
+     "source": "default",
+     "value": 1.0,
+     "master": "suppliers.reliability_score"
+    }
+   }
+  }
+ },
+ "sources": [
+  {
+   "target": "customer_allocation.row_priority",
+   "master": "customers.priority_weight",
+   "entity": "C1::P1",
+   "source": "master",
+   "value": 3.0
+  },
+  {
+   "target": "customer_allocation.row_priority",
+   "master": "customers.priority_weight",
+   "entity": "C1::P2",
+   "source": "master",
+   "value": 3.0
+  },
+  {
+   "target": "customer_allocation.row_priority",
+   "master": "customers.priority_weight",
+   "entity": "C2::P2",
+   "source": "override",
+   "value": 2.0
+  },
+  {
+   "target": "customer_allocation.row_floor_pct",
+   "master": "customers.sla_fill_floor_pct",
+   "entity": "C1::P1",
+   "source": "override",
+   "value": 95.0
+  },
+  {
+   "target": "customer_allocation.row_floor_pct",
+   "master": "customers.sla_fill_floor_pct",
+   "entity": "C1::P2",
+   "source": "master",
+   "value": 90.0
+  },
+  {
+   "target": "customer_allocation.row_floor_pct",
+   "master": "customers.sla_fill_floor_pct",
+   "entity": "C2::P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "SupplierLink.lead_time_weeks",
+   "master": "inbound_logistics.lead_time",
+   "entity": "S1::M1",
+   "source": "master",
+   "value": 2
+  },
+  {
+   "target": "SupplierLink.lead_time_weeks",
+   "master": "inbound_logistics.lead_time",
+   "entity": "S2::M1",
+   "source": "override",
+   "value": 5
+  },
+  {
+   "target": "SupplierLink.lead_time_weeks",
+   "master": "inbound_logistics.lead_time",
+   "entity": "S2::M2",
+   "source": "master",
+   "value": 2
+  },
+  {
+   "target": "SupplierLink.lead_time_weeks",
+   "master": "inbound_logistics.lead_time",
+   "entity": "S3::M3",
+   "source": "default",
+   "value": 2
+  },
+  {
+   "target": "Material.cost",
+   "master": "materials.cost",
+   "entity": "M1",
+   "source": "override",
+   "value": 11.5
+  },
+  {
+   "target": "Material.cost",
+   "master": "materials.cost",
+   "entity": "M2",
+   "source": "lanes",
+   "value": 15.0
+  },
+  {
+   "target": "Material.cost",
+   "master": "materials.cost",
+   "entity": "M3",
+   "source": "lanes",
+   "value": 7.0
+  },
+  {
+   "target": "Material.initial_on_hand",
+   "master": "materials.initial_on_hand",
+   "entity": "M1",
+   "source": "master",
+   "value": 100.0
+  },
+  {
+   "target": "Material.initial_on_hand",
+   "master": "materials.initial_on_hand",
+   "entity": "M2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Material.initial_on_hand",
+   "master": "materials.initial_on_hand",
+   "entity": "M3",
+   "source": "override",
+   "value": 30.0
+  },
+  {
+   "target": "SupplierLink.moq",
+   "master": "materials.moq",
+   "entity": "M1",
+   "source": "master",
+   "value": 5.0
+  },
+  {
+   "target": "SupplierLink.moq",
+   "master": "materials.moq",
+   "entity": "M2",
+   "source": "override",
+   "value": 20.0
+  },
+  {
+   "target": "SupplierLink.moq",
+   "master": "materials.moq",
+   "entity": "M3",
+   "source": "default",
+   "value": 0.0
+  },
+  {
+   "target": "CustomerLink.demand_model",
+   "master": "outbound_logistics.demand_distribution",
+   "entity": "C1::P1",
+   "source": "master",
+   "value": "normal"
+  },
+  {
+   "target": "CustomerLink.demand_model",
+   "master": "outbound_logistics.demand_distribution",
+   "entity": "C1::P2",
+   "source": "override",
+   "value": "poisson"
+  },
+  {
+   "target": "CustomerLink.demand_model",
+   "master": "outbound_logistics.demand_distribution",
+   "entity": "C2::P2",
+   "source": "master",
+   "value": "triangular"
+  },
+  {
+   "target": "CustomerLink.demand_max",
+   "master": "outbound_logistics.demand_max",
+   "entity": "C1::P1",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "CustomerLink.demand_max",
+   "master": "outbound_logistics.demand_max",
+   "entity": "C1::P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "CustomerLink.demand_max",
+   "master": "outbound_logistics.demand_max",
+   "entity": "C2::P2",
+   "source": "master",
+   "value": 20.0
+  },
+  {
+   "target": "CustomerLink.demand_mean",
+   "master": "outbound_logistics.demand_mean",
+   "entity": "C1::P1",
+   "source": "master",
+   "value": 50.0
+  },
+  {
+   "target": "CustomerLink.demand_mean",
+   "master": "outbound_logistics.demand_mean",
+   "entity": "C1::P2",
+   "source": "override",
+   "value": 25.0
+  },
+  {
+   "target": "CustomerLink.demand_mean",
+   "master": "outbound_logistics.demand_mean",
+   "entity": "C2::P2",
+   "source": "master",
+   "value": 10.0
+  },
+  {
+   "target": "CustomerLink.demand_min",
+   "master": "outbound_logistics.demand_min",
+   "entity": "C1::P1",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "CustomerLink.demand_min",
+   "master": "outbound_logistics.demand_min",
+   "entity": "C1::P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "CustomerLink.demand_min",
+   "master": "outbound_logistics.demand_min",
+   "entity": "C2::P2",
+   "source": "master",
+   "value": 5.0
+  },
+  {
+   "target": "CustomerLink.demand_variation",
+   "master": "outbound_logistics.demand_variation",
+   "entity": "C1::P1",
+   "source": "master",
+   "value": 0.2
+  },
+  {
+   "target": "CustomerLink.demand_variation",
+   "master": "outbound_logistics.demand_variation",
+   "entity": "C1::P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "CustomerLink.demand_variation",
+   "master": "outbound_logistics.demand_variation",
+   "entity": "C2::P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "CustomerLink.unit_price",
+   "master": "outbound_logistics.unit_price",
+   "entity": "C1::P1",
+   "source": "master",
+   "value": 110.0
+  },
+  {
+   "target": "CustomerLink.unit_price",
+   "master": "outbound_logistics.unit_price",
+   "entity": "C1::P2",
+   "source": "master",
+   "value": 80.0
+  },
+  {
+   "target": "CustomerLink.unit_price",
+   "master": "outbound_logistics.unit_price",
+   "entity": "C2::P2",
+   "source": "override",
+   "value": 95.0
+  },
+  {
+   "target": "",
+   "master": "products.demand_cv",
+   "entity": "P1",
+   "source": "master",
+   "value": 0.2
+  },
+  {
+   "target": "",
+   "master": "products.demand_cv",
+   "entity": "P2",
+   "source": "default",
+   "value": 0.3
+  },
+  {
+   "target": "",
+   "master": "products.demand_mean",
+   "entity": "P1",
+   "source": "master",
+   "value": 50.0
+  },
+  {
+   "target": "",
+   "master": "products.demand_mean",
+   "entity": "P2",
+   "source": "lanes",
+   "value": 40.0
+  },
+  {
+   "target": "Product.fg_base_stock",
+   "master": "products.fg_base_stock",
+   "entity": "P1",
+   "source": "master",
+   "value": 400.0
+  },
+  {
+   "target": "Product.fg_base_stock",
+   "master": "products.fg_base_stock",
+   "entity": "P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Product.fg_cover_days",
+   "master": "products.fg_cover_days",
+   "entity": "P1",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Product.fg_cover_days",
+   "master": "products.fg_cover_days",
+   "entity": "P2",
+   "source": "override",
+   "value": 10.0
+  },
+  {
+   "target": "Product.fg_initial_on_hand",
+   "master": "products.fg_initial_on_hand",
+   "entity": "P1",
+   "source": "master",
+   "value": 150.0
+  },
+  {
+   "target": "Product.fg_initial_on_hand",
+   "master": "products.fg_initial_on_hand",
+   "entity": "P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Product.fg_policy",
+   "master": "products.fg_policy",
+   "entity": "P1",
+   "source": "master",
+   "value": "min_max"
+  },
+  {
+   "target": "Product.fg_policy",
+   "master": "products.fg_policy",
+   "entity": "P2",
+   "source": "override",
+   "value": "days_of_cover"
+  },
+  {
+   "target": "Product.fg_reorder_point",
+   "master": "products.fg_reorder_point",
+   "entity": "P1",
+   "source": "master",
+   "value": 100.0
+  },
+  {
+   "target": "Product.fg_reorder_point",
+   "master": "products.fg_reorder_point",
+   "entity": "P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Product.fulfillment_mode",
+   "master": "products.fulfillment_mode",
+   "entity": "P1",
+   "source": "master",
+   "value": "mto"
+  },
+  {
+   "target": "Product.fulfillment_mode",
+   "master": "products.fulfillment_mode",
+   "entity": "P2",
+   "source": "override",
+   "value": "mts"
+  },
+  {
+   "target": "Product.production_capacity",
+   "master": "products.production_capacity",
+   "entity": "P1",
+   "source": "master",
+   "value": 200.0
+  },
+  {
+   "target": "Product.production_capacity",
+   "master": "products.production_capacity",
+   "entity": "P2",
+   "source": "derived",
+   "value": 5950.0
+  },
+  {
+   "target": "Product.unit_price",
+   "master": "products.sell_price",
+   "entity": "P1",
+   "source": "override",
+   "value": 120.0
+  },
+  {
+   "target": "Product.unit_price",
+   "master": "products.sell_price",
+   "entity": "P2",
+   "source": "lanes",
+   "value": 82.5
+  },
+  {
+   "target": "Supplier.capacity_per_week",
+   "master": "suppliers.capacity_per_week",
+   "entity": "S1",
+   "source": "master",
+   "value": 500.0
+  },
+  {
+   "target": "Supplier.capacity_per_week",
+   "master": "suppliers.capacity_per_week",
+   "entity": "S2",
+   "source": "override",
+   "value": 250.0
+  },
+  {
+   "target": "Supplier.capacity_per_week",
+   "master": "suppliers.capacity_per_week",
+   "entity": "S3",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Supplier.reliability_score",
+   "master": "suppliers.reliability_score",
+   "entity": "S1",
+   "source": "master",
+   "value": 0.9
+  },
+  {
+   "target": "Supplier.reliability_score",
+   "master": "suppliers.reliability_score",
+   "entity": "S2",
+   "source": "override",
+   "value": 0.8
+  },
+  {
+   "target": "Supplier.reliability_score",
+   "master": "suppliers.reliability_score",
+   "entity": "S3",
+   "source": "default",
+   "value": 1.0
+  }
+ ],
+ "policies": [
+  {
+   "id": "inventory_control",
+   "catalog_ref": "P-P.1",
+   "name": "inventory_control",
+   "summary": "Everyday replenishment rule (min-max / base-stock / (R,Q) / periodic). The baseline shock absorber every chain already has; quantifying it prevents over-buying dedicated resilience.",
+   "in_mapping": true,
+   "params": [
+    {
+     "path": [
+      "policy_type"
+     ],
+     "display": [
+      "Policy type"
+     ],
+     "value": "min_max",
+     "label": "Policy type",
+     "unit": "enum",
+     "notes": "min_max ✅ (manuscript). mrp: BOM × planned production over the lead time, net of stock and the pipeline (WP 14.5).",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "basis"
+     ],
+     "display": [
+      "Basis"
+     ],
+     "value": "days_of_supply",
+     "label": "Basis",
+     "unit": "enum",
+     "notes": "Policy Basis (§II.4): days_of_supply sizes levels from the stationary mean (s = E[D_m]·T_s); forward_visible sums the committed forward order book over the coverage window (WSC-2026 MTO) — requires the P-C.6 forward_visibility customer policy.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "coverage_weeks",
+      "nominal"
+     ],
+     "display": [
+      "Coverage weeks",
+      "Nominal"
+     ],
+     "value": 8.0,
+     "label": "Nominal",
+     "unit": "",
+     "notes": "",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "coverage_weeks",
+      "alert"
+     ],
+     "display": [
+      "Coverage weeks",
+      "Alert"
+     ],
+     "value": 8.0,
+     "label": "Alert",
+     "unit": "",
+     "notes": "",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "coverage_weeks",
+      "crisis"
+     ],
+     "display": [
+      "Coverage weeks",
+      "Crisis"
+     ],
+     "value": 8.0,
+     "label": "Crisis",
+     "unit": "",
+     "notes": "",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "review_cadence_weeks"
+     ],
+     "display": [
+      "Review cadence weeks"
+     ],
+     "value": 1,
+     "label": "Review cadence weeks",
+     "unit": "weeks",
+     "notes": "",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "rop_q_quantity"
+     ],
+     "display": [
+      "ROP q quantity"
+     ],
+     "value": null,
+     "label": "ROP q quantity",
+     "unit": "units",
+     "notes": "Fixed (R,Q) lot; ≥ MOQ enforced.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "periodic_review_weeks"
+     ],
+     "display": [
+      "Periodic review weeks"
+     ],
+     "value": 1,
+     "label": "Periodic review weeks",
+     "unit": "weeks",
+     "notes": "",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "material_overrides"
+     ],
+     "display": [
+      "Material overrides"
+     ],
+     "value": {},
+     "label": "Material overrides",
+     "unit": "map",
+     "notes": "material_id → row-level override from the supplier grid (§II.3). Unknown material ids are ignored at runtime.",
+     "set_by_mapping": false
+    }
+   ]
+  },
+  {
+   "id": "safety_stock_materials",
+   "catalog_ref": "P-P.3",
+   "name": "safety_stock_materials",
+   "summary": "ABC-XYZ-differentiated material safety stock (Eqs. 20–21). Dominates short disruptions; depletes — beyond ~7–9 weeks expediting wins (run the crossover sweep).",
+   "in_mapping": true,
+   "params": [
+    {
+     "path": [
+      "classification"
+     ],
+     "display": [
+      "Classification"
+     ],
+     "value": "fixed_days",
+     "label": "Classification",
+     "unit": "enum",
+     "notes": "abc_xyz ✅.",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "z_matrix",
+      "AX"
+     ],
+     "display": [
+      "Z matrix",
+      "AX"
+     ],
+     "value": 99.5,
+     "label": "Ax",
+     "unit": "% service level",
+     "notes": "Nine ABC×XYZ cells.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "z_matrix",
+      "AY"
+     ],
+     "display": [
+      "Z matrix",
+      "AY"
+     ],
+     "value": 99.0,
+     "label": "Ay",
+     "unit": "% service level",
+     "notes": "Nine ABC×XYZ cells.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "z_matrix",
+      "AZ"
+     ],
+     "display": [
+      "Z matrix",
+      "AZ"
+     ],
+     "value": 98.0,
+     "label": "Az",
+     "unit": "% service level",
+     "notes": "Nine ABC×XYZ cells.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "z_matrix",
+      "BX"
+     ],
+     "display": [
+      "Z matrix",
+      "BX"
+     ],
+     "value": 98.0,
+     "label": "Bx",
+     "unit": "% service level",
+     "notes": "Nine ABC×XYZ cells.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "z_matrix",
+      "BY"
+     ],
+     "display": [
+      "Z matrix",
+      "BY"
+     ],
+     "value": 95.0,
+     "label": "By",
+     "unit": "% service level",
+     "notes": "Nine ABC×XYZ cells.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "z_matrix",
+      "BZ"
+     ],
+     "display": [
+      "Z matrix",
+      "BZ"
+     ],
+     "value": 90.0,
+     "label": "Bz",
+     "unit": "% service level",
+     "notes": "Nine ABC×XYZ cells.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "z_matrix",
+      "CX"
+     ],
+     "display": [
+      "Z matrix",
+      "CX"
+     ],
+     "value": 95.0,
+     "label": "Cx",
+     "unit": "% service level",
+     "notes": "Nine ABC×XYZ cells.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "z_matrix",
+      "CY"
+     ],
+     "display": [
+      "Z matrix",
+      "CY"
+     ],
+     "value": 90.0,
+     "label": "Cy",
+     "unit": "% service level",
+     "notes": "Nine ABC×XYZ cells.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "z_matrix",
+      "CZ"
+     ],
+     "display": [
+      "Z matrix",
+      "CZ"
+     ],
+     "value": 80.0,
+     "label": "Cz",
+     "unit": "% service level",
+     "notes": "Nine ABC×XYZ cells.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "abc_breakpoints"
+     ],
+     "display": [
+      "ABC breakpoints"
+     ],
+     "value": [
+      0.8,
+      0.95
+     ],
+     "label": "ABC breakpoints",
+     "unit": "cumulative value share",
+     "notes": "A up to 80%, B up to 95%, C the rest (80/15/5).",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "xyz_cv_breakpoints"
+     ],
+     "display": [
+      "XYZ CV breakpoints"
+     ],
+     "value": [
+      0.13,
+      0.25
+     ],
+     "label": "XYZ CV breakpoints",
+     "unit": "demand CV",
+     "notes": "X ≤ 0.13, Y ≤ 0.25, Z above.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "uniform_service_level"
+     ],
+     "display": [
+      "Uniform service level"
+     ],
+     "value": 95.0,
+     "label": "Uniform service level",
+     "unit": "%",
+     "notes": "classification=uniform.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "fixed_days_cover"
+     ],
+     "display": [
+      "Fixed days cover"
+     ],
+     "value": 7.0,
+     "label": "Fixed days cover",
+     "unit": "days",
+     "notes": "classification=fixed_days.",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "fixed_days_by_material"
+     ],
+     "display": [
+      "Fixed days by material"
+     ],
+     "value": {},
+     "label": "Fixed days by material",
+     "unit": "days",
+     "notes": "Per-material fixed-days cover (the /policies Supplier stage's safety-stock days). A listed material's buffer is E[D_m]·days/7 whatever the classification; unlisted materials follow it.",
+     "set_by_mapping": false
+    }
+   ]
+  },
+  {
+   "id": "unmet_demand_handling",
+   "catalog_ref": "P-C.1",
+   "name": "unmet_demand_handling",
+   "summary": "What happens to an unservable order: it dies (lost_sales — competitive markets), waits (backorder — contractual B2B), or splits (partial_backorder). Backorders convert lost revenue into delay cost, changing the economics of every strategy.",
+   "in_mapping": true,
+   "params": [
+    {
+     "path": [
+      "rule"
+     ],
+     "display": [
+      "Rule"
+     ],
+     "value": "backorder",
+     "label": "Rule",
+     "unit": "enum",
+     "notes": "lost_sales ✅ (manuscript).",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "backorder_horizon"
+     ],
+     "display": [
+      "Backorder horizon"
+     ],
+     "value": 2,
+     "label": "Backorder horizon",
+     "unit": "weeks",
+     "notes": "Aged-out backlog becomes lost.",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "backorder_penalty"
+     ],
+     "display": [
+      "Backorder penalty"
+     ],
+     "value": 14.0,
+     "label": "Backorder penalty",
+     "unit": "€/unit/wk",
+     "notes": "",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "partial_accept_prob"
+     ],
+     "display": [
+      "Partial accept prob"
+     ],
+     "value": 0.5,
+     "label": "Partial accept prob",
+     "unit": "-",
+     "notes": "Share of unmet demand that waits.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "row_overrides",
+      "C1::P1",
+      "backorder_allowed"
+     ],
+     "display": [
+      "Row overrides",
+      "C1::P1",
+      "Backorder allowed"
+     ],
+     "value": true,
+     "label": "Backorder allowed",
+     "unit": "",
+     "notes": "",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "row_overrides",
+      "C1::P1",
+      "backorder_horizon"
+     ],
+     "display": [
+      "Row overrides",
+      "C1::P1",
+      "Backorder horizon"
+     ],
+     "value": 1,
+     "label": "Backorder horizon",
+     "unit": "",
+     "notes": "",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "row_overrides",
+      "C1::P1",
+      "backorder_penalty"
+     ],
+     "display": [
+      "Row overrides",
+      "C1::P1",
+      "Backorder penalty"
+     ],
+     "value": 14.0,
+     "label": "Backorder penalty",
+     "unit": "",
+     "notes": "",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "row_overrides",
+      "C2::P2",
+      "backorder_allowed"
+     ],
+     "display": [
+      "Row overrides",
+      "C2::P2",
+      "Backorder allowed"
+     ],
+     "value": false,
+     "label": "Backorder allowed",
+     "unit": "",
+     "notes": "",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "row_overrides",
+      "C2::P2",
+      "backorder_horizon"
+     ],
+     "display": [
+      "Row overrides",
+      "C2::P2",
+      "Backorder horizon"
+     ],
+     "value": null,
+     "label": "Backorder horizon",
+     "unit": "",
+     "notes": "",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "row_overrides",
+      "C2::P2",
+      "backorder_penalty"
+     ],
+     "display": [
+      "Row overrides",
+      "C2::P2",
+      "Backorder penalty"
+     ],
+     "value": null,
+     "label": "Backorder penalty",
+     "unit": "",
+     "notes": "",
+     "set_by_mapping": false
+    }
+   ]
+  },
+  {
+   "id": "customer_allocation",
+   "catalog_ref": "P-C.2",
+   "name": "customer_allocation",
+   "summary": "Under scarcity, 'who do we disappoint first' is deliberate — protect strategic accounts / SLA tiers / spread pain. Inert for single-customer MTO. Hook: PH-60.",
+   "in_mapping": true,
+   "params": [
+    {
+     "path": [
+      "rule"
+     ],
+     "display": [
+      "Rule"
+     ],
+     "value": "priority",
+     "label": "Rule",
+     "unit": "enum",
+     "notes": "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata); priority, sla_tier and revenue_max (by row price) reorder.",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "priority_weights"
+     ],
+     "display": [
+      "Priority weights"
+     ],
+     "value": {},
+     "label": "Priority weights",
+     "unit": "weight per customer",
+     "notes": "Overrides Customer.priority_weight; higher serves first.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "sla_tiers"
+     ],
+     "display": [
+      "SLA tiers"
+     ],
+     "value": {},
+     "label": "SLA tiers",
+     "unit": "segment → fill floor %",
+     "notes": "Guaranteed first-pass fill per segment; scaled down pro-rata when supply cannot honor all floors.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "row_priority",
+      "C2::P2"
+     ],
+     "display": [
+      "Row priority",
+      "C2::P2"
+     ],
+     "value": 2.0,
+     "label": "C2::p2",
+     "unit": "weight per row",
+     "notes": "'<customer>::<product>' → priority; beats priority_weights and Customer.priority_weight for that row.",
+     "set_by_mapping": true
+    },
+    {
+     "path": [
+      "row_price"
+     ],
+     "display": [
+      "Row price"
+     ],
+     "value": {},
+     "label": "Row price",
+     "unit": "€/unit per row",
+     "notes": "'<customer>::<product>' → price revenue_max orders by; beats the row's own unit price.",
+     "set_by_mapping": false
+    },
+    {
+     "path": [
+      "row_floor_pct"
+     ],
+     "display": [
+      "Row floor pct"
+     ],
+     "value": {},
+     "label": "Row floor pct",
+     "unit": "row → fill floor %",
+     "notes": "'<customer>::<product>' → the row's service target under sla_tier; beats Customer.sla_fill_floor_pct and sla_tiers.",
+     "set_by_mapping": false
+    }
+   ]
+  }
+ ],
+ "warnings": [
+  {
+   "level": "warn",
+   "entity": "supply:S3->M3",
+   "field": "lead_time",
+   "reason": "missing lead_time → defaulted to 2 weeks"
+  },
+  {
+   "level": "info",
+   "entity": "material:M2",
+   "field": "cost",
+   "reason": "no master cost → using volume-weighted inbound price"
+  },
+  {
+   "level": "info",
+   "entity": "material:M3",
+   "field": "master_row",
+   "reason": "no row in `materials` — simulated from its BOM and inbound lanes, cost derived from those lanes; MOQ, initial stock and holding cost take the Supplier-stage value when one is set, else the engine default; the lead-time distribution takes the engine default"
+  },
+  {
+   "level": "info",
+   "entity": "product:P1",
+   "field": "production_capacity",
+   "reason": "production_capacity (units/week, the item master) shadows the plant grid's line capacity (units/day) — the line capacity entry is not applied"
+  },
+  {
+   "level": "info",
+   "entity": "product:P1",
+   "field": "fg_policy",
+   "reason": "FG policy / levels are set but the product is MTO — an MTO product holds no finished-goods stock, so they are not read"
+  },
+  {
+   "level": "info",
+   "entity": "product:P2",
+   "field": "unit_price",
+   "reason": "no master sell_price → demand-weighted outbound price"
+  },
+  {
+   "level": "info",
+   "entity": "product:P2",
+   "field": "production_capacity",
+   "reason": "no master capacity → derived from production policy"
+  },
+  {
+   "level": "info",
+   "entity": "customers",
+   "field": "segment",
+   "reason": "the `customers` table describes 1 of this project's customers but not 1 other(s), which keep the engine defaults (segment=default, priority_weight=1.0): ['C2']"
+  },
+  {
+   "level": "info",
+   "entity": "scenario",
+   "field": "analysis_window",
+   "reason": "52 wk is outside the engine range [13, 39] wk → 39 wk used"
+  },
+  {
+   "level": "info",
+   "entity": "policy:default",
+   "field": "review_period_days",
+   "reason": "review period 1 d → reviewed every 1 wk (the engine steps in whole weeks)"
+  },
+  {
+   "level": "info",
+   "entity": "policy:inventory_control",
+   "field": "order_up_to",
+   "reason": "project-wide s/S are the formulas s = E[D]·T_s, S = E[D]·(T_s+κ); a supplier-grid row's absolute s/S IS that material's level, with no safety stock added on top"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "customers.priority_weight",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 2"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "inbound_logistics.lead_time",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 2 · default 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "materials.cost",
+   "reason": "value sources (override → item master → lanes → default): override 1 · lanes 2"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "materials.initial_on_hand",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 1 · default 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "materials.moq",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 1 · default 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "outbound_logistics.demand_distribution",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 2"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "outbound_logistics.demand_max",
+   "reason": "value sources (override → item master → lanes → default): master 1 · default 2"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "outbound_logistics.demand_mean",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 2"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "outbound_logistics.demand_min",
+   "reason": "value sources (override → item master → lanes → default): master 1 · default 2"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "outbound_logistics.demand_variation",
+   "reason": "value sources (override → item master → lanes → default): master 1 · default 2"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "outbound_logistics.unit_price",
+   "reason": "value sources (override → item master → lanes → default): override 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.demand_cv",
+   "reason": "value sources (override → item master → lanes → default): master 1 · default 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.demand_mean",
+   "reason": "value sources (override → item master → lanes → default): master 1 · lanes 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.fg_base_stock",
+   "reason": "value sources (override → item master → lanes → default): master 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.fg_cover_days",
+   "reason": "value sources (override → item master → lanes → default): override 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.fg_initial_on_hand",
+   "reason": "value sources (override → item master → lanes → default): master 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.fg_policy",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.fg_reorder_point",
+   "reason": "value sources (override → item master → lanes → default): master 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.fulfillment_mode",
+   "reason": "value sources (override → item master → lanes → default): override 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.production_capacity",
+   "reason": "value sources (override → item master → lanes → default): master 1 · derived 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.sell_price",
+   "reason": "value sources (override → item master → lanes → default): override 1 · lanes 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "suppliers.capacity_per_week",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 1 · default 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "suppliers.reliability_score",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 1 · default 1"
+  }
+ ]
+}

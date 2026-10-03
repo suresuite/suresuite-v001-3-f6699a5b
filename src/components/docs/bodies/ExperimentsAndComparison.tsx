@@ -13,9 +13,10 @@
 // NOTHING. No route mounts it. So the one thing in this product that is
 // literally called an experiment is unreachable, and the page did not say so.
 //
-// What a user can actually do is stage 5 of Simulation Lab: pick two scenarios
-// with results and read a paired comparison, which refuses to show a number
-// until four conditions hold. None of that was on the page. It is now the page.
+// What a user can actually do is stage 5 of Simulation Lab: pick a baseline and
+// read every other scenario with results against it as a paired comparison,
+// which refuses to show a number for a scenario until four conditions hold. None
+// of that was on the page. It is now the page.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { UNDESCRIBED } from "@/components/docs/generated/dataModel.generated";
@@ -25,7 +26,7 @@ export default function ExperimentsAndComparison() {
 
   return (
     <>
-      <PageTitle lead="Reading two scenarios against each other — the four conditions the comparison insists on, and why it refuses rather than showing you a difference.">
+      <PageTitle lead="Reading scenarios against a baseline — the four conditions the comparison insists on, and why it refuses rather than showing you a difference.">
         Experiments &amp; comparison
       </PageTitle>
 
@@ -41,16 +42,19 @@ export default function ExperimentsAndComparison() {
         </P>
         <P>
           In this product that is stage 5 of <DocLink to="simulation-lab">Simulation Lab</DocLink>:
-          two pickers, A and B, over the scenarios that have completed runs. It is deliberately
-          strict, and the strictness is the feature.
+          a baseline picker, and every other scenario that has completed runs read against it at
+          once. Each scenario is tested against the baseline on its own — the comparison is still a
+          set of pairs, never scenario against scenario. It is deliberately strict, and the
+          strictness is the feature.
         </P>
       </Section>
 
       <Section id="the-four-conditions" title="The four conditions, and what each refusal means">
         <P>
-          The panel checks the pair before it computes anything. If any condition fails you get the
-          reason instead of a table — which is the right behaviour and is easy to read as a bug the
-          first time you meet it.
+          The panel checks each scenario against the baseline before it computes anything. A
+          scenario that fails any condition gets no column: it is listed under{" "}
+          <em>Not comparable with the baseline</em> with the reason instead — which is the right
+          behaviour and is easy to read as a bug the first time you meet it.
         </P>
         <div className="space-y-3">
           <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
@@ -81,7 +85,7 @@ export default function ExperimentsAndComparison() {
               Two runs under the same policy version, on the same data, with the same disruptions
               have nothing to compare, and the panel says so rather than drawing a table of zeroes.
               The most common valid pair is the validated baseline against a scenario that adds a
-              disruption to it — which is why the baseline is picked as A by default. Two runs that
+              disruption to it — which is why the validated baseline is picked as the baseline by default. Two runs that
               differ in <em>two</em> components are the mistake this whole screen exists to prevent:
               the difference is real and it is not attributable, and no chart can make it so.
               Isolate one component and run again.
@@ -101,14 +105,27 @@ export default function ExperimentsAndComparison() {
         <P>
           Before any of that, the panel needs two scenarios <em>with results</em>, and it counts
           them for you when there are not enough. A scenario you configured and never ran does not
-          appear in either picker.
+          appear at all. And the baseline must not be an exploratory run: when every scenario with
+          results ran exploratory, the panel says there is no baseline rather than offering one.
         </P>
       </Section>
 
       <Section id="reading-the-table" title="Reading the table">
         <P>
-          One row per measure both runs produced, with A's value and interval, B's value and
-          interval, and the difference. Because the two runs share their random numbers,
+          The comparison is a matrix: one row per measure, the baseline's value and interval in the
+          first column, and one column per comparable scenario holding its difference from the
+          baseline with the scenario's own value beneath. Each column's head counts how many
+          measures it is separated-better, separated-worse, changed (a measure with no better
+          direction, such as inventory) or within the noise on. Untick a scenario to drop its
+          column; <em>Rank by</em> orders the columns by one measure, best first in that
+          measure's own direction, and starts on the baseline's objective. In each row the largest
+          separated improvement is marked <em>best</em> — a row where nothing is separated has no
+          best, however large a mean difference looks.
+        </P>
+        <P>
+          Click a scenario's column for its full table: one row per measure both runs produced,
+          with the baseline's value and interval, the scenario's value and interval, and the
+          difference. Because the two runs share their random numbers,
           replication 7 of A and replication 7 of B saw the same world, so the difference is taken
           replication by replication and its interval is on THOSE differences — the common swing
           cancels. A policy that is better in every replication is therefore shown as better even
@@ -125,6 +142,13 @@ export default function ExperimentsAndComparison() {
           real result rather than a failure.{" "}
           <DocLink to="seeds-replications-confidence">Seeds, replications &amp; confidence</DocLink>{" "}
           is how many you would need.
+        </P>
+        <P>
+          <strong>Many columns are many tests.</strong> Every cell is its own 95% test, so across
+          six scenarios and five measures — thirty tests — expect one or two differences that are
+          really noise to read as separated anyway. The panel says so under the matrix. Treat a
+          single separated cell in a wide comparison as a candidate, and confirm it with more
+          replications before acting on it.
         </P>
         <P>
           Rows appear only for measures <strong>both</strong> runs carry. A measure present on one
@@ -150,8 +174,8 @@ export default function ExperimentsAndComparison() {
         </p>
         <p>
           <strong>If you want a designed sweep today, you build it by hand</strong>: duplicate the
-          baseline once per cell, change one factor in each, run them, and compare them two at a
-          time here.
+          baseline once per cell, change one factor in each, run them, and read them all against the
+          baseline here.
         </p>
       </Callout>
 
