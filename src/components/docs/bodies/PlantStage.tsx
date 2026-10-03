@@ -23,10 +23,9 @@ export default function PlantStage() {
           decides how much of this stage applies to it. A make-to-order product holds no finished
           goods, so its row shows no FG policy at all. For a make-to-stock product the FG policy
           and only the levels it reads appear, and they decide how much to build: planned
-          production is the policy's requirement plus any backlog, capped at capacity. While some
-          make-to-stock product is on base-stock with S left empty, the <Term>FG safety buffer</Term>{" "}
-          line above the grid sets the one project-wide buffer added to that derived target; a typed
-          target gets nothing on top. Demand is not set here: it is set per row on the{" "}
+          production is the policy's requirement plus any backlog, capped at capacity. How much
+          finished stock to keep is said once, on the row: an empty S is one week of the projected
+          demand, and a typed S is used as typed. Demand is not set here: it is set per row on the{" "}
           <DocLink to="customer-stage">Customer stage</DocLink>, and a row with no demand of its own
           inherits the product's mean from the item master, then the outbound volume.
         </P>

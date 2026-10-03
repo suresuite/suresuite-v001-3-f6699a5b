@@ -172,7 +172,7 @@ export function PolicyColumnCheck() {
           )}
           {stage === "plant" && (
             <CheckTable
-              title="FG safety buffer line (above the Plant grid) — project scope, P-P.4"
+              title="FG safety buffer (P-P.4) — no control by design; a saved value shows as a notice above the Plant grid"
               rows={Object.entries(FG_BUFFER_CHECK).map(([field, check]) => ({
                 key: `inventory:${field}`,
                 label: field,

@@ -79,7 +79,7 @@ export const STAGE_ROWS: Record<GridStage, string> = {
     "authored on the Customer rows, and a Plant-row demand override is no longer read (§4 D286). The FG stock columns appear " +
     "per row, behind the row's own MTS / MTO — the value the engine reads (row → products.fulfillment_mode → " +
     "projects.supply_chain_model → MTO); the policy's fulfillment strategy decides nothing here (§4 D197). " +
-    "The FG safety buffer (P-P.4) is the one project setting above the grid, shown while some MTS product's S is derived.",
+    "How much FG to keep is the row's S (or s,S / D); P-P.4's project buffer has no control, and a saved one shows as a removable notice.",
   customer:
     "Rows: outbound lanes of the stored graph. Backorder, priority, price and service target are per row (WP 14.3); " +
     "the allocation rule and the backorder an EMPTY row cell inherits are the Customer rules line above the grid.",
@@ -571,13 +571,14 @@ export const CUSTOMER_RULE_CHECK: Record<string, ColumnCheck> = {
 };
 
 /**
- * The FG safety buffer line above the Plant grid (`projectRules.ts`
- * FG_BUFFER_RULE) — P-P.4, project scope, saves the whole inventory family.
+ * P-P.4's FG safety buffer — NO control on /policies (owner decision, WP 14.8):
+ * a second way to say "keep more FG" beside the row's S. A saved value is shown
+ * as a removable notice above the Plant grid while it acts.
  */
 export const FG_BUFFER_CHECK: Record<string, ColumnCheck> = {
   fg_safety_stock: {
-    shows: "saved value; never saved → none (the line appears only while some MTS product is on base-stock with an empty S)",
-    savedTo: "policy_defaults.inventory (whole family on save)",
+    shows: "no control (owner decision, WP 14.8 — it duplicated S on the row); a value an older version saved shows as a notice above the Plant grid while it acts, with Remove",
+    savedTo: "policy_defaults.inventory — written only by Remove (→ none), Excel import or a version restore",
     engine: "P-P.4 sizes a buffer on a DERIVED FG target S, for MTS products only; a typed S gets nothing on top",
     verdict: "conditional",
     note: "Was a Plant-row column whose per-row value was dropped; the engine reads it project-wide only.",

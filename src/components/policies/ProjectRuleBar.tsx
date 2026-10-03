@@ -131,3 +131,48 @@ export function ProjectRuleBar<F extends PolicyFamily>({
     </div>
   );
 }
+
+/**
+ * A saved setting the page no longer offers, shown where it acts so it is never
+ * invisible (T2), with the one action that matters: remove it.
+ */
+export function LegacySettingNotice({
+  title, note, actionLabel, onAction, readOnly,
+}: {
+  title: string;
+  note: string;
+  actionLabel: string;
+  onAction: () => Promise<void>;
+  readOnly?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-sm border border-dashed border-[#e0c48a] bg-[#fffaf0] px-2.5 py-1.5 text-[11.5px]"
+      data-testid="legacy-setting-notice"
+    >
+      <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.14em] text-[#8a6d2b]">{title}</span>
+      <span className="min-w-0 text-[11px] text-[#6b5a35]">{note}</span>
+      {!readOnly && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="ml-auto h-6 px-2.5 text-[11px]"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await onAction();
+            } catch (err) {
+              if (!(err instanceof ProjectRightRefused)) toast.error(String(err));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {actionLabel}
+        </Button>
+      )}
+    </div>
+  );
+}

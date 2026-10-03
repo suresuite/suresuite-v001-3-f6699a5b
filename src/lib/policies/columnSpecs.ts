@@ -423,7 +423,15 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       }),
       col("fg_base_stock", "production", {
         visibleWhen: fgPolicyIn("base_stock", "min_max"),
-        master: { table: "products", field: "fg_base_stock", idFrom: "product_id" },
+        master: {
+          table: "products", field: "fg_base_stock", idFrom: "product_id",
+          // How much FG to keep is said HERE and nowhere else (WP 14.8: the
+          // project FG buffer control was removed as a second way to say it).
+          nullMeans: {
+            token: "≈ 1 wk demand",
+            title: "Empty — S is derived: one week of the projected demand. Type a number to set the target yourself; a typed S is used as typed.",
+          },
+        },
         band: FG_BAND,
       }),
       col("fg_cover_days", "production", {
