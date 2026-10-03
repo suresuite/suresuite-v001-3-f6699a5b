@@ -70,8 +70,11 @@ describe("WP 6.2 · every `master:` pointer names a column that exists", () => {
     // `idFrom` names the STAGE ROW's id field, and the master table must carry a
     // column of that name to be joined on. A pointer whose key is wrong fails the
     // same way the column being wrong does — silently, as `undefined`.
+    // A COMPOSITE key (`customer_id::product_id`, PLAN.md §24 WP 14.2) joins on
+    // every part, so EVERY part must be a column of the master table.
     const missing = pointers
-      .filter((p) => !contract.tables[p.table]?.columns?.some((c) => c.name === p.idFrom))
+      .filter((p) => !p.idFrom.split("::").every((part) =>
+        contract.tables[p.table]?.columns?.some((c) => c.name === part)))
       .map((p) => `${p.stage}.${p.field} keyed from ${p.table}.${p.idFrom}`);
     expect(missing, "the join key for this item-master lookup does not exist").toEqual([]);
   });

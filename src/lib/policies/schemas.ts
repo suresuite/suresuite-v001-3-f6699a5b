@@ -91,6 +91,9 @@ export const InventoryPolicyType = z.enum([
   "rop",
   "periodic_review",
   "continuous_review",
+  // PLAN.md §24 WP 14.5 — ordered from the plan: BOM × planned production over the
+  // lead time, net of stock and the pipeline, ≥ MOQ.
+  "mrp",
 ]);
 export const SafetyStockMethod = z.enum([
   "fixed_days",
@@ -195,6 +198,12 @@ export const FulfillmentPolicy = z.object({
   sourcing_firm: z.string().default(""),
   primary_source: z.boolean().default(false),
   price: z.number().min(0).default(0),
+  // WP 14.3 — the row's inputs to the project's allocation rule. OPTIONAL, not
+  // defaulted: each is a Customer-row override over a master value (the
+  // customer's priority / contracted floor), so the project bundle — and the
+  // defaults a policy version stores — carries neither.
+  row_priority: z.number().min(0).optional(),
+  sla_fill_floor_pct: z.number().min(0).max(100).optional(),
 });
 
 // ---------- Production ----------
@@ -399,6 +408,11 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
   routing: RoutingPolicy.options,
   // fulfillment
   allocation: AllocationRule.options,
+  // customer · demand per row (WP 14.2) — the engine's own enum domains
+  row_demand_mode: ["forecast", "model"],
+  row_demand_distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
+  // PLAN.md §24 WP 14.4 — the Plant row's FG policy (MTS).
+  fg_policy: ["base_stock", "min_max", "days_of_cover"],
   // production
   lot_policy: LotPolicy.options,
   scheduling: SchedulingRule.options,
@@ -468,6 +482,10 @@ export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<stri
     "capacity_units_per_day", "utilization_cap_pct", "allocation_priority_weight",
   ]),
   recovery: new Set(["response", "detection_lag_days"]),
+  // PLAN.md §24 WP 14.2 — the Customer row's forecast-or-model choice. The
+  // row's other demand cells are master overrides (`outbound_logistics`), which
+  // the grid resolves through their own rule, not through this map.
+  demand: new Set(["row_demand_mode"]),
 };
 
 /** True when a default-level field is exposed in the GUI (consumed by scsim). */
@@ -488,7 +506,7 @@ export function visibleFieldGroups(family: PolicyFamily): Record<string, string[
 /** Enum options narrowed to the values the scsim conversion maps. */
 export const SCSIM_ENUM_OPTIONS: Record<string, readonly string[]> = {
   // s_S / continuous_review collapse to min_max in scsim; offer the four real types.
-  type: ["min_max", "base_stock", "rop", "periodic_review"],
+  type: ["min_max", "base_stock", "rop", "periodic_review", "mrp"],
   // demand_variability is approximated as uniform in scsim; not offered.
   safety_stock_method: ["fixed_days", "service_level", "king_method"],
 };
@@ -615,9 +633,27 @@ export const FIELD_LABELS: Record<string, string> = {
   production_cost_per_unit: "Production cost / unit",
   production_lead_time_mean_days: "Production lead time mean (days)",
   production_lead_time_std_days: "Production lead time σ (days)",
+  // customer · demand per row (PLAN.md §24 WP 14.2) — overrides of the
+  // outbound row's own spec, read by the engine before the uploaded value.
+  row_demand_mode: "Demand mode (forecast / model)",
+  row_forecast: "Forecast series (uploaded)",
+  row_demand_distribution: "Demand distribution",
+  row_demand_mean: "Demand mean (units/wk)",
+  row_demand_variation: "Demand variation (CV for normal, ± fraction for triangularAV)",
+  row_demand_min: "Demand min (units/wk, triangular)",
+  row_demand_max: "Demand max (units/wk, triangular)",
+  // plant · FG policy per product (PLAN.md §24 WP 14.4) — MTS only.
+  fg_policy: "FG policy (base-stock / min-max / days of cover)",
+  fg_base_stock: "FG target S (units)",
+  fg_reorder_point: "FG reorder point s (units, min-max)",
+  fg_cover_days: "FG cover D (days, days of cover)",
+  fg_initial_on_hand: "FG opening stock (units)",
   // fulfillment extensions
   sourcing_firm: "Sourcing firm",
-  price: "Price",
+  price: "Price (€/unit, this row)",
+  // customer · fulfillment per row (PLAN.md §24 WP 14.3)
+  row_priority: "Priority (this row)",
+  sla_fill_floor_pct: "Service target (% fill floor)",
   // transport distribution params
   lead_time_shape: "Lead time shape (k)",
   lead_time_scale: "Lead time scale (θ)",

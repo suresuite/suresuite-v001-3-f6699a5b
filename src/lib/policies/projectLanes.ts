@@ -102,3 +102,26 @@ export async function fetchProjectLanes(
   }
   return fetchDirect(projectId);
 }
+
+/**
+ * The project's demand-forecast buckets (PLAN.md §24 WP 14.2), one row per
+ * uploaded week or month, each carrying its `weekly_quantity` (spread at
+ * promotion) and its exclusive `period_end`. Through the SECURITY DEFINER RPC
+ * that names its caller — `demand_forecasts` has no `anon` policy (§4 D28).
+ * An error is RETURNED, never swallowed into an empty list: a failed read and a
+ * project with no forecast must not look alike (§4 D178).
+ */
+export async function fetchProjectForecasts(
+  projectId: string | null | undefined,
+  user: { id: string; email: string } | null | undefined,
+): Promise<{ rows: Record<string, unknown>[]; error: string | null }> {
+  if (!projectId || !user?.id || !user?.email) return { rows: [], error: null };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc("get_project_demand_forecasts", {
+    p_project_id: projectId,
+    p_user_id: user.id,
+    p_user_email: user.email,
+  });
+  if (error) return { rows: [], error: String((error as { message?: string }).message ?? error) };
+  return { rows: (data ?? []) as Record<string, unknown>[], error: null };
+}

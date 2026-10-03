@@ -15,7 +15,7 @@ reproduction until edge features are switched on (§3.6).
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -28,6 +28,9 @@ from scsim.entities.enums import (
     SupplierProfile,
     TransportMode,
 )
+
+
+RowDemandModel = Literal["deterministic", "normal", "triangular", "triangular_av", "poisson"]
 
 
 def _meta(unit: str, scope: str, notes: str = "") -> dict:
@@ -208,6 +211,14 @@ class Product(BaseModel):
         1.0, gt=0,
         json_schema_extra=_meta("-", "P", "k for negbin (variance = b + b²/k)."),
     )
+    demand_cv: Optional[float] = Field(
+        None, ge=0,
+        json_schema_extra=_meta(
+            "-", "P",
+            "Coefficient of variation for demand_model=normal: σ = cv · demand_mode. "
+            "Negative draws are set to 0 and counted (ADR 0002, decision 8). Read only "
+            "by normal; triangular uses demand_floor_factor / explicit bounds."),
+    )
 
     # Plant — §3.2.
     production_capacity: float = Field(
@@ -218,9 +229,31 @@ class Product(BaseModel):
     fulfillment_mode: FulfillmentMode = Field(
         FulfillmentMode.MTO, json_schema_extra=_meta("enum", "P"),
     )
-    fg_policy: FgPolicy = Field(FgPolicy.BASE_STOCK, json_schema_extra=_meta("enum", "P", "MTS only."))
+    # FG inventory policy (WP 14.4, ADR 0002 decision 3; design doc §3.2). All
+    # levels are END-OF-WEEK finished-goods targets, MTS only. ONE SOURCE PER
+    # NUMBER: a typed level IS the target and P-P.4 adds nothing on top; P-P.4
+    # sizes the buffer only for base_stock with S empty (today's derivation).
+    fg_policy: FgPolicy = Field(
+        FgPolicy.BASE_STOCK, json_schema_extra=_meta(
+            "enum", "P", "base_stock (S) · min_max (s, S) · days_of_cover (D). MTS only."))
     fg_base_stock: Optional[float] = Field(
-        None, ge=0, json_schema_extra=_meta("units", "P", "S^FG_p; derived if None. MTS only."),
+        None, ge=0, json_schema_extra=_meta(
+            "units", "P", "S^FG_p: the order-up-to level (base_stock, min_max); derived if None "
+                          "under base_stock. MTS only."),
+    )
+    fg_reorder_point: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "units", "P", "s: min_max only — produce up to S when the stock left after this "
+                          "week's demand falls below s."),
+    )
+    fg_cover_days: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "days", "P", "D: days_of_cover only — target = D/7 × projected weekly demand; "
+                         "moves with the forecast."),
+    )
+    fg_initial_on_hand: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "units", "P", "FG opening stock (engine RFC 4). None = start at the policy target."),
     )
     forecast_model: ForecastModel = Field(
         ForecastModel.MA, json_schema_extra=_meta("enum", "P", "MTS plans to forecast."),
@@ -245,6 +278,18 @@ class Product(BaseModel):
                 raise ValueError(f"product {self.id}: demand_max < demand_mode")
         if self.demand_model == DemandModel.BOOTSTRAP and not self.demand_history:
             raise ValueError(f"product {self.id}: bootstrap demand requires demand_history")
+        if self.fg_policy == FgPolicy.MIN_MAX:
+            if self.fg_base_stock is None or self.fg_reorder_point is None:
+                raise ValueError(f"product {self.id}: fg_policy=min_max needs fg_reorder_point (s) "
+                                 f"and fg_base_stock (S)")
+            if self.fg_reorder_point >= self.fg_base_stock:
+                raise ValueError(f"product {self.id}: fg_policy=min_max needs s < S "
+                                 f"({self.fg_reorder_point} ≥ {self.fg_base_stock})")
+        if self.fg_policy == FgPolicy.DAYS_OF_COVER and self.fg_cover_days is None:
+            raise ValueError(f"product {self.id}: fg_policy=days_of_cover needs fg_cover_days (D)")
+        if self.demand_model == DemandModel.NORMAL and self.demand_cv is None:
+            raise ValueError(f"product {self.id}: normal demand requires demand_cv "
+                             f"(σ = cv · demand_mode)")
         return self
 
     @classmethod
@@ -291,6 +336,12 @@ class Customer(BaseModel):
     name: str = ""
     segment: str = Field("default", json_schema_extra=_meta("-", "C", "≤10 segments."))
     priority_weight: float = Field(1.0, ge=0)
+    # WP 14.3 (ADR 0002 decision 4): the customer's contracted fill floor, the
+    # default service target of each of its rows under the `sla_tier` rule.
+    # None = no contracted floor (NOT 0): the segment's `sla_tiers` floor applies.
+    sla_fill_floor_pct: Optional[float] = Field(
+        None, ge=0, le=100, json_schema_extra=_meta(
+            "%", "C", "Default per-row service target under sla_tier; None = the segment floor."))
 
 
 class CustomerLink(BaseModel):
@@ -305,6 +356,89 @@ class CustomerLink(BaseModel):
     customer_id: str = Field(..., min_length=1)
     share: float = Field(1.0, gt=0, json_schema_extra=_meta(
         "relative weight", "PC", "Normalized per product at compile."))
+
+    # ── Demand per customer × product row (P-C.4 demand_model, WP 14.1) ──────
+    # ADR 0002 decision 2. A row either carries a FORECAST series (the per-week
+    # centre of its distribution) or a demand MODEL (mean + variation +
+    # distribution). A row that sets neither keeps today's behaviour: its
+    # product's distribution, scaled by the row's share. If NO row of the
+    # network carries a spec, demand is drawn per product exactly as before.
+    demand_model: Optional[RowDemandModel] = Field(
+        None, json_schema_extra=_meta(
+            "enum", "PC",
+            "deterministic | normal | triangular | triangular_av | poisson. None = the "
+            "product's distribution scaled by share."))
+    demand_mean: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "units/wk", "PC",
+            "The row's mean (the mode for triangular). Past the end of a forecast it is "
+            "the value the plan uses."))
+    demand_variation: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "-", "PC",
+            "Interpreted by model: normal → coefficient of variation (σ = cv · centre); "
+            "triangular_av → ± fraction of the centre; ignored by deterministic, poisson "
+            "and triangular (whose bounds are explicit)."))
+    demand_min: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta("units/wk", "PC", "triangular only: the lower bound."))
+    demand_max: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta("units/wk", "PC", "triangular only: the upper bound."))
+    # WP 14.3 (ADR 0002 decision 4): the row's own price — what `revenue_max`
+    # orders rows by and what values the row's fill rate. None = the product's
+    # unit_price.
+    unit_price: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "€/unit", "PC", "The row's sell price; None = the product's unit_price."))
+    forecast: Optional[list[float]] = Field(
+        None, json_schema_extra=_meta(
+            "units/wk", "PC",
+            "One value per simulated week from week 0: the centre of that week's "
+            "distribution, and what the plan reads. Past its end the row uses "
+            "demand_mean if set, else the last value (with a warning)."))
+
+    @property
+    def has_demand_spec(self) -> bool:
+        return self.demand_model is not None or self.forecast is not None
+
+    @model_validator(mode="after")
+    def _check_demand(self) -> "CustomerLink":
+        row = f"customer row {self.customer_id}::{self.product_id}"
+        if self.forecast is not None:
+            if len(self.forecast) == 0:
+                raise ValueError(f"{row}: forecast is empty — omit it, or give one value per week")
+            if any((not isinstance(v, (int, float))) or v != v or v < 0 for v in self.forecast):
+                raise ValueError(f"{row}: forecast values must be finite and ≥ 0")
+        model = self.demand_model
+        if model is None:
+            if self.forecast is None and any(
+                    v is not None for v in (self.demand_mean, self.demand_variation,
+                                            self.demand_min, self.demand_max)):
+                raise ValueError(f"{row}: demand parameters given without a demand_model")
+            return self
+        has_centre = self.forecast is not None or self.demand_mean is not None
+        if model in ("deterministic", "poisson", "normal", "triangular_av") and not has_centre:
+            raise ValueError(f"{row}: {model} demand needs demand_mean or a forecast")
+        if model == "normal" and self.demand_variation is None:
+            raise ValueError(f"{row}: normal demand needs demand_variation (the CV, σ = cv · centre)")
+        if model == "triangular_av" and self.demand_variation is None:
+            raise ValueError(f"{row}: triangular_av demand needs demand_variation (the ± fraction)")
+        if model == "triangular_av" and self.demand_variation is not None and self.demand_variation > 1:
+            raise ValueError(f"{row}: triangular_av's ± fraction must be ≤ 1, got "
+                             f"{self.demand_variation:g}")
+        if model == "triangular":
+            if self.demand_min is None or self.demand_max is None or self.demand_mean is None:
+                raise ValueError(f"{row}: triangular demand needs demand_min, demand_mean (the "
+                                 f"mode) and demand_max")
+            if not self.demand_min <= self.demand_mean <= self.demand_max:
+                raise ValueError(f"{row}: triangular demand needs demand_min ≤ demand_mean ≤ "
+                                 f"demand_max, got {self.demand_min:g} / {self.demand_mean:g} / "
+                                 f"{self.demand_max:g}")
+            if self.forecast is not None and self.demand_mean + self.demand_min + self.demand_max <= 0:
+                raise ValueError(f"{row}: a triangular forecast row needs a triangle with a "
+                                 f"positive mean to scale")
+        elif self.demand_min is not None or self.demand_max is not None:
+            raise ValueError(f"{row}: demand_min / demand_max apply to triangular only, not {model}")
+        return self
 
 
 class Lane(BaseModel):

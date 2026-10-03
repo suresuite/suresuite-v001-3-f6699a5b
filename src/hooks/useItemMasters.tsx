@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import { ProjectRightRefused } from "@/lib/auth/projectRights";
 import { toast } from "sonner";
-import { fetchProjectLanes } from "@/lib/policies/projectLanes";
+import { fetchProjectForecasts, fetchProjectLanes } from "@/lib/policies/projectLanes";
+import type { ForecastBucket } from "@/lib/policies/customerRows";
 import {
   demandWeightedSellPrice,
   derivedMaterialCost,
@@ -49,6 +50,12 @@ export interface ProductRow extends RowSource {
   demand_cv: number | null;
   demand_min: number | null; // a_p — explicit triangular lower bound (null → mean·(1−cv))
   demand_max: number | null; // c_p — explicit triangular upper bound, e.g. historical max (null → mean·(1+cv))
+  // PLAN.md §24 WP 14.4 — the FG policy (MTS) and FG opening stock.
+  fg_policy?: string | null; // base_stock | min_max | days_of_cover
+  fg_base_stock?: number | null; // S, units
+  fg_reorder_point?: number | null; // s, units (min_max)
+  fg_cover_days?: number | null; // D, days (days_of_cover)
+  fg_initial_on_hand?: number | null; // units
 }
 
 export interface SupplierRow extends RowSource {
@@ -110,6 +117,11 @@ interface UseItemMastersResult {
   lanes: {
     inbound: Record<string, unknown>[];
     outbound: Record<string, unknown>[];
+    /** PLAN.md §24 WP 14.2 — the per-row forecast buckets (weekly rate each). */
+    forecasts: ForecastBucket[];
+    /** PLAN.md §24 WP 14.3 — the `customers` master rows (priority, contracted
+     *  floor): the base under a Customer row's priority and service target. */
+    customers: Record<string, unknown>[];
     /** Single- OR multi-level rows — bomLevel tells consumers the shape. */
     bom: Record<string, unknown>[];
     /** projects.bom_level — 'single' or 'multi'/'multi_level'. */
@@ -146,6 +158,8 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [inboundArcs, setInboundArcs] = useState<Record<string, unknown>[]>([]);
   const [outboundArcs, setOutboundArcs] = useState<Record<string, unknown>[]>([]);
+  const [forecasts, setForecasts] = useState<ForecastBucket[]>([]);
+  const [customerRows, setCustomerRows] = useState<Record<string, unknown>[]>([]);
   const [bomRows, setBomRows] = useState<Record<string, unknown>[]>([]);
   const [bomLevel, setBomLevel] = useState<string>("single");
   const [lanesLoaded, setLanesLoaded] = useState(false);
@@ -162,6 +176,22 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
     const lanes = await fetchProjectLanes(projectId, user);
     setInboundArcs(lanes.inbound);
     setOutboundArcs(lanes.outbound);
+    // WP 14.2 — a failed read is logged and leaves the series empty; the
+    // Customer row then shows no forecast, which the Data map reports as a
+    // failed read rather than as "none uploaded" (useDataMap).
+    const fq = await fetchProjectForecasts(projectId, user);
+    if (fq.error) console.warn("[useItemMasters] demand forecast read failed", fq.error);
+    setForecasts(fq.rows as unknown as ForecastBucket[]);
+    // WP 14.3 — the customers master (anon-readable, `customers_anon_read`).
+    // A failed read is logged; the Customer row's priority and target then
+    // show their declared defaults, the same answer the Data map reports.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cq = await (supabase as any)
+      .from("customers")
+      .select("customer_id,segment,priority_weight,sla_fill_floor_pct")
+      .eq("project_id", projectId);
+    if (cq.error) console.warn("[useItemMasters] customers read failed", cq.error);
+    setCustomerRows((cq.data ?? []) as Record<string, unknown>[]);
     // BOTH BOM shapes pass through raw — the shared grader normalizes
     // multi-level rows itself. Dropping them here once made "Verify your
     // inputs" grade an empty BOM on multi-level projects and miss the
@@ -309,10 +339,10 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
 
   const lanes = useMemo(
     () => ({
-      inbound: inboundArcs, outbound: outboundArcs, bom: bomRows, bomLevel,
+      inbound: inboundArcs, outbound: outboundArcs, forecasts, customers: customerRows, bom: bomRows, bomLevel,
       truncated: laneTruncation, loaded: lanesLoaded,
     }),
-    [inboundArcs, outboundArcs, bomRows, bomLevel, laneTruncation, lanesLoaded],
+    [inboundArcs, outboundArcs, forecasts, customerRows, bomRows, bomLevel, laneTruncation, lanesLoaded],
   );
 
   return {

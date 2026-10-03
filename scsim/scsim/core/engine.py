@@ -37,13 +37,16 @@ from scsim.core.mechanics import greedy_feasible
 from scsim.core.phases import (
     ARRIVALS,
     DEMAND,
+    DEMAND_ROWS,
     DISRUPTION_STATE,
     FG_FULFILLMENT,
     FIRM_KNOWLEDGE,
     FORECAST,
+    GROSS_REQUIREMENTS,
     KPI_ROWS,
     MATERIAL_DEMAND,
     OVERTIME_CAPACITY,
+    PLANNED_PRODUCTION,
     PRODUCTION_OUTPUT,
     PRODUCTION_PLAN,
     PURCHASE_ORDERS,
@@ -59,6 +62,7 @@ from scsim.core.phases import (
     PhaseId,
     validate_hooks,
 )
+from scsim.core.planning import fg_gap, fg_target_for, plan_ahead
 from scsim.disruption.injector import any_stochastic, resolve_events, validate_events
 from scsim.entities.config import StatisticsReport, WarmupReport
 from scsim.entities.enums import (
@@ -136,6 +140,12 @@ def _mech_demand(model: CompiledModel, ctx: SimContext) -> None:
     # Realized demand is this week's column of the pre-drawn world schedule
     # (§III-D.6: D_{p}[t] = D̃_{p}[t] — the committed order book realizes).
     ctx.demand = ctx.demand_schedule[:, ctx.week].copy()
+    # Per customer × product row (WP 14.1). Drawn per row when a row carries a
+    # spec; otherwise the product's demand split by share — a view, no draw.
+    if model.has_row_demand:
+        ctx.demand_rows = ctx.demand_schedule_rows[:, ctx.week].copy()
+    else:
+        ctx.demand_rows = ctx.demand[model.row_prod] * model.row_share
     # Append the realization to the history ring (consumed by next week's forecast).
     ctx.demand_history[:, ctx.demand_history_n % 26] = ctx.demand
     ctx.demand_history_n += 1
@@ -205,7 +215,10 @@ def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
     want_mto = ctx.demand + ctx.backlog
     if model.mts_mask.any():
         backlog_unserved = ctx.backlog - ctx.fg_served_backlog
-        gap = np.maximum(ctx.fg_target - ctx.fg_on_hand, 0.0) + backlog_unserved
+        # The FG policy's ask (WP 14.4): base-stock and days of cover fill to the
+        # target, min-max only below s — `max(target − stock, 0)` for the first two,
+        # exactly as before.
+        gap = fg_gap(model, ctx.fg_target, ctx.fg_on_hand) + backlog_unserved
         want = np.where(model.mts_mask, gap, want_mto)
     else:
         want = want_mto
@@ -221,6 +234,8 @@ def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
     # answer to "should I buy another line".
     ctx.trace.prod_cap_bound[:, ctx.week] = (want > cap + 1e-9) & (cap > 0.0)
     ctx.production_plan = np.minimum(want, cap)
+    # Planned production over the horizon (WP 14.4): column 0 is the plan above.
+    plan_ahead(model, ctx, want, ctx.production_plan)
 
 
 def _mech_production_execute(model: CompiledModel, ctx: SimContext) -> None:
@@ -251,13 +266,21 @@ def _mech_material_demand(model: CompiledModel, ctx: SimContext) -> None:
         ctx.material_demand = model.exp_demand_m.copy()
 
 
+def _mech_gross_requirements(model: CompiledModel, ctx: SimContext) -> None:
+    """GR = BOMᵀ × planned production, [materials × H] (WP 14.5, design doc
+    §3.4) — what MRP nets. It reads the PLAN only, so it inherits the plan's
+    honesty: no realized future draw reaches it."""
+    ctx.write_gross_requirements(np.asarray(model.bom.T @ ctx.planned_production))
+
+
 def _mech_fg_target_base(model: CompiledModel, ctx: SimContext) -> None:
     """Base S^FG = forecast over the production cycle (1 week, v1) — the thin
     cycle stock. P-P.4 adds the real FG safety stock on top (priority 55)."""
     if not model.mts_mask.any():
         return
-    base = np.where(model.fg_base_stock_override >= 0,
-                    model.fg_base_stock_override, ctx.forecast)
+    # WP 14.4: a typed S, D/7 × next week's projected demand (days of cover), else
+    # this week's forecast (today's derivation). Read at next week's PH-40.
+    base = fg_target_for(model, ctx.forecast, ctx.projected_demand(ctx.week + 1, 1)[:, 0])
     ctx.fg_target = np.where(model.mts_mask, base, 0.0)
 
 
@@ -293,7 +316,24 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
         and e.overflow_rule == OverflowRule.REJECT
         and e.cap_factor_at(t) < 1.0
     }
+    ship_links: list[np.ndarray] = []
+    ship_qty: list[np.ndarray] = []
+    # An UNLIMITED supplier ships its whole queue: nothing to ration, nothing to
+    # record (an infinite capacity is on neither side of the utilization ratio,
+    # below). Done for all of them at once — the per-supplier loop is kept for
+    # the finite ones, whose arithmetic it is (WP 14.5: MRP queues an order at
+    # every supplier every week).
+    cap_eff_all = model.sup_capacity * ctx.cap_factor
+    inf_sup = np.isinf(cap_eff_all)
+    if inf_sup.any():
+        inf_links = np.flatnonzero(inf_sup[model.link_sup] & (ctx.queue > 0))
+        if inf_links.size:
+            ship_links.append(inf_links)
+            ship_qty.append(ctx.queue[inf_links].copy())
+            ctx.queue[inf_links] = 0.0
     for s in range(model.n_sups):
+        if inf_sup[s]:
+            continue
         links = model.links_of_sup[s]
         total_q = float(ctx.queue[links].sum())
         cap_eff = model.sup_capacity[s] * ctx.cap_factor[s]
@@ -325,27 +365,45 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
                 if rejected > 0:
                     ctx.lost_inbound_this_week += rejected
                     ctx.queue[links] = 0.0
-        # Assign arrival weeks per link.
-        for k, link in enumerate(links):
-            qty = float(shipped[k])
-            if qty <= 0:
-                continue
-            lt = int(ctx.po_lt_override[link]) if ctx.po_lt_override[link] > 0 else int(model.link_lt[link])
-            dist = model.link_lt_dist[link]
-            if dist != LeadTimeDist.DETERMINISTIC and model.link_lt_cv[link] > 0:
-                lt = _lt_from_variate(dist, lt, float(model.link_lt_cv[link]),
-                                      float(ctx.lt_variates[link, t]))
-            arrival = t + max(1, lt)
-            if ctx.lt_block_end[s] > 0:
-                arrival = max(arrival, int(ctx.lt_block_end[s]))
-            # The ring holds W slots; a delay of W or more writes a slot that is
-            # read EARLIER than the arrival week — the shipment lands early and
-            # nothing downstream can tell (audit F-36). Bound it, and count it:
-            # `lead_time_truncations` on the result, a warning on the run.
-            if arrival - t > W - 2:
-                arrival = t + W - 2
-                ctx.lt_truncated[link] += 1
-            ctx.pipeline[link, arrival % W] += qty
+        ship_links.append(np.asarray(links))
+        ship_qty.append(np.asarray(shipped, dtype=float))
+    # Assign arrival weeks per link — vectorized (WP 14.5: MRP ships every
+    # material every week, and a Python loop per shipped link was most of a
+    # replication). Each link belongs to one supplier, so it is shipped at most
+    # once per week and every (link, slot) cell below is written once: the
+    # arithmetic is the per-link loop's, element by element.
+    if not ship_links:
+        return
+    L = np.concatenate(ship_links)
+    Q = np.concatenate(ship_qty)
+    keep = Q > 0
+    if not keep.any():
+        return
+    L, Q = L[keep], Q[keep]
+    ovr = ctx.po_lt_override[L]
+    lt = np.where(ovr > 0, ovr, model.link_lt[L]).astype(np.int64)
+    stoch_links = getattr(model, "_link_stochastic", None)
+    if stoch_links is None:
+        stoch_links = model._link_stochastic = np.array(
+            [model.link_lt_dist[l] != LeadTimeDist.DETERMINISTIC and model.link_lt_cv[l] > 0
+             for l in range(model.n_links)], dtype=bool)
+    stoch = np.flatnonzero(stoch_links[L])
+    for i in stoch:
+        link = int(L[i])
+        lt[i] = _lt_from_variate(model.link_lt_dist[link], int(lt[i]),
+                                 float(model.link_lt_cv[link]), float(ctx.lt_variates[link, t]))
+    arrival = t + np.maximum(1, lt)
+    block = ctx.lt_block_end[model.link_sup[L]]
+    arrival = np.where(block > 0, np.maximum(arrival, block), arrival)
+    # The ring holds W slots; a delay of W or more writes a slot that is read
+    # EARLIER than the arrival week — the shipment lands early and nothing
+    # downstream can tell (audit F-36). Bound it, and count it:
+    # `lead_time_truncations` on the result, a warning on the run.
+    trunc = arrival - t > W - 2
+    if trunc.any():
+        arrival = np.where(trunc, t + W - 2, arrival)
+        np.add.at(ctx.lt_truncated, L[trunc], 1)
+    np.add.at(ctx.pipeline, (L, arrival % W), Q)
 
 
 def _lt_from_variate(dist: LeadTimeDist, mean: float, cv: float, v: float,
@@ -412,6 +470,9 @@ def _mech_accounting(model: CompiledModel, ctx: SimContext, policies: list[Polic
                 ctx.cost.add(component, amount)
     if tr.keep_matrices:
         tr.D[:, t] = D
+        tr.PD[:, t] = ctx.plan_projected_demand[:, 0]
+        tr.REQ[:, t] = ctx.plan_requirement[:, 0]
+        tr.PLAN[:, t] = ctx.planned_production[:, 0]
         tr.Q[:, t] = ctx.production_output
         tr.F[:, t] = F
         tr.B[:, t] = ctx.backlog
@@ -430,7 +491,7 @@ _MECHANIC_HOOKS: list[tuple[str, Hook, Callable]] = [
     ("mech.week_start", Hook(phase=PhaseId.PH00, priority=50, writes={DISRUPTION_STATE}),
      _mech_week_start),
     ("mech.demand_realization", Hook(phase=PhaseId.PH10, priority=50,
-                                     writes={DEMAND, FORECAST}),
+                                     writes={DEMAND, FORECAST, DEMAND_ROWS}),
      _mech_demand),
     ("mech.detection", Hook(phase=PhaseId.PH20, priority=50,
                             reads={DISRUPTION_STATE}, writes={FIRM_KNOWLEDGE}),
@@ -440,14 +501,17 @@ _MECHANIC_HOOKS: list[tuple[str, Hook, Callable]] = [
                                      writes={FG_FULFILLMENT, ST_FG_ON_HAND}),
      _mech_fulfill_from_stock),
     ("mech.default_plan", Hook(phase=PhaseId.PH40, priority=50,
-                               reads={DEMAND, FG_FULFILLMENT, OVERTIME_CAPACITY,
+                               reads={DEMAND, DEMAND_ROWS, FG_FULFILLMENT, OVERTIME_CAPACITY,
                                       ST_BACKLOG, ST_FG_TARGET},
-                               writes={PRODUCTION_PLAN}),
+                               writes={PRODUCTION_PLAN, PLANNED_PRODUCTION}),
      _mech_default_plan),
     ("mech.production_execute", Hook(phase=PhaseId.PH50, priority=50,
                                      reads={PRODUCTION_PLAN, OVERTIME_CAPACITY},
                                      writes={PRODUCTION_OUTPUT, ST_ON_HAND, ST_FG_ON_HAND}),
      _mech_production_execute),
+    ("mech.gross_requirements", Hook(phase=PhaseId.PH70, priority=30,
+                                     reads={PLANNED_PRODUCTION}, writes={GROSS_REQUIREMENTS}),
+     _mech_gross_requirements),
     ("mech.material_demand", Hook(phase=PhaseId.PH70, priority=40,
                                   reads={FORECAST}, writes={MATERIAL_DEMAND}),
      _mech_material_demand),
@@ -512,6 +576,12 @@ def compile_scenario(scenario: Scenario, debug: bool = True) -> CompiledScenario
 
     policies = [instantiate(pid, raw) for pid, raw in sorted(policy_specs.items())]
     params_by_id = {pol.id: pol.params for pol in policies}
+    # A policy may shape the compiled model before any context is built (WP
+    # 14.5: P-P.1 marks its MRP materials and sets the planning horizon H).
+    for pol in policies:
+        configure = getattr(pol, "configure_model", None)
+        if configure is not None:
+            configure(model)
 
     bound: list[BoundHook] = [
         BoundHook(owner=name, hook=hook, is_mechanic=True) for name, hook, _ in _MECHANIC_HOOKS
@@ -646,7 +716,10 @@ def _initialize_state(compiled: CompiledScenario, ctx: SimContext) -> None:
         _log.debug("computed init: %s", init)
     ctx.on_hand = init.astype(float)
     if model.mts_mask.any():
-        ctx.fg_on_hand = ctx.fg_target.copy()  # MTS starts at its stock target
+        # MTS starts at its FG opening stock (engine RFC 4, WP 14.4), else at its
+        # stock target — today's behaviour.
+        ctx.fg_on_hand = np.where(model.mts_mask & (model.fg_initial >= 0),
+                                  model.fg_initial, ctx.fg_target)
     W = model.ring_width
     for m in range(model.n_mats):
         link = model.primary_link[m]
@@ -739,6 +812,14 @@ class ScenarioResult:
     # Fixed-start events moved from inside warm-up to t_w (audit F-03):
     # [{"event_index", "target_id", "authored_week", "used_week", "replications"}].
     event_shifts: list = field(default_factory=list)
+    # Demand per customer × product row (WP 14.1). `demand_clips`: normal draws
+    # set to 0 (decision 8) — [{"row"|"product", "clipped_draws", "draws",
+    # "mean_shift", "replications"}], empty when nothing was clipped.
+    # `demand_warnings`: the run's demand notes in the mapping-warning shape
+    # ({level, entity, field, reason}) — clips and forecasts shorter than the
+    # horizon — so the bridge can put them where the run panel reads.
+    demand_clips: list = field(default_factory=list)
+    demand_warnings: list = field(default_factory=list)
 
     def kpi_array(self, key: str) -> np.ndarray:
         return np.array([row.get(key, np.nan) for row in self.kpis])
@@ -811,6 +892,30 @@ class _CapacityBindingAccumulator:
         self.ring_width = int(model.ring_width)
         self.link_ids = [(model.sup_ids[model.link_sup[k]], model.mat_ids[model.link_mat[k]])
                          for k in range(model.n_links)]
+        # Normal-demand clips (WP 14.1, decision 8): per row when demand is drawn
+        # per row, else per product — summed over replications like the above.
+        self.clip_labels = (list(model.row_ids) if model.has_row_demand
+                            else list(model.prod_ids))
+        self.clip_kind = "row" if model.has_row_demand else "product"
+        self.demand_clips = np.zeros(len(self.clip_labels))
+        self.demand_clip_add = np.zeros(len(self.clip_labels))
+        self.horizon = int(model.settings.horizon)
+
+    def demand_clip_report(self) -> list[dict]:
+        """Rows (or products) whose normal draws were clipped at 0, with the
+        mean count per replication and how far clipping raised the realized
+        weekly mean (Σ clipped-away negatives / draws)."""
+        if self.reps == 0:
+            return []
+        n = float(self.reps)
+        return [
+            {self.clip_kind: label,
+             "clipped_draws": round(float(self.demand_clips[i]) / n, 3),
+             "draws": self.horizon,
+             "mean_shift": round(float(self.demand_clip_add[i]) / (n * self.horizon), 6),
+             "replications": self.reps}
+            for i, label in enumerate(self.clip_labels) if self.demand_clips[i] > 0
+        ]
 
     def lead_time_truncations(self) -> list[dict]:
         return [
@@ -822,6 +927,8 @@ class _CapacityBindingAccumulator:
     def observe(self, ctx: SimContext, t_w: int, window_end: int) -> None:
         w = slice(t_w, window_end)
         self.lt_truncated += ctx.lt_truncated
+        self.demand_clips += ctx.demand_clips
+        self.demand_clip_add += ctx.demand_clip_add
         self.prod_bound += ctx.trace.prod_cap_bound[:, w].sum(axis=1)
         self.sup_bound += ctx.trace.sup_cap_bound[:, w].sum(axis=1)
         self.reps += 1
@@ -942,11 +1049,25 @@ def run_scenario(
             "material.in_transit": tr.I_transit,
             "material.orders": tr.O_mat,
             "product.demand": tr.D,
+            # WP 14.4 — the plan's record: what it projected, required and planned
+            # (built is `product.production`).
+            "product.projected_demand": tr.PD,
+            "product.requirement": tr.REQ,
+            "product.planned": tr.PLAN,
             "product.production": tr.Q,
             "product.fulfillment": tr.F,
             "product.backlog": tr.B,
             "product.lost_units": tr.L,
         }
+        if tr.MRP_NEED is not None:
+            # WP 14.5 — the MRP record, week by week, for a run that has MRP
+            # materials (orders placed are `material.orders`).
+            item_series.update({
+                "material.mrp_need": tr.MRP_NEED,
+                "material.mrp_on_hand": tr.MRP_ON_HAND,
+                "material.mrp_on_the_way": tr.MRP_ON_WAY,
+                "material.mrp_net": tr.MRP_NET,
+            })
         item_ids = {
             "material": list(compiled.model.mat_ids),
             "product": list(compiled.model.prod_ids),
@@ -992,7 +1113,31 @@ def run_scenario(
              "authored_week": a, "used_week": u, "replications": len(grid)}
             for i, (a, u) in sorted(shifts.items())
         ],
+        demand_clips=(clips := cap_acc.demand_clip_report()),
+        demand_warnings=_demand_warnings(compiled.model, clips),
     )
+
+
+def _demand_warnings(model: CompiledModel, clips: list[dict]) -> list[dict]:
+    """The demand notes a user must see at the point of display (T2)."""
+    out: list[dict] = []
+    for f in model.row_forecast_short:
+        out.append({
+            "level": "warn", "entity": f"customer_row:{f['row']}", "field": "forecast",
+            "reason": (f"the forecast covers {f['weeks']} of the run's {f['horizon']} weeks; "
+                       f"later weeks use the row's {f['tail_source']} ({f['tail']:g}/wk)"),
+        })
+    for c in clips:
+        kind = "row" if "row" in c else "product"
+        label = c.get("row", c.get("product"))
+        out.append({
+            "level": "warn", "entity": f"{'customer_row' if kind == 'row' else 'product'}:{label}",
+            "field": "demand_distribution",
+            "reason": (f"normal demand: {c['clipped_draws']:g} of {c['draws']} weekly draws per "
+                       f"replication were negative and set to 0, raising the realized mean by "
+                       f"{c['mean_shift']:g}/wk"),
+        })
+    return out
 
 
 def _extend_until_ci(compiled, scenario, kpis, rows, grid, t_w, window_end, debug,

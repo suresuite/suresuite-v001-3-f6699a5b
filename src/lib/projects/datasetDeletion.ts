@@ -10,7 +10,7 @@
  */
 import type { ConfirmFn } from '@/components/shared/confirm/useConfirm';
 
-export type DatasetTab = 'bom' | 'inbound' | 'outbound' | 'nodeList' | 'deepNodes' | 'deepEdges' | 'deepSummary';
+export type DatasetTab = 'bom' | 'inbound' | 'outbound' | 'forecast' | 'nodeList' | 'deepNodes' | 'deepEdges' | 'deepSummary';
 
 export interface DatasetDeleteTarget {
   /** The `p_dataset` argument `delete_project_dataset` takes. */
@@ -32,6 +32,13 @@ export const DATASET_DELETE_TARGETS: Record<DatasetTab, DatasetDeleteTarget> = {
   bom: { dataset: 'bom', noun: 'BOM rows', note: LANES_REBUILD },
   inbound: { dataset: 'inbound', noun: 'inbound rows', note: LANES_REBUILD },
   outbound: { dataset: 'outbound', noun: 'outbound rows', note: LANES_REBUILD },
+  // PLAN.md §24 WP 14.2. The rows' demand then falls back to their mean, or to
+  // the product's demand split by volume.
+  forecast: {
+    dataset: 'demand_forecasts',
+    noun: 'forecast buckets',
+    note: "Each customer × product row then plans on its own mean, or on its product's demand split by volume.",
+  },
   nodeList: {
     dataset: 'node_list_uploads',
     noun: 'nodes',

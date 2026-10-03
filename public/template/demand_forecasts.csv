@@ -1,0 +1,7 @@
+customer_id,product_id,period_start,time_unit,quantity
+C0001,P0001,2026-11-02,week,150
+C0001,P0001,2026-11-09,week,150
+C0001,P0001,2026-11-16,week,180
+C0001,P0001,2026-11-23,week,160
+C0001,P0001,2026-12-01,month,700
+C0002,P0001,2027-01-01,month,520

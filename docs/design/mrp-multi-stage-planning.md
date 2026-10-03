@@ -327,6 +327,93 @@ None left. The last three were decided on 2026-10-02 (§0, decisions 6–8). New
 found during implementation are recorded here, each with its default, before the package
 that raises them merges.
 
+Found by WP 14.1 (defaults shipped; the owner may overrule):
+
+1. **What "centre" means for a forecast.** The forecast value is the week's **expected
+   value**: normal's μ, poisson's λ, triangularAV's mode (= its mean), deterministic's value.
+   For an explicit **triangular** row (min, mode, max) the triangle is **scaled** so its mean
+   equals the week's forecast — its shape is kept, its bounds move proportionally. Without a
+   forecast, the plan reads the triangle's mean (min + mode + max)/3, and `demand_mean` is
+   its mode, as `products.demand_mean` is for a product.
+2. **A row without a spec, beside rows with one.** It takes its product's distribution scaled
+   by its share of the product's volume (normalized over all the product's rows). The
+   product's stationary mean becomes the sum of its rows' means, so P-P.1 sizes on the rows.
+3. **A product no customer row names** gets one implicit row (no customer, share 1).
+4. **Week 0 of a forecast series** is the first simulated week. Where a stored series carries
+   dates, WP 14.2 decides how a date maps to a simulated week (below, point 5).
+
+Found by WP 14.2 (defaults shipped; the owner may overrule):
+
+5. **Which simulated week a dated bucket is.** Week 0 starts on the project's **earliest**
+   `period_start` — one calendar for every row, so two customers' weeks line up. Week *w* is
+   the seven days starting 7·*w* days later; its value is the sum over those days of each
+   covering bucket's daily rate (its weekly rate ÷ 7), so a week straddling two months takes
+   some of each and decision 7's even spread survives the boundary. A row's series ends at
+   its last week that lies wholly before its last bucket's end; a day no bucket covers adds
+   nothing (`sim_worker/datamap.py::forecast_series`).
+6. **Where a row's demand spec lives.** On `outbound_logistics`, whose natural key
+   (project, plant, customer, product) is the row the engine keys by (customer, product) once
+   a project has one plant. A forecast is its own table, `demand_forecasts`, keyed
+   (project, customer, product, `period_start`) — no plant, because demand belongs to the
+   customer row, not the lane that serves it. The monthly spread happens **at promotion**
+   (`weekly_quantity` = quantity × 7 ÷ the period's days; `period_end` exclusive).
+7. **`demand_mode` is derived, not uploaded.** A row with forecast buckets runs on them; an
+   override `row_demand_mode = model` on /policies sets the series aside and the row runs on
+   its mean + distribution. There is no stored mode column a second upload could contradict.
+
+Found by WP 14.3 (defaults shipped; the owner may overrule):
+
+8. **When fulfillment runs per row.** Only when a row carries its own backorder setting,
+   window or cost, or the project's rule needs a per-row input (`revenue_max`; a row
+   priority; a row or customer floor under `sla_tier`). Otherwise the product path runs
+   unchanged — a backlog per product, oldest first — which is what "project-wide settings
+   are byte-identical" requires: with several rows per product and a `priority` rule, a
+   per-row backlog would serve a high-priority row's new demand before a low-priority
+   row's old backlog, and the product path does not.
+9. **A row's window of 0 weeks** (e.g. 3 days) means the row's shortfall may be served the
+   next week and is lost after that. (The project-wide path keeps its old degenerate
+   behaviour for a 0-week horizon, unchanged.)
+10. **A row's fill rate** is the engine's β-service: units of THIS week's demand served this
+    week. A backorder row whose supply clears its backlog first can show a low fill rate
+    while losing nothing — its lost units and backorder cost are reported beside it.
+11. **An implicit row** (a product no customer row names) belongs to no customer and no
+    segment: it is served and reported per row, and left out of the per-customer and
+    per-segment fill rates.
+
+Found by WP 14.4 (defaults shipped; the owner may overrule):
+
+12. **When an FG target is set, and which demand it reads.** As before, the target is set
+    at the end of week t (PH-70) and used by week t+1's plan; days of cover reads the
+    projected demand of week t+1. Week t's MTS plan fills from the stock left after this
+    week's ACTUAL demand — the §3.2 formula's "start − projected demand" with the week
+    already known; the projection uses the projected demand for later weeks.
+13. **What the projection assumes about later weeks.** Nominal capacity (no overtime, no
+    disruption the plan has not seen), the current derived target for an untyped
+    base-stock product, and — off the per-row fulfillment path, where backlog ages are not
+    tracked — the actual backlog entering at age 0, so it can only expire later than it
+    would. Week t is always the actual state.
+14. **An incomplete FG policy** (min-max without both levels or with s ≥ S; days of cover
+    without D) runs as base-stock with whatever S it has, and the run says so. FG fields
+    on an MTO product are ignored with an info line.
+
+Found by WP 14.5 (defaults shipped; the owner may overrule):
+
+15. **MRP plans from the forecast, not from realized demand.** The appendix's probe 2 fed its
+    MRP a 4-week moving average of REALIZED demand; Phase 14's MRP nets BOM × planned
+    production, and the plan reads the customer table's forecast (or mean). So a demand step
+    that is in the forecast is ordered for before it arrives (0 units lost in the test), and
+    a step nobody forecast is met only by what is on hand — the plan never learns a realized
+    future. That second case is a forecast-error case and belongs to WP 14.6's forecast-bias
+    study, not to the order rule.
+16. **What counts as late.** An MRP order is due usable at release week + lead time. A
+    material is late in a week when what MRP had due by then exceeds what it has received by
+    then; the warm start's primed pipeline is not an MRP receipt. Material shortage weeks
+    are weeks the plant built less than it planned.
+17. **The safety stock's days** are P-P.3's own buffer expressed as days of cover per
+    material (its units ÷ the stationary weekly need × 7), so every P-P.3 classification
+    feeds MRP and none is counted twice.
+
+
 ---
 
 ## Appendix — probe method (reproducibility; not engine code)

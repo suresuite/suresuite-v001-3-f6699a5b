@@ -31,7 +31,9 @@ const FAMILY_META: Record<PolicyFamily, { title: string; description: string }> 
   sourcing: { title: "Sourcing", description: "Supplier strategy & failover." },
   inventory: { title: "Inventory", description: "Stock policy, safety stock & costs." },
   transport: { title: "Transportation", description: "Mode, lead time, capacity & cost." },
-  fulfillment: { title: "Customer fulfillment", description: "Allocation, backorder & service level." },
+  // WP 14.3 — the project's ONE allocation rule and the defaults every Customer
+  // row inherits; a row's own backorder, priority, price and target are cells.
+  fulfillment: { title: "Customer allocation", description: "One allocation rule; the backorder defaults every customer row inherits." },
   production: { title: "Production", description: "Lot sizing, capacity & scheduling." },
   recovery: { title: "Recovery", description: "Disruption triggers & response." },
   demand: { title: "Demand", description: "Pattern, forecast & service tier." },

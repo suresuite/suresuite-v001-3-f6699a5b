@@ -36,8 +36,16 @@ export interface ColSpec {
    * (docs/data-simulation-mapping.md §4).
    */
   master?: {
-    table: "materials" | "products" | "suppliers";
+    /**
+     * `outbound_logistics` (PLAN.md §24 WP 14.2) is the customer × product row's
+     * own demand spec — the base under the Customer stage's demand cells, joined
+     * on a COMPOSITE `idFrom` (`customer_id::product_id`), as the engine keys it.
+     * `customers` (WP 14.3) is the base under a row's priority and service
+     * target — per CUSTOMER, so `idFrom` is `customer_id`; the override is per row.
+     */
+    table: "materials" | "products" | "suppliers" | "outbound_logistics" | "customers";
     field: string;
+    /** The stage row's id field — or several joined by `::` for a composite key. */
     idFrom: string;
     /**
      * What an EMPTY master column MEANS, when empty means something (§4 D17).
@@ -117,6 +125,16 @@ const pendingCol = (field: string, family: PolicyFamily): ColSpec => {
 };
 
 // ---------- gating helpers ----------
+
+/** WP 14.3 — a Customer row's per-row inputs are shown under the project rule
+ *  that reads them (the rule is one per project, decision 4). */
+const ruleIs =
+  (...rules: string[]): ColSpec["visibleWhen"] =>
+  ({ effective }) =>
+    rules.includes(String(effective?.allocation ?? ""));
+/** A row's window and cost matter only when the row backorders. */
+const rowBackorders: ColSpec["visibleWhen"] = ({ effective, draft }) =>
+  (draft?.backorder_allowed ?? effective?.backorder_allowed) === true;
 const plantNeedsInventory: ColSpec["visibleWhen"] = ({ fulfillmentStrategy }) =>
   fulfillmentStrategy === "make_to_stock" ||
   fulfillmentStrategy === "assemble_to_order" ||
@@ -313,6 +331,27 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // number here could only ever speak by disagreeing (the WP 0.1 gap
       // check's second divergence).
       col("utilization_cap_pct", "production", { readOnly: true }),
+      // THE FG INVENTORY POLICY, MTS (PLAN.md §24 WP 14.4, ADR 0002 decision 3):
+      // base-stock fills to S, min-max fills to S only below s, days of cover
+      // fills to D/7 × the projected weekly demand. A typed level IS the target —
+      // P-P.4's buffer is never added on top of it. Over the `products` master,
+      // edits are Plant-row overrides (§23 WP 13.1).
+      col("fg_policy", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_policy", idFrom: "product_id" },
+      }),
+      col("fg_base_stock", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_base_stock", idFrom: "product_id" },
+      }),
+      col("fg_reorder_point", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_reorder_point", idFrom: "product_id" },
+      }),
+      col("fg_cover_days", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_cover_days", idFrom: "product_id" },
+      }),
       // Fulfillment (backorder, allocation, service level) is a customer-stage
       // concern only — the engine reads it from the project fulfillment default,
       // never from a plant node — so no fulfillment column is offered here.
@@ -326,18 +365,16 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("order_up_to", "inventory", { visibleWhen: plantInvType("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200, vectorGroup: "invParams" }),
       col("rop_q_quantity", "inventory", { visibleWhen: plantInvType("rop"), defaultWhenMissing: 0, vectorGroup: "invParams" }),
       col("review_period_days", "inventory", { visibleWhen: plantInvType("periodic_review"), defaultWhenMissing: 1, vectorGroup: "invParams" }),
-      // NO `master:` BLOCK, AND ITS ABSENCE IS THE FIX (§4 D89). This column was
-      // declared `master: { table: "products", field: "initial_on_hand" }` — a
-      // copy of the supplier stage's correct `materials.initial_on_hand` fifty
-      // lines above — and `products` has no such column. `masterValueFor`
-      // returns undefined for a column that does not exist, so every cell fell
-      // through to the policy bundle while the Parameter Sheet said "reaches
-      // engine · from item master". `masterPointersResolve.test.ts` is now a GATE
-      // on that class, so the next such copy fails on the commit that makes it.
-      // Restoring the pointer means adding the column AND a scsim reader for it:
-      // `context.py:150` builds on-hand from `net.materials` only, so there is no
-      // finished-goods initial inventory in the strategic engine to feed (§16).
-      col("initial_on_hand", "inventory", { visibleWhen: plantNeedsInventory }),
+      // FG OPENING STOCK IS A REAL CELL SINCE PLAN.md §24 WP 14.4 (§4 D89's
+      // remainder, engine RFC 4). Until then this was `initial_on_hand` with no
+      // `master:` block — its pointer had named `products.initial_on_hand`, a
+      // column that did not exist, and no scsim reader existed either. Engine
+      // 0.5.0 starts an MTS product at `fg_initial_on_hand`, and the column
+      // followed the capability in RFC 4's own order, so the pointer is real now.
+      col("fg_initial_on_hand", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_initial_on_hand", idFrom: "product_id" },
+      }),
       col("safety_stock_days", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 7 }),
       col("holding_cost_pct", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.2 }),
       col("service_level_target", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.95 }),
@@ -359,15 +396,63 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       { id: "customer_id", label: "Customer" },
       { id: "product_id", label: "Product" },
     ],
-    // scsim alignment: demand-shape fields are not consumed by the engine
-    // (demand comes from product/graph data), and the fulfillment family
-    // (allocation, backorder, service level) is consumed at the PROJECT default
-    // scope only — never per customer×product — so those are edited in the
-    // fulfillment defaults card, not per-row here. What remains per-row is the
-    // firm-routing choice for a customer×product lane.
+    // DEMAND PER ROW (PLAN.md §24 WP 14.2, ADR 0002 decision 2). The row's own
+    // demand spec: its base is the uploaded `outbound_logistics` row (and the
+    // row's forecast series), an edit is a policy OVERRIDE on this row's key —
+    // the engine reads override → data → the product's distribution × share,
+    // exactly the order every master-backed cell follows (§23 WP 13.1). The
+    // forecast series itself is uploaded in Project manager and shown read-only.
+    //
+    // FULFILLMENT PER ROW (PLAN.md §24 WP 14.3, ADR 0002 decisions 4–5). The
+    // allocation RULE is one per project and stays on the Customer allocation
+    // card; a row carries its own backorder setting, window and cost (an empty
+    // cell is the project's), and the per-row inputs the project's rule reads —
+    // priority (priority, sla_tier), price (revenue_max), service target
+    // (sla_tier) — each shown only under the rule that reads it. Priority and
+    // target sit over the customer's master values, price over the outbound
+    // row's unit price. The firm-routing choice for a lane stays per row too.
     cols: [
       col("primary_source", "fulfillment"),
       col("sourcing_firm", "fulfillment"),
+      // An OVERRIDE-ONLY choice, not a master column: the mode is derived from
+      // the data (a row with an uploaded series plans on it), so there is no
+      // column to point at. Empty = the engine's rule; `model` sets an uploaded
+      // series aside, and the Forecast cell beside it says whether there is one.
+      col("row_demand_mode", "demand"),
+      col("row_forecast", "demand", { readOnly: true }),
+      col("row_demand_distribution", "demand", {
+        master: { table: "outbound_logistics", field: "demand_distribution", idFrom: "customer_id::product_id" },
+      }),
+      col("row_demand_mean", "demand", {
+        master: { table: "outbound_logistics", field: "demand_mean", idFrom: "customer_id::product_id" },
+      }),
+      // Read BY THE DISTRIBUTION: a CV for normal, the ± fraction for
+      // triangularAV. The cell's title says which, for the row's distribution.
+      col("row_demand_variation", "demand", {
+        master: { table: "outbound_logistics", field: "demand_variation", idFrom: "customer_id::product_id" },
+      }),
+      col("row_demand_min", "demand", {
+        master: { table: "outbound_logistics", field: "demand_min", idFrom: "customer_id::product_id" },
+      }),
+      col("row_demand_max", "demand", {
+        master: { table: "outbound_logistics", field: "demand_max", idFrom: "customer_id::product_id" },
+      }),
+      // WP 14.3 — backorder per row. Empty = the project's setting.
+      col("backorder_allowed", "fulfillment"),
+      col("max_backorder_days", "fulfillment", { visibleWhen: rowBackorders }),
+      col("backorder_cost_per_day", "fulfillment", { visibleWhen: rowBackorders }),
+      col("row_priority", "fulfillment", {
+        visibleWhen: ruleIs("priority", "sla_tier"),
+        master: { table: "customers", field: "priority_weight", idFrom: "customer_id" },
+      }),
+      col("price", "fulfillment", {
+        visibleWhen: ruleIs("revenue_max"),
+        master: { table: "outbound_logistics", field: "unit_price", idFrom: "customer_id::product_id" },
+      }),
+      col("sla_fill_floor_pct", "fulfillment", {
+        visibleWhen: ruleIs("sla_tier"),
+        master: { table: "customers", field: "sla_fill_floor_pct", idFrom: "customer_id" },
+      }),
     ],
     targetKey: (r) => `${r.customer_id}::${r.product_id ?? ""}`,
   },
@@ -500,6 +585,27 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   fg_safety_stock_days: { sub: "days · when sized", w: 78, kind: "int", unit: "d", prio: 1 },
   // ---- customer · fulfillment
   sourcing_firm: { sub: "serving node", w: 168, kind: "text", keep: true, align: "left" },
+  // ---- customer · demand per row (WP 14.2)
+  row_demand_mode: { sub: "forecast · model", w: 92, kind: "text", keep: true, align: "left" },
+  row_forecast: { sub: "uploaded series", w: 168, kind: "text", align: "left", prio: 6 },
+  row_demand_distribution: { sub: "per row", w: 112, kind: "text", keep: true, align: "left" },
+  row_demand_mean: { sub: "units / wk", w: 88, kind: "num", dec: 1, keep: true },
+  row_demand_variation: { sub: "CV (normal) · ± (triangularAV)", w: 96, kind: "num", dec: 2, prio: 5 },
+  row_demand_min: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
+  row_demand_max: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
+  // ---- plant · FG policy (WP 14.4)
+  fg_policy: { sub: "base · min-max · cover", w: 120, kind: "text", keep: true, align: "left" },
+  fg_base_stock: { sub: "S · units", w: 84, kind: "int", prio: 5 },
+  fg_reorder_point: { sub: "s · units · min-max", w: 88, kind: "int", prio: 4 },
+  fg_cover_days: { sub: "D · days · cover", w: 84, kind: "num", dec: 1, prio: 4 },
+  fg_initial_on_hand: { sub: "units · opening", w: 88, kind: "int", prio: 6 },
+  // ---- customer · fulfillment per row (WP 14.3)
+  backorder_allowed: { sub: "this row waits", w: 76, kind: "toggle", keep: true, filterable: false, align: "center" },
+  max_backorder_days: { sub: "days → whole wk", w: 84, kind: "int", unit: "d", prio: 6 },
+  backorder_cost_per_day: { sub: "€ / unit / day", w: 92, kind: "num", dec: 2, unit: "€", prio: 5 },
+  row_priority: { sub: "weight · priority, sla_tier", w: 88, kind: "num", dec: 2, prio: 6 },
+  price: { sub: "€ / unit · revenue_max", w: 92, kind: "num", dec: 2, unit: "€", prio: 6 },
+  sla_fill_floor_pct: { sub: "% · sla_tier", w: 84, kind: "num", dec: 1, unit: "%", prio: 6 },
 };
 
 /** Fallback so a new engine field renders sanely before it gets metadata. */
@@ -537,11 +643,29 @@ export const SHORT_LABEL: Record<string, string> = {
   fg_service_level_target: "FG service",
   fg_safety_stock_days: "FG days",
   sourcing_firm: "Sourcing firm",
+  row_demand_mode: "Demand mode",
+  row_forecast: "Forecast",
+  row_demand_distribution: "Distribution",
+  row_demand_mean: "Mean",
+  row_demand_variation: "Variation",
+  row_demand_min: "Min",
+  row_demand_max: "Max",
+  fg_policy: "FG policy",
+  fg_base_stock: "FG S",
+  fg_reorder_point: "FG s",
+  fg_cover_days: "FG cover",
+  fg_initial_on_hand: "Initial FG",
+  backorder_allowed: "Backorder",
+  max_backorder_days: "Max backorder",
+  backorder_cost_per_day: "Backorder cost",
+  row_priority: "Priority",
+  price: "Price",
+  sla_fill_floor_pct: "Service target",
 };
 
 /** Per-stage label overrides — same field, different meaning by context. */
 const STAGE_LABEL_OVERRIDE: Partial<Record<StageKey, Record<string, string>>> = {
-  plant: { initial_on_hand: "Initial FG" },
+  // (`plant.initial_on_hand` → "Initial FG" left with the column in WP 14.4.)
 };
 
 export function shortLabelFor(stage: StageKey, field: string, fallback: string): string {

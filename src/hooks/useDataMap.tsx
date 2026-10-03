@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { useScenarios } from "@/hooks/useScenarios";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchProjectLanes } from "@/lib/policies/projectLanes";
+import { fetchProjectForecasts, fetchProjectLanes } from "@/lib/policies/projectLanes";
 import type { StatusKey } from "@/lib/policies/dataMap";
 
 export type DataMapStatus = "ok" | "fallback" | "default" | "unused" | "missing";
@@ -25,6 +25,8 @@ interface LaneRow {
   lead_time_unit?: string | null;
   expected_lead_time?: number | string | null;
   volume?: number | string | null;
+  demand_distribution?: string | null;
+  demand_mean?: number | string | null;
 }
 
 const num = (v: unknown): number => {
@@ -45,6 +47,8 @@ export function useDataMap(projectId: string | null | undefined) {
   const [bomTable, setBomTable] = useState<"bom_multi_level" | "bom_single_level">("bom_single_level");
   // customers: null = could not read (said so on screen), [] = none uploaded.
   const [customers, setCustomers] = useState<Array<Record<string, unknown>> | null>([]);
+  // WP 14.2 — forecast buckets: null = could not read (said so), [] = none uploaded.
+  const [forecasts, setForecasts] = useState<Array<Record<string, unknown>> | null>([]);
   const { scenarios } = useScenarios(projectId);
   // D20: named lane tables whose read was cut short, for the grid to show.
   const [truncated, setTruncated] = useState<string[]>([]);
@@ -58,6 +62,7 @@ export function useDataMap(projectId: string | null | undefined) {
       setBomBlankRates(0);
       setBomConsumed(new Set());
       setCustomers([]);
+      setForecasts([]);
       setTruncated([]);
       return;
     }
@@ -90,9 +95,12 @@ export function useDataMap(projectId: string | null | undefined) {
       // The engine reads `customers` (§4 D69); production grants anon read.
       const cq = await (supabase as unknown as {
         from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => Promise<{ data: unknown; error: unknown }> } };
-      }).from("customers").select("customer_id,segment,priority_weight").eq("project_id", projectId);
+      }).from("customers").select("customer_id,segment,priority_weight,sla_fill_floor_pct").eq("project_id", projectId);
       if (cancelled) return;
       setCustomers(cq.error ? null : ((cq.data ?? []) as Array<Record<string, unknown>>));
+      const fq = await fetchProjectForecasts(projectId, user);
+      if (cancelled) return;
+      setForecasts(fq.error ? null : fq.rows);
       setLoading(false);
     })();
     return () => {
@@ -185,6 +193,21 @@ export function useDataMap(projectId: string | null | undefined) {
         status: "unused",
         detail: "engine does not read it (display only)",
       },
+      // WP 14.2 — a row with no spec is not a gap: it runs on its product's
+      // distribution scaled by its volume share, as every project did before.
+      outbound_demand_spec: (() => {
+        if (outbound.length === 0) return { status: "missing" as const, detail: "no lanes uploaded" };
+        const set = outbound.filter((r) => (r.demand_distribution ?? "") !== "" || r.demand_mean != null).length;
+        return set === 0
+          ? { status: "default" as const, detail: `0/${outbound.length} rows state their own demand — each runs on its product's distribution × its volume share` }
+          : { status: "ok" as const, detail: `${set}/${outbound.length} rows state their own demand; the rest run on their product's distribution × share` };
+      })(),
+      forecast_series: (() => {
+        if (forecasts === null) return { status: "missing" as const, detail: "could not read the forecast table" };
+        if (forecasts.length === 0) return { status: "unused" as const, detail: "no forecast uploaded — rows plan on their mean" };
+        const rows = new Set(forecasts.map((f) => `${f.customer_id}::${f.product_id}`)).size;
+        return { status: "ok" as const, detail: `${forecasts.length} buckets across ${rows} customer × product row(s)` };
+      })(),
       bom_consumption_rate:
         bomCount === 0
           ? { status: "missing", detail: "no BOM uploaded" }
@@ -250,11 +273,11 @@ export function useDataMap(projectId: string | null | undefined) {
       },
       customer_segment: customerField("segment", "every customer in segment 'default'"),
       customer_priority: customerField("priority_weight", "priority 1.0"),
-      customer_sla_floor: { status: "unused", detail: "engine does not read it" },
+      customer_sla_floor: customerField("sla_fill_floor_pct", "no contracted floor — the segment's tier floor applies"),
       plant_ignored: { status: "unused", detail: "not read by the engine" },
       name: { status: "ok", detail: "display only" },
     };
-  }, [inbound, outbound, bomCount, bomBlankRates, bomConsumed, bomTable, customers, scenarios, materials, products, suppliers, derived]);
+  }, [inbound, outbound, bomCount, bomBlankRates, bomConsumed, bomTable, customers, forecasts, scenarios, materials, products, suppliers, derived]);
 
   return { statuses, truncated, bomTable, loading: loading || mastersLoading };
 }

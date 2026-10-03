@@ -433,6 +433,10 @@ export async function dispatchExperimentRun(
         (scenario.disruption_schedule as Array<Record<string, unknown>>) ?? [],
       acknowledgeWarnings:
         (cmd.payload as Record<string, unknown>).acknowledge_warnings === true,
+      // PLAN.md §24 WP 14.2 — a forecast shorter than the run is warned.
+      horizonWeeks: Number(scenario.horizon_days) > 0
+        ? Math.max(1, Math.round(Number(scenario.horizon_days) / 7))
+        : undefined,
     });
     if (gate) throw new ValidationRejection(gate);
   } catch (e) {

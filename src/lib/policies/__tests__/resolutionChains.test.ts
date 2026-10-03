@@ -236,7 +236,8 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
   const KNOWN_BREAKS = [
     "customer.primary_source",
     "customer.sourcing_firm",
-    "plant.initial_on_hand",
+    // plant.initial_on_hand left this list in WP 14.4 (§4 D89's remainder, RFC
+    // 4): the cell is `fg_initial_on_hand` now, master-backed and read.
     "plant.review_period_days",
     // supplier.primary_source left this list when a saved Supplier-stage primary
     // became the engine's primary link (`SupplierLink.primary`, §4 D188). The
@@ -323,11 +324,18 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     // defect fell through.
     const byDeclaration = chains.filter((c) =>
       /declared policy-bundle key/.test(c.hops.find((h) => h.kind === "engine")?.detail ?? ""));
-    expect(byDeclaration.length).toBe(17);
-    // 13 rendered fields resolve by declaration (rop_q_quantity, coverage_weeks
+    // EIGHTEEN since PLAN.md §24 WP 14.2: `row_demand_mode` — the Customer row's
+    // override-only choice between its forecast and its model — resolves by
+    // declaration; the five other Customer demand cells are master overrides.
+    // TWENTY-ONE since WP 14.3: the Customer row's backorder setting, window and
+    // cost resolve by declaration too (read at the project default AND on the
+    // row); its priority, price and target are master overrides.
+    expect(byDeclaration.length).toBe(21);
+    // 17 rendered fields resolve by declaration (14 until WP 14.3 added the
+    // three backorder cells; rop_q_quantity, coverage_weeks
     // and holding_cost_pct resolve through their own doors on some stages, so
     // the field count trails the 16 keys project_map declares).
-    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(13);
+    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(17);
     for (const c of byDeclaration) {
       const detail = c.hops.find((h) => h.kind === "engine")!.detail;
       // The TARGET is what makes the chain followable; the TRANSFORM is what makes

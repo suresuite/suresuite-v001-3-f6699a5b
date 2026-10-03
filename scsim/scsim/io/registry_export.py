@@ -145,6 +145,23 @@ def run_window_rule() -> dict[str, Any]:
     }
 
 
+def backorder_rule() -> dict[str, Any]:
+    """``project_map._backorder_weeks`` — max backorder days → whole weeks,
+    rounded half up and clamped (PLAN.md §24 WP 14.3). The Customer table shows
+    each row's window in the weeks the engine will use; ``backorderWeeks.test.ts``
+    holds the browser's copy to the examples below, computed BY the mapper."""
+    return {
+        "days_per_week": 7,
+        "rounding": "half_up",
+        "min_weeks": 0,
+        "max_weeks": 26,
+        "examples": [
+            {"days": d, "weeks": pm._backorder_weeks(d, w=[], entity="example")}
+            for d in (0, 3, 3.5, 4, 10, 10.5, 11, 14, 200)
+        ],
+    }
+
+
 def disruption_rule() -> dict[str, Any]:
     """What ``project_map._map_events`` keeps, verbatim (WP 9.4, PLAN.md §4 D226).
 
@@ -219,6 +236,7 @@ def build_registry() -> dict[str, Any]:
         # engine measured a fixed window; the card now reads this, so the rule
         # has one author (`project_map.analysis_window_weeks`).
         "run_window": run_window_rule(),
+        "backorder": backorder_rule(),
         "disruption": disruption_rule(),
         "pipeline": pipeline_schema(),
         "kpis": [

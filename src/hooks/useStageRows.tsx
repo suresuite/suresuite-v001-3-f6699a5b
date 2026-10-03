@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { StageKey } from "@/lib/policies/stages";
 import { ratePerDay } from "@/lib/policies/effectiveEconomics";
-import { fetchProjectLanes } from "@/lib/policies/projectLanes";
+import { fetchProjectForecasts, fetchProjectLanes } from "@/lib/policies/projectLanes";
+import { forecastSummary, type ForecastBucket } from "@/lib/policies/customerRows";
 import { engineSupplierLinks } from "../../supabase/functions/_shared/grading";
 
 export interface StageRow {
@@ -707,6 +708,16 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
         }
 
         if (stage === "customer") {
+          // PLAN.md §24 WP 14.2 — each row's uploaded forecast series, shown
+          // read-only with its source; the series itself is uploaded in Project
+          // manager (the `demand_forecasts` dataset).
+          const fq = await fetchProjectForecasts(projectId, user);
+          if (fq.error) console.warn("[useStageRows] demand forecast read failed", fq.error);
+          const bucketsByRow = new Map<string, ForecastBucket[]>();
+          for (const f of fq.rows as unknown as ForecastBucket[]) {
+            const k = `${f.customer_id}::${f.product_id}`;
+            bucketsByRow.set(k, [...(bucketsByRow.get(k) ?? []), f]);
+          }
           const bomProducts = new Set<string>();
           for (const e of edges) if (e.data_source === "bom") bomProducts.add(e.to_location);
 
@@ -743,6 +754,8 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             const firms = meta?.firms ?? [];
             const suggestedFirm = meta?.firm ?? "";
             const prov = { __from_data: {} as Record<string, true>, __imputed: {} as Record<string, true> };
+            const row_forecast = forecastSummary(bucketsByRow.get(key) ?? []);
+            if (row_forecast) prov.__from_data.row_forecast = true;
             // Both firm-routing fields are decided by the uploaded outbound
             // volumes (highest volume wins). DECIDED, not uploaded — see the
             // supplier stage above for what conflating the two cost (§4 D23).
@@ -752,6 +765,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               key,
               customer_id: customer,
               product_id: product,
+              row_forecast,
               // Prefill the suggested sourcing firm; single firm → only option.
               sourcing_firm,
               // Single firm → lock primary. Multi-firm → auto-enable the

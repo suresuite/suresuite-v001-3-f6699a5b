@@ -22,6 +22,38 @@ FR_BAND_PP = 0.02          # band half-width below the pre-disruption baseline
 TTR_SUSTAIN_WEEKS = 3      # recovery must hold this long
 
 
+def demand_projection_kpis(ctx: SimContext, t_w: int, window_end: int) -> dict[str, float]:
+    """Projected (the plan's view) vs actual (drawn) demand over the window — WP 14.1.
+
+    ``demand_forecast_bias`` = (Σ projected − Σ actual) / Σ actual — positive
+    means the plan expected more than came. ``demand_forecast_mape`` = mean
+    over weeks with demand of |projected − actual| / actual. Pooled over all
+    products, then per product as ``…_<product id>``. Emitted only when demand
+    is specified per row, so a project that sets no row field reports exactly
+    the KPIs it did before.
+    """
+    W = window_end - t_w
+    if W <= 0:
+        return {}
+    proj = ctx.projected_demand(t_w, W)
+    act = ctx.demand_schedule[:, t_w:window_end]
+    out: dict[str, float] = {}
+
+    def _pair(p: np.ndarray, a: np.ndarray) -> tuple[float, float]:
+        sa = float(a.sum())
+        bias = (float(p.sum()) - sa) / sa if sa > 0 else float("nan")
+        pos = a > 0
+        mape = float((np.abs(p[pos] - a[pos]) / a[pos]).mean()) if pos.any() else float("nan")
+        return bias, mape
+
+    out["demand_forecast_bias"], out["demand_forecast_mape"] = _pair(proj, act)
+    for j, pid in enumerate(ctx.model.prod_ids):
+        b, m = _pair(proj[j], act[j])
+        out[f"demand_forecast_bias_{pid}"] = b
+        out[f"demand_forecast_mape_{pid}"] = m
+    return out
+
+
 def compute_replication_kpis(
     ctx: SimContext,
     t_w: int,
@@ -91,6 +123,8 @@ def compute_replication_kpis(
                 row["ttr_weeks"] = m.ttr
             if m.tts is not None:
                 row["tts_weeks"] = m.tts
+    if getattr(ctx.model, "has_row_demand", False):
+        row.update(demand_projection_kpis(ctx, t_w, window_end))
     return row
 
 

@@ -28,6 +28,7 @@ from scipy import sparse
 from scsim.core.phases import (
     FG_FULFILLMENT,
     FULFILLMENT,
+    GROSS_REQUIREMENTS,
     INVENTORY_LEVELS,
     OVERTIME_CAPACITY,
     PRODUCTION_PLAN,
@@ -131,6 +132,11 @@ class CompiledModel:
         self.demand_a, self.demand_b, self.demand_c = tri[:, 0], tri[:, 1], tri[:, 2]
         self.demand_model_of = [p.demand_model for p in net.products]
         self.negbin_k = np.array([p.negbin_dispersion for p in net.products])
+        # σ = cv · b for demand_model=normal (WP 14.1); 0 for every other model.
+        self.demand_cv_p = np.array([
+            float(p.demand_cv or 0.0) if p.demand_model == DemandModel.NORMAL else 0.0
+            for p in net.products
+        ])
         self.demand_history = [np.asarray(p.demand_history, dtype=float) for p in net.products]
         self.mean_demand_p = np.array([p.mean_demand(nu) for p in net.products])
         self.var_demand_p = self._demand_variances()
@@ -221,6 +227,26 @@ class CompiledModel:
         self.fg_base_stock_override = np.array(
             [-1.0 if p.fg_base_stock is None else p.fg_base_stock for p in net.products]
         )
+        # FG policies (WP 14.4, ADR 0002 decision 3): 0 base_stock, 1 min_max,
+        # 2 days_of_cover. `fg_typed` marks a product whose target is a TYPED
+        # level (S, (s, S) or D): P-P.4 adds nothing on top of it.
+        from scsim.entities.enums import FgPolicy as _Fg
+        _code = {_Fg.BASE_STOCK: 0, _Fg.MIN_MAX: 1, _Fg.DAYS_OF_COVER: 2}
+        self.fg_policy_code = np.array([_code[p.fg_policy] for p in net.products], dtype=int)
+        self.fg_reorder_point = np.array(
+            [np.nan if p.fg_reorder_point is None else p.fg_reorder_point for p in net.products])
+        self.fg_cover_days = np.array(
+            [np.nan if p.fg_cover_days is None else p.fg_cover_days for p in net.products])
+        self.fg_initial = np.array(
+            [-1.0 if p.fg_initial_on_hand is None else p.fg_initial_on_hand for p in net.products])
+        self.fg_typed = (self.fg_policy_code != 0) | (self.fg_base_stock_override >= 0)
+        # Planning horizon H (weeks of planned production, week t first). 1 until
+        # MRP sets it (WP 14.5): with H = 1 the plan IS this week's production plan.
+        self.plan_horizon = 1
+        # MRP materials (WP 14.5), set at compile by P-P.1 (`configure_model`),
+        # which also raises `plan_horizon` to the longest MRP lead time + 1.
+        self.mrp_mask = np.zeros(self.n_mats, dtype=bool)
+        self.has_mrp = False
         # Full COGS per FG unit (P-P.4 holding basis): Σ_m r_{p,m} · c_m.
         self.fg_unit_cogs = np.asarray(self.bom @ self.mat_cost).ravel()
 
@@ -246,6 +272,175 @@ class CompiledModel:
         # plus the recovery ramp; +4 slack (§10.2.2).
         self.ring_width = int(self.link_lt.max()) + 52 + 8 + 4
 
+        # Demand per customer × product row (WP 14.1, ADR 0002 decision 2).
+        self._compile_demand_rows(net)
+
+    # Weeks of plan view kept past the drawn schedule, so a planner looking
+    # ahead from the last simulated week still reads a defined value.
+    PLAN_PAD_WEEKS = 64
+
+    def _compile_demand_rows(self, net) -> None:
+        """Rows = customer × product pairs, product-major (CSR ``row_ptr``).
+
+        Every product owns at least one row: a product no customer link names
+        gets one IMPLICIT row (customer index −1, share 1). Each row has a
+        CENTRE per week — the expected value of that week's distribution and
+        the only thing the plan reads (``SimContext.projected_demand_rows``):
+        the forecast value, else the row's mean, else (no spec) the product's
+        mean × the row's share.
+
+        ``has_row_demand`` is True when ANY link carries a spec; only then is
+        demand drawn per row. Otherwise the per-product draw is unchanged and
+        the rows exist for the plan's view alone.
+        """
+        T = self.settings.horizon
+        Tc = T + self.settings.visibility_horizon + self.PLAN_PAD_WEEKS
+        self.demand_horizon = T + self.settings.visibility_horizon
+        links = sorted(net.customer_links,
+                       key=lambda cl: (self.prod_index[cl.product_id],
+                                       self.cust_index[cl.customer_id]))
+        linked = {cl.product_id for cl in links}
+        rows: list[tuple[int, int, Optional[object]]] = []
+        it = iter(links)
+        nxt = next(it, None)
+        for j, pid in enumerate(self.prod_ids):
+            if pid not in linked:
+                rows.append((j, -1, None))
+                continue
+            while nxt is not None and nxt.product_id == pid:
+                rows.append((j, self.cust_index[nxt.customer_id], nxt))
+                nxt = next(it, None)
+        R = len(rows)
+        self.n_rows = R
+        self.row_prod = np.array([r[0] for r in rows], dtype=int)
+        self.row_cust = np.array([r[1] for r in rows], dtype=int)
+        self.row_ptr = np.concatenate([[0], np.cumsum(np.bincount(self.row_prod,
+                                                                  minlength=self.n_prods))])
+        self.row_ids = [
+            f"{self.cust_ids[c] if c >= 0 else ''}::{self.prod_ids[j]}" for j, c, _ in rows
+        ]
+        raw_share = np.array([1.0 if l is None else float(l.share) for _, _, l in rows])
+        tot = np.bincount(self.row_prod, weights=raw_share, minlength=self.n_prods)
+        self.row_share = raw_share / tot[self.row_prod]
+        self.row_to_prod = sparse.csr_matrix(
+            (np.ones(R), (self.row_prod, np.arange(R))), shape=(self.n_prods, R))
+        specs = [l for _, _, l in rows]
+        # Per-row fulfillment inputs (WP 14.3, ADR 0002 decision 4): the row's
+        # price (its own, else the product's), its customer's priority and its
+        # customer's contracted floor (NaN = none). An implicit row has no
+        # customer: priority 1.0, no floor.
+        self.row_price = np.array([
+            float(l.unit_price) if l is not None and l.unit_price is not None
+            else float(self.unit_price[j]) for j, _c, l in rows])
+        self.row_cust_priority = np.array([
+            float(self.cust_priority[c]) if c >= 0 else 1.0 for _j, c, _l in rows])
+        floors = [c.sla_fill_floor_pct for c in net.customers]
+        self.row_cust_floor = np.array([
+            np.nan if c < 0 or floors[c] is None else float(floors[c]) for _j, c, _l in rows])
+        self.row_has_spec = np.array([l is not None and l.has_demand_spec for l in specs])
+        self.has_row_demand = bool(self.row_has_spec.any())
+        self.row_forecast_short: list[dict] = []
+
+        # Per-row draw parameters. Kinds reuse DemandModel; triangular rows
+        # carry their shape as RATIOS of the centre (a/m, b/m, c/m with m the
+        # triangle's mean), so a forecast that moves the centre scales the
+        # triangle and its expected value is exactly the forecast.
+        kind: list[DemandModel] = []
+        tri = np.zeros((R, 3))
+        cv = np.zeros(R)
+        k_nb = np.ones(R)
+        centre = np.zeros((R, Tc))
+        for r, (j, _c, link) in enumerate(rows):
+            share = self.row_share[r]
+            if link is None or not link.has_demand_spec:
+                dm = self.demand_model_of[j]
+                kind.append(dm)
+                m = self.mean_demand_p[j]
+                centre[r, :] = m * share
+                if dm == DemandModel.TRIANGULAR:
+                    a, b, c = self.demand_a[j], self.demand_b[j], self.demand_c[j]
+                    tri[r] = (a / m, b / m, c / m) if m > 0 else (0.0, 0.0, 0.0)
+                elif dm == DemandModel.NORMAL:
+                    cv[r] = self.demand_cv_p[j]
+                elif dm == DemandModel.NEGBIN:
+                    k_nb[r] = self.negbin_k[j]
+                continue
+            model = link.demand_model or "deterministic"
+            if model == "triangular":
+                m3 = (link.demand_min + link.demand_mean + link.demand_max) / 3.0
+                tri[r] = ((link.demand_min / m3, link.demand_mean / m3, link.demand_max / m3)
+                          if m3 > 0 else (0.0, 0.0, 0.0))
+                base = m3
+                kind.append(DemandModel.TRIANGULAR)
+            elif model == "triangular_av":
+                v = float(link.demand_variation)
+                tri[r] = (max(0.0, 1.0 - v), 1.0, 1.0 + v)
+                base = link.demand_mean
+                kind.append(DemandModel.TRIANGULAR)
+            elif model == "normal":
+                cv[r] = float(link.demand_variation)
+                base = link.demand_mean
+                kind.append(DemandModel.NORMAL)
+            elif model == "poisson":
+                base = link.demand_mean
+                kind.append(DemandModel.POISSON)
+            else:
+                base = link.demand_mean
+                kind.append(DemandModel.DETERMINISTIC)
+            fc = link.forecast
+            if fc is None:
+                centre[r, :] = float(base)
+                continue
+            n = min(len(fc), Tc)
+            centre[r, :n] = np.asarray(fc[:n], dtype=float)
+            if len(fc) < Tc:
+                tail = float(base) if base is not None else float(fc[-1])
+                centre[r, n:] = tail
+                if len(fc) < T:
+                    self.row_forecast_short.append({
+                        "row": self.row_ids[r], "weeks": len(fc), "horizon": T,
+                        "tail": tail, "tail_source": "mean" if base is not None else "last value",
+                    })
+        self.row_kind = kind
+        self.row_tri = tri
+        self.row_cv = cv
+        self.row_negbin_k = k_nb
+        self.row_centre = centre
+        self.row_groups: list[tuple[DemandModel, np.ndarray]] = []
+        for dm in DemandModel:
+            idx = np.array([r for r, km in enumerate(kind) if km == dm], dtype=int)
+            if idx.size:
+                self.row_groups.append((dm, idx))
+
+        if self.has_row_demand:
+            # The product's stationary mean IS the sum of its rows' means over
+            # the simulated weeks — what P-P.1 sizes on, the material
+            # expectation and the cold-start forecast all read.
+            row_mean = centre[:, :T].mean(axis=1)
+            self.mean_demand_p = np.asarray(self.row_to_prod @ row_mean).ravel()
+            self.var_demand_p = np.asarray(self.row_to_prod @ self._row_variances(row_mean)).ravel()
+            self.exp_demand_m = np.asarray(self.bom.T @ self.mean_demand_p).ravel()
+            self.var_demand_m = np.asarray((self.bom.power(2)).T @ self.var_demand_p).ravel()
+
+    def _row_variances(self, row_mean: np.ndarray) -> np.ndarray:
+        out = np.zeros(self.n_rows)
+        for r, dm in enumerate(self.row_kind):
+            m = row_mean[r]
+            if dm == DemandModel.TRIANGULAR:
+                a, b, c = self.row_tri[r] * m
+                out[r] = (a * a + b * b + c * c - a * b - a * c - b * c) / 18.0
+            elif dm == DemandModel.POISSON:
+                out[r] = m
+            elif dm == DemandModel.NORMAL:
+                out[r] = (self.row_cv[r] * m) ** 2
+            elif dm == DemandModel.NEGBIN:
+                out[r] = m + m * m / self.row_negbin_k[r]
+            elif dm == DemandModel.BOOTSTRAP:
+                j = self.row_prod[r]
+                h = self.demand_history[j]
+                out[r] = float(h.var(ddof=1)) * self.row_share[r] ** 2 if h.size > 1 else 0.0
+        return out
+
     def _demand_variances(self) -> np.ndarray:
         out = np.zeros(self.n_prods)
         for j, model in enumerate(self.demand_model_of):
@@ -258,17 +453,40 @@ class CompiledModel:
                 out[j] = b + b * b / self.negbin_k[j]
             elif model == DemandModel.BOOTSTRAP and self.demand_history[j].size > 1:
                 out[j] = float(self.demand_history[j].var(ddof=1))
+            elif model == DemandModel.NORMAL:
+                out[j] = (self.demand_cv_p[j] * b) ** 2
             else:  # deterministic
                 out[j] = 0.0
         return out
 
 
-def draw_week_demand(model: CompiledModel, rng: np.random.Generator, out: np.ndarray) -> None:
+def _draw_normal(rng: np.random.Generator, mu: np.ndarray, cv: np.ndarray,
+                 clips: Optional[np.ndarray], clip_add: Optional[np.ndarray],
+                 idx: np.ndarray) -> np.ndarray:
+    """N(μ, σ = cv·μ) with negative draws set to 0 (ADR 0002, decision 8).
+
+    ``clips[idx]`` counts the clipped draws and ``clip_add[idx]`` sums what
+    clipping added (−x for each x < 0), so the run can report how often it
+    happened and how far it raised the realized mean. Pass ``None`` to draw
+    without counting (the look-ahead tail beyond the horizon)."""
+    raw = rng.normal(mu, np.maximum(cv * mu, 0.0))
+    neg = raw < 0.0
+    if clips is not None and neg.any():
+        clips[idx] += neg
+        clip_add[idx] += np.where(neg, -raw, 0.0)
+    return np.where(neg, 0.0, raw)
+
+
+def draw_week_demand(model: CompiledModel, rng: np.random.Generator, out: np.ndarray,
+                     clips: Optional[np.ndarray] = None,
+                     clip_add: Optional[np.ndarray] = None) -> None:
     """Draw one week of product demand into ``out``.
 
     The per-group draw sequence is the world-stream consumption contract:
     golden traces byte-compare on it, so schedule pre-generation and the
-    former per-week loop must consume ``rng`` in exactly this order.
+    former per-week loop must consume ``rng`` in exactly this order. NORMAL
+    (WP 14.1) is the last DemandModel, so it is the last group and every
+    pre-existing sequence is unchanged.
     """
     for model_type, idx in model.demand_groups:
         if model_type == DemandModel.TRIANGULAR:
@@ -286,9 +504,54 @@ def draw_week_demand(model: CompiledModel, rng: np.random.Generator, out: np.nda
             b, k = model.demand_b[idx], model.negbin_k[idx]
             p = k / (k + np.maximum(b, 1e-12))
             out[idx] = rng.negative_binomial(k, p).astype(float)
-        else:  # BOOTSTRAP
+        elif model_type == DemandModel.BOOTSTRAP:
             for j in idx:
                 out[j] = float(rng.choice(model.demand_history[j]))
+        else:  # NORMAL
+            out[idx] = _draw_normal(rng, model.demand_b[idx], model.demand_cv_p[idx],
+                                    clips, clip_add, idx)
+
+
+def draw_week_demand_rows(model: CompiledModel, rng: np.random.Generator, t: int,
+                          out: np.ndarray, clips: Optional[np.ndarray] = None,
+                          clip_add: Optional[np.ndarray] = None) -> None:
+    """Draw week ``t`` of demand PER CUSTOMER × PRODUCT ROW into ``out`` (WP 14.1).
+
+    THE ROW CONSUMPTION CONTRACT — a new world-stream contract, used only when
+    some row carries a demand spec (``model.has_row_demand``); a network with
+    none keeps ``draw_week_demand`` and its contract byte for byte. Weeks are
+    drawn in order 0 … T+τ*−1; within a week, rows are drawn by kind in
+    DemandModel order (deterministic, triangular, poisson, negbin, bootstrap,
+    normal), and within a kind in row order (product-major, then customer).
+    Each row is centred on ``model.row_centre[:, t]``: its forecast, its mean,
+    or its product's mean × share. The draw depends only on settings, network
+    and the world seed — never on the policy portfolio (G-RNG invariance).
+    """
+    centre = model.row_centre[:, t]
+    for model_type, idx in model.row_groups:
+        c = centre[idx]
+        if model_type == DemandModel.TRIANGULAR:
+            shape = model.row_tri[idx]
+            a, b, cc = shape[:, 0] * c, shape[:, 1] * c, shape[:, 2] * c
+            spread = cc > a + 1e-12
+            vals = np.where(spread, 0.0, b)
+            if spread.any():
+                vals[spread] = rng.triangular(a[spread], b[spread], cc[spread])
+            out[idx] = vals
+        elif model_type == DemandModel.DETERMINISTIC:
+            out[idx] = c
+        elif model_type == DemandModel.POISSON:
+            out[idx] = rng.poisson(np.maximum(c, 0.0)).astype(float)
+        elif model_type == DemandModel.NEGBIN:
+            k = model.row_negbin_k[idx]
+            p = k / (k + np.maximum(c, 1e-12))
+            out[idx] = rng.negative_binomial(k, p).astype(float)
+        elif model_type == DemandModel.BOOTSTRAP:
+            for r in idx:
+                j = model.row_prod[r]
+                out[r] = float(rng.choice(model.demand_history[j])) * model.row_share[r]
+        else:  # NORMAL
+            out[idx] = _draw_normal(rng, c, model.row_cv[idx], clips, clip_add, idx)
 
 
 class CostLedger:
@@ -449,6 +712,16 @@ class WeeklyTrace:
     prod_cap_bound: np.ndarray = field(init=False)
     sup_cap_bound: np.ndarray = field(init=False)
     D: Optional[np.ndarray] = None
+    PD: Optional[np.ndarray] = None
+    # WP 14.5 — the MRP record per material (need over the lead time, on hand
+    # after production, on the way, net), allocated by P-P.1 when a run has MRP
+    # materials and keeps matrices.
+    MRP_NEED: Optional[np.ndarray] = None
+    MRP_ON_HAND: Optional[np.ndarray] = None
+    MRP_ON_WAY: Optional[np.ndarray] = None
+    MRP_NET: Optional[np.ndarray] = None
+    REQ: Optional[np.ndarray] = None
+    PLAN: Optional[np.ndarray] = None
     Q: Optional[np.ndarray] = None
     F: Optional[np.ndarray] = None
     B: Optional[np.ndarray] = None
@@ -471,6 +744,11 @@ class WeeklyTrace:
         self.sup_cap_bound = np.zeros((self.n_sups, T))
         if self.keep_matrices:
             self.D = np.zeros((self.n_prods, T))
+            # WP 14.4 — the plan's own record per product: projected demand,
+            # requirement and planned production for the week (inspection only).
+            self.PD = np.zeros((self.n_prods, T))
+            self.REQ = np.zeros((self.n_prods, T))
+            self.PLAN = np.zeros((self.n_prods, T))
             self.Q = np.zeros((self.n_prods, T))
             self.F = np.zeros((self.n_prods, T))
             self.B = np.zeros((self.n_prods, T))
@@ -542,17 +820,65 @@ class SimContext:
         # The schedule depends only on settings + network + world seed, never
         # on the policy portfolio (G-RNG invariance).
         lookahead = model.settings.visibility_horizon
-        self.demand_schedule = np.zeros((model.n_prods, T + lookahead))
-        for t in range(T + lookahead):
-            draw_week_demand(model, streams.demand, self.demand_schedule[:, t])
+        # Clip accounting for normal demand (decision 8) — per row when demand
+        # is drawn per row, else per product; counted over the simulated weeks
+        # only, never the look-ahead tail.
+        n_draw = model.n_rows if model.has_row_demand else model.n_prods
+        self.demand_clips = np.zeros(n_draw, dtype=int)
+        self.demand_clip_add = np.zeros(n_draw)
+        if model.has_row_demand:
+            # Drawn per row (WP 14.1): product demand IS the row sum.
+            self.demand_schedule_rows = np.zeros((model.n_rows, T + lookahead))
+            for t in range(T + lookahead):
+                counted = t < T
+                draw_week_demand_rows(
+                    model, streams.demand, t, self.demand_schedule_rows[:, t],
+                    self.demand_clips if counted else None,
+                    self.demand_clip_add if counted else None)
+            self.demand_schedule = np.asarray(model.row_to_prod @ self.demand_schedule_rows)
+        else:
+            self.demand_schedule_rows = None
+            self.demand_schedule = np.zeros((model.n_prods, T + lookahead))
+            for t in range(T + lookahead):
+                counted = t < T
+                draw_week_demand(model, streams.demand, self.demand_schedule[:, t],
+                                 self.demand_clips if counted else None,
+                                 self.demand_clip_add if counted else None)
 
         # Weekly transients (rebound each week by the engine/mechanics).
         self.week: int = 0
         self.demand = np.zeros(model.n_prods)
+        self.demand_rows = np.zeros(model.n_rows)   # PH-10 (WP 14.1): Σ by product = demand
+        # Per-row fulfillment (WP 14.3). `backlog_rows` is the per-row backlog,
+        # Σ by product = `backlog`: TRACKED when P-C.1 runs per row, otherwise
+        # the product backlog split by row share (a view). The `*_rows`
+        # fulfillment outputs are None unless P-C.1 runs per row.
+        self.backlog_rows = np.zeros(model.n_rows)
+        self.fulfilled_rows: Optional[np.ndarray] = None
+        self.served_new_rows: Optional[np.ndarray] = None
+        self.lost_rows: Optional[np.ndarray] = None
+        # The project's ONE allocation rule and its per-row inputs, published by
+        # P-C.2 at setup (the P-C.6 publish-at-setup pattern); None = no P-C.2.
+        self.row_allocation: Optional[dict] = None
+        # Every row's backorder settings (share that waits, horizon, penalty),
+        # published by P-C.1 at setup (WP 14.4); None = no P-C.1 (lost sales).
+        self.row_fulfillment: Optional[dict] = None
+        # Safety-stock days of cover per material, published by P-P.3 at setup
+        # (WP 14.5); None = no P-P.3, so MRP holds no buffer.
+        self.material_ss_days: Optional[np.ndarray] = None
         self.forecast = model.mean_demand_p.copy()
         self.fg_served_backlog = np.zeros(model.n_prods)  # PH-30 (MTS)
         self.fg_served_new = np.zeros(model.n_prods)
         self.production_plan = np.zeros(model.n_prods)
+        # PH-40 (WP 14.4): planned production over the horizon, [products × H];
+        # column 0 is this week's `production_plan`. The requirement behind each
+        # column and the projected demand it was planned against ride along.
+        H = model.plan_horizon
+        self.planned_production = np.zeros((model.n_prods, H))
+        self.plan_requirement = np.zeros((model.n_prods, H))
+        self.plan_projected_demand = np.zeros((model.n_prods, H))
+        # PH-70 (WP 14.5): BOMᵀ × planned production, [materials × H].
+        self.gross_requirements = np.zeros((model.n_mats, H))
         self.overtime_extra = np.zeros(model.n_prods)
         self.production_output = np.zeros(model.n_prods)
         self.fulfillment = np.zeros(model.n_prods)
@@ -619,6 +945,10 @@ class SimContext:
                 mask[e.supplier_idx] = True
         return mask
 
+    def write_gross_requirements(self, gr: np.ndarray) -> None:
+        self._check_write(GROSS_REQUIREMENTS)
+        self.gross_requirements = gr
+
     def pipeline_on_order(self) -> np.ndarray:
         """Per-material in-transit + supplier-queue quantities (position input)."""
         per_link = self.pipeline.sum(axis=1) + self.queue
@@ -633,6 +963,24 @@ class SimContext:
             slots = np.arange(start_week, end_week) % W
             per_link = self.pipeline[:, slots].sum(axis=1)
         return np.asarray(self.model.link_to_mat @ per_link).ravel()
+
+    def projected_demand_rows(self, start_week: int, weeks: int) -> np.ndarray:
+        """The PLAN's view of demand per customer × product row, weeks
+        ``start_week … start_week + weeks − 1`` → ``[rows × weeks]``.
+
+        Each value is the row's forecast for that week, else its mean, else
+        its product's mean × share — the centre the world draws around, never
+        the draw itself. It reads the COMPILED model only, so no planner can
+        learn a realized future demand through it (gate ``plan-from-demand``;
+        ``tests/test_demand_rows.py`` perturbs the drawn schedule to prove it).
+        """
+        cols = np.clip(np.arange(start_week, start_week + weeks), 0,
+                       self.model.row_centre.shape[1] - 1)
+        return self.model.row_centre[:, cols]
+
+    def projected_demand(self, start_week: int, weeks: int) -> np.ndarray:
+        """``projected_demand_rows`` summed per product → ``[products × weeks]``."""
+        return np.asarray(self.model.row_to_prod @ self.projected_demand_rows(start_week, weeks))
 
     def forward_material_demand(self, start_week: int, cover_weeks) -> np.ndarray:
         """Per-material forward-visible demand summed INCLUSIVELY over
@@ -697,9 +1045,14 @@ class SimContext:
         self.pipeline[link_idx, src] -= take
         self.pipeline[link_idx, dst] += take
 
-    def set_backlog(self, backlog: np.ndarray) -> None:
+    def set_backlog(self, backlog: np.ndarray, rows: Optional[np.ndarray] = None) -> None:
+        """Product backlog; ``rows`` is the per-row backlog when P-C.1 tracks it
+        (WP 14.3), else the rows are the product backlog split by share."""
         self._check_write(ST_BACKLOG)
         self.backlog = np.maximum(backlog, 0.0)
+        m = self.model
+        self.backlog_rows = (np.maximum(rows, 0.0) if rows is not None
+                             else self.backlog[m.row_prod] * m.row_share)
 
     def write_fg_target(self, target: np.ndarray) -> None:
         """S^FG_p — MTS stock target, consumed by next week's PH-40 (ADR 0001)."""
@@ -720,3 +1073,13 @@ class SimContext:
         self.fulfillment = fulfilled
         self.served_new_week = np.clip(served_new, 0.0, None)
         self.lost_units_week = np.maximum(lost_units, 0.0)
+
+    def write_fulfillment_rows(
+        self, fulfilled: np.ndarray, served_new: np.ndarray, lost_units: np.ndarray
+    ) -> None:
+        """Per customer × product row (WP 14.3): Σ by product equals what
+        ``write_fulfillment`` wrote. Same contract key, same single writer."""
+        self._check_write(FULFILLMENT)
+        self.fulfilled_rows = np.maximum(fulfilled, 0.0)
+        self.served_new_rows = np.clip(served_new, 0.0, None)
+        self.lost_rows = np.maximum(lost_units, 0.0)

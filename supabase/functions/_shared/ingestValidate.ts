@@ -162,6 +162,21 @@ function validateCell(
       return { value: trimmed.toLowerCase() };
     }
 
+    case "date": {
+      // ISO calendar date only (PLAN.md §24 WP 14.2: a forecast period's start).
+      // "3/4/2026" means two different days in two locales, so it is reported
+      // rather than guessed at; so is a date the calendar does not have.
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+      const d = m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+      if (!m || !d || d.getUTCFullYear() !== +m[1] || d.getUTCMonth() !== +m[2] - 1 || d.getUTCDate() !== +m[3]) {
+        return { finding: {
+          level: "error", field: column.csvHeader, code: "not_a_date", row: line,
+          message: `${where}: "${trimmed}" is not a calendar date written YYYY-MM-DD.`,
+        } };
+      }
+      return { value: trimmed };
+    }
+
     case "boolean": {
       const t = trimmed.toLowerCase();
       if (["true", "1", "yes", "y"].includes(t)) return { value: "true" };

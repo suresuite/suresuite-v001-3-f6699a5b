@@ -8,6 +8,7 @@ See docs/data-simulation-mapping.md.
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import TYPE_CHECKING, Any, Optional
 
 log = logging.getLogger(__name__)
@@ -33,6 +34,61 @@ def _num(v: Any) -> Optional[float]:
         return float(v) if v is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _date(v: Any) -> Optional[date]:
+    try:
+        return date.fromisoformat(str(v)[:10]) if v else None
+    except ValueError:
+        return None
+
+
+def forecast_series(rows: list[dict]) -> dict[tuple[str, str], list[float]]:
+    """``demand_forecasts`` buckets → one WEEKLY series per (product, customer).
+
+    PLAN.md §24 WP 14.2 (design doc §9, point 4). Each tier-2 bucket already
+    states its weekly rate (``weekly_quantity``, spread over its own days at
+    promotion — decision 7) and its exclusive ``period_end``, so nothing here
+    converts a unit. What it decides is the CALENDAR:
+
+    * simulated week 0 starts on the project's EARLIEST ``period_start`` — one
+      calendar for every row, so two customers' weeks line up;
+    * simulated week w is the seven days starting 7·w days later, and its value
+      is the sum, over those days, of each covering bucket's daily rate
+      (``weekly_quantity / 7``) — a week straddling two months takes some of
+      each, so the spread stays even across the boundary;
+    * a row's series runs to the last week that lies WHOLLY before its last
+      bucket's end; past it, the engine uses the row's mean, else its last value
+      (WP 14.1). A day no bucket covers contributes nothing.
+    """
+    parsed = []
+    for r in rows:
+        start, end = _date(r.get("period_start")), _date(r.get("period_end"))
+        wq = _num(r.get("weekly_quantity"))
+        if not (r.get("product_id") and r.get("customer_id") and start and end and wq is not None):
+            continue
+        parsed.append((str(r["product_id"]), str(r["customer_id"]), start, end, wq))
+    if not parsed:
+        return {}
+    anchor = min(p[2] for p in parsed)
+    by_row: dict[tuple[str, str], list[tuple[int, int, float]]] = {}
+    for pid, cid, start, end, wq in parsed:
+        by_row.setdefault((pid, cid), []).append(
+            ((start - anchor).days, (end - anchor).days, wq))
+    out: dict[tuple[str, str], list[float]] = {}
+    for key, buckets in sorted(by_row.items()):
+        weeks = max(b[1] for b in buckets) // 7
+        series = [0.0] * weeks
+        for d0, d1, wq in buckets:
+            for w in range(max(d0, 0) // 7, min((d1 + 6) // 7, weeks)):
+                days = min(d1, 7 * w + 7) - max(d0, 7 * w)
+                if days > 0:
+                    # A whole week inside one bucket is the bucket's weekly rate,
+                    # exactly; a partial week takes its share of days.
+                    series[w] += wq if days == 7 else wq * days / 7.0
+        if weeks:
+            out[key] = series
+    return out
 
 
 def _flatten_multi_level_bom(rows: list[dict]) -> list[dict]:
@@ -93,7 +149,11 @@ def build_project_data(
     scenario: dict,
     project_model: Optional[str],
     customers: Optional[list[dict]] = None,
+    demand_forecasts: Optional[list[dict]] = None,
 ) -> ProjectData:
+    forecasts = forecast_series(demand_forecasts or [])
+    arc_keys = {(str(r["product_id"]), str(r["customer_id"]))
+                for r in outbound if r.get("product_id") and r.get("customer_id")}
     return ProjectData(
         suppliers=[
             SupplierRow(
@@ -123,6 +183,12 @@ def build_project_data(
                 demand_distribution=r.get("demand_distribution"),
                 demand_mean=_num(r.get("demand_mean")), demand_cv=_num(r.get("demand_cv")),
                 demand_min=_num(r.get("demand_min")), demand_max=_num(r.get("demand_max")),
+                # WP 14.4 — the FG policy and levels (MTS), and FG opening stock.
+                fg_policy=r.get("fg_policy"),
+                fg_base_stock=_num(r.get("fg_base_stock")),
+                fg_reorder_point=_num(r.get("fg_reorder_point")),
+                fg_cover_days=_num(r.get("fg_cover_days")),
+                fg_initial_on_hand=_num(r.get("fg_initial_on_hand")),
             )
             for r in products if r.get("product_id")
         ],
@@ -157,8 +223,20 @@ def build_project_data(
                 product_id=str(r["product_id"]), customer_id=str(r["customer_id"]),
                 unit_price=_num(r.get("unit_price")), volume=_num(r.get("volume")),
                 time_unit=r.get("time_unit"),
+                # WP 14.2 — the row's own demand spec and its forecast series.
+                demand_distribution=r.get("demand_distribution"),
+                demand_mean=_num(r.get("demand_mean")),
+                demand_variation=_num(r.get("demand_variation")),
+                demand_min=_num(r.get("demand_min")),
+                demand_max=_num(r.get("demand_max")),
+                forecast=forecasts.get((str(r["product_id"]), str(r["customer_id"]))),
             )
             for r in outbound if r.get("product_id") and r.get("customer_id")
+        ] + [
+            # A forecast for a customer × product no outbound row names is still
+            # that row's demand: it becomes an arc with no volume of its own.
+            OutboundArc(product_id=pid, customer_id=cid, forecast=series)
+            for (pid, cid), series in sorted(forecasts.items()) if (pid, cid) not in arc_keys
         ],
         # §4 D69 — the `customers` table was fetched by nothing, so every customer
         # reached the engine with `segment="default"` and `priority_weight=1.0`.
@@ -169,6 +247,9 @@ def build_project_data(
                 id=str(r["customer_id"]), name=r.get("name"),
                 segment=r.get("segment"),
                 priority_weight=_num(r.get("priority_weight")),
+                # WP 14.3 — the customer's contracted floor, its rows' default
+                # service target under sla_tier. Null = no floor, never 0.
+                sla_fill_floor_pct=_num(r.get("sla_fill_floor_pct")),
             )
             for r in (customers or []) if r.get("customer_id")
         ],
@@ -295,7 +376,19 @@ async def load_project_data(
             "supplier_id,material_id,unit_price,lead_time,lead_time_unit,time_unit,volume",
         ),
         bom=bom,
-        outbound=await rows("outbound_logistics", "product_id,customer_id,unit_price,volume,time_unit"),
+        # One string literal, not two concatenated: `dataMapContract.test.ts` and
+        # `graphHashCoverage.test.ts` parse this projection to prove every column
+        # the run reads is mapped and hashed.
+        outbound=await rows(
+            "outbound_logistics",
+            "product_id,customer_id,unit_price,volume,time_unit,demand_distribution,demand_mean,demand_variation,demand_min,demand_max",
+        ),
+        # WP 14.2 — the per-row forecast buckets, already spread to a weekly rate
+        # at promotion (decision 7); `forecast_series` lays them on the run's weeks.
+        demand_forecasts=await rows(
+            "demand_forecasts",
+            "customer_id,product_id,period_start,period_end,weekly_quantity",
+        ),
         # §4 D69 — nothing fetched this table, so P-C.2's `priority` ordering and
         # its per-segment `sla_tiers` were inert on every project. Columns are
         # named explicitly for the same reason D9 gives above, and the names are
@@ -304,7 +397,7 @@ async def load_project_data(
         # would leave every customer on the engine defaults and look exactly
         # like the defect being fixed. `sla_fill_floor_pct` is not selected —
         # `Customer` has no field for it (§16).
-        customers=await rows("customers", "customer_id,name,segment,priority_weight"),
+        customers=await rows("customers", "customer_id,name,segment,priority_weight,sla_fill_floor_pct"),
         policies=policies,
         scenario=scenario,
         project_model=project_model,

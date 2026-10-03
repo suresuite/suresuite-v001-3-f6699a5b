@@ -19,6 +19,7 @@ every fallback is recorded as a warning.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal, Optional
 
@@ -146,6 +147,12 @@ class ProductRow:
     # reaches the engine. Ignored for non-triangular demand kinds.
     demand_min: Optional[float] = None         # a_p (master); else b·(1−cv)
     demand_max: Optional[float] = None         # c_p (master); else b·(1+cv)
+    # FG inventory policy, MTS only (PLAN.md §24 WP 14.4, design doc §3.2).
+    fg_policy: Optional[str] = None            # base_stock | min_max | days_of_cover
+    fg_base_stock: Optional[float] = None      # S (units)
+    fg_reorder_point: Optional[float] = None   # s (units), min_max
+    fg_cover_days: Optional[float] = None      # D (days), days_of_cover
+    fg_initial_on_hand: Optional[float] = None  # FG opening stock (units), RFC 4
 
 
 @dataclass
@@ -174,12 +181,27 @@ class BomArc:
 
 @dataclass
 class OutboundArc:
-    """outbound_logistics row: product → customer (demand + price fallback)."""
+    """outbound_logistics row: product → customer (demand + price fallback).
+
+    The ``demand_*`` fields and ``forecast`` are the row's own demand spec
+    (WP 14.1, ADR 0002 decision 2). All optional: a row that sets none keeps
+    today's behaviour — its product's distribution, scaled by its volume share.
+    ``demand_mean`` / ``demand_min`` / ``demand_max`` are rates in the row's
+    ``time_unit`` (like ``volume``); ``forecast`` is already weekly, one value
+    per simulated week from week 0. ``demand_variation`` is read by the
+    distribution: a CV for ``normal``, the ± fraction for ``triangular_av``.
+    """
     product_id: str
     customer_id: str
     unit_price: Optional[float] = None
     volume: Optional[float] = None
     time_unit: Optional[str] = None
+    demand_distribution: Optional[str] = None
+    demand_mean: Optional[float] = None
+    demand_variation: Optional[float] = None
+    demand_min: Optional[float] = None
+    demand_max: Optional[float] = None
+    forecast: Optional[list[float]] = None
 
 
 @dataclass
@@ -201,16 +223,19 @@ class CustomerRow:
     put demand-less customers into `len(net.customers)`, which P-C.2's own
     feasibility check reads.
 
-    ``sla_fill_floor_pct`` is deliberately absent: the column exists on the table
-    and ``Customer`` has no field for it, so there is nothing to carry it into.
-    Mapping a per-customer floor onto P-C.2's per-SEGMENT ``sla_tiers`` needs a
-    rule for what happens when two customers in one segment disagree, and
-    inventing that rule is not a reader change (§16).
+    ``sla_fill_floor_pct`` is read since WP 14.3 (PLAN.md §24): the floor is
+    per CUSTOMER × PRODUCT ROW now, not per segment, so a customer's contracted
+    floor is the default service target of each of its rows under ``sla_tier``
+    (``Customer.sla_fill_floor_pct``), and the segment's ``sla_tiers`` floor
+    applies only where it is empty. The question that kept it out — two
+    customers of one segment disagreeing — has no answer to invent when the
+    floor belongs to the row.
     """
     id: str
     name: Optional[str] = None
     segment: Optional[str] = None
     priority_weight: Optional[float] = None
+    sla_fill_floor_pct: Optional[float] = None
 
 
 @dataclass
@@ -332,6 +357,14 @@ class MappingResult:
 # `products.production_capacity` (§4 D167) — which since WP 13.1 is present when
 # the master OR the Plant-stage override of it carries a value.
 #
+# `customer` (PLAN.md §24 WP 14.2) is a Customer-stage row, `node:<customer>::<product>`.
+# From WP 14.2 to WP 14.4 the seven production-family keys declared it too, because
+# `_composite_patches` resolved ANY `node:<x>::<product>` key to the product, so a
+# production patch on a Customer row reached the product. WP 14.4 closed that reach
+# (`exclude=` the existing Customer rows) when its five FG keys would have had to
+# declare the same false scope; the probe that found it is
+# `test_declared_scopes_are_the_scopes_the_mapper_reads` (§16 · WP 14.2, WP 14.4).
+#
 # `scopes` is REQUIRED (§23 WP 13.4, §4 D204 b): WHERE the mapper reads the key —
 # `default` (the project-wide policy), `supplier` (a Supplier-stage row,
 # `node:<supplier>::<material>`), `plant` (a Plant-stage row,
@@ -367,8 +400,8 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "target": "inventory_control.policy_type",
         "catalog_ref": "P-X.1",
         "transform": "enum map — min_max/s_S/continuous_review -> min_max, base_stock -> "
-                     "base_stock, rop -> rop_q, periodic_review -> periodic; anything "
-                     "unrecognised falls back to min_max",
+                     "base_stock, rop -> rop_q, periodic_review -> periodic, mrp -> mrp (WP "
+                     "14.5: ordered from the plan); anything unrecognised falls back to min_max",
     },
     {
         "key": "safety_stock_days",
@@ -670,6 +703,253 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
                      "only; dropped with a warning when it does not exceed the row's "
                      "reorder point. Not read at default scope",
     },
+    # ── Demand per customer × product row (PLAN.md §24 WP 14.2, D284 b) ─────
+    # The Customer stage's demand cells. Each is an OVERRIDE of the row's
+    # uploaded spec on `outbound_logistics` (`master`), read from the Customer
+    # row's key `node:<customer>::<product>` (`rows: customer`) — the same
+    # override → data → default order as every master-backed cell. Rates are
+    # weekly (the grid shows units/wk); the data's rates are weekly after
+    # promotion. A project that sets none of them maps exactly as before.
+    {
+        # NOT a master override: the mode is DERIVED from the data (a row with an
+        # uploaded series plans on it), so there is no column to override.
+        "key": "row_demand_mode",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.forecast",
+        "catalog_ref": "P-C.4",
+        "transform": "empty = the engine's rule (forecast when the row has an uploaded "
+                     "series, else model). Enum — 'model' plans and draws on the row's mean even when a forecast "
+                     "series is uploaded (the series is set aside); 'forecast' uses the "
+                     "series and is warned and ignored when the row has none",
+    },
+    {
+        "key": "row_demand_distribution",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_model",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_distribution",
+        "rows": "customer",
+        "domain": "distribution",
+        "empty_default": None,
+        "empty_note": "the product's distribution, scaled by the row's volume share",
+        "transform": "enum deterministic | normal | triangular | triangular_av | poisson. "
+                     "Order: the Customer-stage row -> outbound_logistics.demand_distribution "
+                     "-> the product's distribution × share",
+    },
+    {
+        "key": "row_demand_mean",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_mean",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_mean",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "the product's mean × the row's volume share",
+        "transform": "units per week, >= 0 (the mode for triangular). Order: the "
+                     "Customer-stage row -> outbound_logistics.demand_mean (weekly after "
+                     "promotion)",
+    },
+    {
+        "key": "row_demand_variation",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_variation",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_variation",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — the distribution needs no variation, or the row is not specified",
+        "transform": "read by the distribution: CV for normal, ± fraction for "
+                     "triangular_av. Order: the Customer-stage row -> "
+                     "outbound_logistics.demand_variation",
+    },
+    {
+        "key": "row_demand_min",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_min",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_min",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular rows need it",
+        "transform": "units per week, triangular only. Order: the Customer-stage row -> "
+                     "outbound_logistics.demand_min",
+    },
+    {
+        "key": "row_demand_max",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_max",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_max",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular rows need it",
+        "transform": "units per week, triangular only. Order: the Customer-stage row -> "
+                     "outbound_logistics.demand_max",
+    },
+    # ── FG inventory policy per product, MTS (PLAN.md §24 WP 14.4, D284 d) ──
+    # Plant-stage rows (`node:<plant>::<product>`, family `production`) over the
+    # `products` master. ONE SOURCE PER NUMBER: a typed level IS the target and
+    # P-P.4 adds nothing on top. Read for an MTS product only.
+    {
+        "key": "fg_policy",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_policy",
+        "catalog_ref": None,
+        "master": "products.fg_policy",
+        "rows": "plant",
+        "domain": "fg_policy",
+        "empty_default": None,
+        "empty_note": "base_stock",
+        "transform": "enum — base_stock (S) · min_max (s, S) · days_of_cover (D). Order: the "
+                     "Plant-stage row -> products.fg_policy -> base_stock. An incomplete min_max "
+                     "or days_of_cover runs as base_stock, warned. MTS only",
+    },
+    {
+        "key": "fg_base_stock",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_base_stock",
+        "catalog_ref": None,
+        "master": "products.fg_base_stock",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "derived: one week of forecast, plus P-P.4's buffer when it is on",
+        "transform": "units, >= 0: S, the end-of-week FG target (base_stock, min_max). Order: "
+                     "the Plant-stage row -> products.fg_base_stock -> derived. MTS only",
+    },
+    {
+        "key": "fg_reorder_point",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_reorder_point",
+        "catalog_ref": None,
+        "master": "products.fg_reorder_point",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — read by min_max only",
+        "transform": "units, >= 0: s — min_max builds up to S only when the stock left after "
+                     "the week's demand is below s. MTS only",
+    },
+    {
+        "key": "fg_cover_days",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_cover_days",
+        "catalog_ref": None,
+        "master": "products.fg_cover_days",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — read by days_of_cover only",
+        "transform": "days, >= 0: D — the target is D/7 x the projected weekly demand, so it "
+                     "moves with the forecast. MTS only",
+    },
+    {
+        "key": "fg_initial_on_hand",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_initial_on_hand",
+        "catalog_ref": None,
+        "master": "products.fg_initial_on_hand",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "the policy target — the run starts at it",
+        "transform": "units, >= 0: FG opening stock (engine RFC 4). Order: the Plant-stage row "
+                     "-> products.fg_initial_on_hand -> the target. MTS only",
+    },
+    # ── Per-row fulfillment (PLAN.md §24 WP 14.3, D284 c) ───────────────────
+    # Backorder, its window and cost are read at the project default AND on a
+    # Customer row (`node:<customer>::<product>`, an existing row only); a row
+    # that names any of them gets all three resolved row → project → default,
+    # so the engine never falls to a parameter default the page does not show.
+    # The allocation RULE stays one per project (decision 4); the row's
+    # priority, price and service target are what that rule reads per row.
+    {
+        "key": "backorder_allowed",
+        "scopes": ("default", "customer"),
+        "family": "fulfillment",
+        "target": "unmet_demand_handling.rule / row_overrides[row].backorder_allowed",
+        "catalog_ref": "P-C.1",
+        "transform": "boolean. Project: backorder (else lost_sales). Row: whether this "
+                     "customer × product row waits; empty = the project's setting",
+    },
+    {
+        "key": "max_backorder_days",
+        "scopes": ("default", "customer"),
+        "family": "fulfillment",
+        "target": "unmet_demand_handling.backorder_horizon / row_overrides[row].backorder_horizon",
+        "catalog_ref": "P-C.1",
+        "transform": "days -> whole weeks rounded HALF UP (3 -> 0, 4 -> 1, 10 -> 1, 11 -> 2), "
+                     "clamped 0-26; empty = the project's, else 14 days. Read only for a "
+                     "project or row that backorders",
+    },
+    {
+        "key": "backorder_cost_per_day",
+        "scopes": ("default", "customer"),
+        "family": "fulfillment",
+        "target": "unmet_demand_handling.backorder_penalty / row_overrides[row].backorder_penalty",
+        "catalog_ref": "P-C.1",
+        "transform": "per unit per day x 7 -> per unit per week; empty = the project's, else 0. "
+                     "Read only for a project or row that backorders",
+    },
+    {
+        "key": "row_priority",
+        "scopes": ("customer",),
+        "family": "fulfillment",
+        "target": "customer_allocation.row_priority",
+        "catalog_ref": None,
+        "master": "customers.priority_weight",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": 1.0,
+        "transform": "weight, >= 0; higher serves first. Order: the Customer-stage row -> "
+                     "customers.priority_weight of the row's customer -> 1.0. Read under the "
+                     "priority and sla_tier rules",
+    },
+    {
+        "key": "price",
+        "scopes": ("customer",),
+        "family": "fulfillment",
+        "target": "CustomerLink.unit_price",
+        "catalog_ref": None,
+        "master": "outbound_logistics.unit_price",
+        "rows": "customer",
+        "domain": "positive",
+        "empty_default": None,
+        "empty_note": "the product's sell price",
+        "transform": "per unit, > 0. Order: the Customer-stage row -> outbound_logistics."
+                     "unit_price -> the product's sell price. What revenue_max orders rows by "
+                     "and what values a row's fill rate",
+    },
+    {
+        "key": "sla_fill_floor_pct",
+        "scopes": ("customer",),
+        "family": "fulfillment",
+        "target": "customer_allocation.row_floor_pct",
+        "catalog_ref": None,
+        "master": "customers.sla_fill_floor_pct",
+        "rows": "customer",
+        "domain": "percent",
+        "empty_default": None,
+        "empty_note": "no contracted floor — the segment's tier floor applies, else none",
+        "transform": "% of the row's demand guaranteed first, 0-100. Order: the Customer-stage "
+                     "row -> customers.sla_fill_floor_pct of the row's customer -> the "
+                     "segment's tier floor. Read under the sla_tier rule",
+    },
 )
 
 
@@ -859,9 +1139,14 @@ class _SourceTally:
         self.counts: dict[str, dict[str, int]] = {}
         self.by_entity: dict[str, dict[str, dict[str, Any]]] = {}
 
-    def add(self, field: str, source: str, entity: Optional[str] = None) -> None:
-        row = self.counts.setdefault(field, {})
-        row[source] = row.get(source, 0) + 1
+    def add(self, field: str, source: str, entity: Optional[str] = None,
+            count: bool = True) -> None:
+        """``count=False`` records the entity's answer (page-equals-run) without
+        a run-log line — for a value the run does not use, so a project that
+        sets none of a feature logs exactly as before it existed."""
+        if count:
+            row = self.counts.setdefault(field, {})
+            row[source] = row.get(source, 0) + 1
         if entity is not None:
             self.by_entity.setdefault(field, {})[entity] = {"source": source}
 
@@ -895,6 +1180,8 @@ def _override_num(
         ok = ok and n > 0
     elif domain == "fraction":
         ok = ok and n <= 1.0
+    elif domain == "percent":
+        ok = ok and n <= 100.0
     if not ok:
         w.append(MappingWarning(
             "warn", entity, field,
@@ -984,6 +1271,7 @@ def _composite_target(key_body: str, targets: set[str]) -> Optional[str]:
 
 def _composite_patches(
     policies: dict, family: str, targets: set[str], w: list[MappingWarning],
+    exclude: frozenset[str] = frozenset(),
 ) -> dict[str, dict]:
     """Index ``node:<owner>::<target>`` patches of ``family`` by their target.
 
@@ -1002,6 +1290,10 @@ def _composite_patches(
     out: dict[str, dict] = {}
     for key in sorted(k for k in policies if isinstance(k, str)):
         if not key.startswith("node:") or "::" not in key:
+            continue
+        # A Customer row `<customer>::<product>` is not the product's row (WP
+        # 14.4 closed the reach WP 14.2 found): its patches are the row's own.
+        if key[len("node:"):] in exclude:
             continue
         target = _composite_target(key[len("node:"):], targets)
         if target is None:
@@ -1061,15 +1353,88 @@ def _negbin_k(mean: float, cv: float) -> float:
     return max(1e-3, mean * mean / (var - mean))
 
 
+_FG_POLICIES = ("base_stock", "min_max", "days_of_cover")
+
+
+def _resolve_fg(
+    pid: str, master: ProductRow, prod_row: dict, overrides: dict[str, Optional[float]],
+    tally: "_SourceTally", w: list[MappingWarning],
+) -> dict[str, Any]:
+    """The product's FG policy and levels (WP 14.4): the Plant-stage row's
+    override → the products master → the engine default (base-stock, derived S,
+    start at the target). Recorded for page-equals-run for every product; the
+    engine receives them for an MTS product only.
+
+    An incomplete policy (min-max without s or S, s ≥ S; days of cover without
+    D) is NOT a crash: the product runs base-stock with whatever S it has, and
+    the run says so — the pre-run check is where such a row should be caught.
+    """
+    ent = f"product:{pid}"
+    out: dict[str, Any] = {}
+    for field in ("fg_base_stock", "fg_reorder_point", "fg_cover_days", "fg_initial_on_hand"):
+        ov = overrides.get(field)
+        mv = getattr(master, field)
+        if ov is not None:
+            out[field] = ov
+            tally.add(f"products.{field}", "override", pid, count=True)
+        elif mv is not None:
+            out[field] = float(mv)
+            tally.add(f"products.{field}", "master", pid, count=True)
+        else:
+            out[field] = None
+            tally.add(f"products.{field}", "default", pid, count=False)
+        tally.value(f"products.{field}", pid, out[field])
+    raw = prod_row.get("fg_policy")
+    token = str(raw).strip().lower() if raw not in (None, "") else None
+    if token is not None and token not in _FG_POLICIES:
+        w.append(MappingWarning("warn", ent, "fg_policy",
+                                f"/policies override {raw!r} is not an FG policy — ignored, "
+                                f"the item master decides"))
+        token = None
+    if token is not None:
+        policy, src = token, "override"
+    elif master.fg_policy:
+        policy, src = str(master.fg_policy).strip().lower(), "master"
+        if policy not in _FG_POLICIES:
+            w.append(MappingWarning("warn", ent, "fg_policy",
+                                    f"products.fg_policy {master.fg_policy!r} is not an FG policy "
+                                    f"→ base_stock"))
+            policy = "base_stock"
+    else:
+        policy, src = "base_stock", "default"
+    tally.add("products.fg_policy", src, pid, count=src != "default")
+    if policy == "min_max" and not (
+            out["fg_base_stock"] is not None and out["fg_reorder_point"] is not None
+            and out["fg_reorder_point"] < out["fg_base_stock"]):
+        w.append(MappingWarning("warn", ent, "fg_policy",
+                                "min_max needs s (fg_reorder_point) below S (fg_base_stock) — "
+                                "run as base_stock"))
+        policy = "base_stock"
+    if policy == "days_of_cover" and out["fg_cover_days"] is None:
+        w.append(MappingWarning("warn", ent, "fg_policy",
+                                "days_of_cover needs D (fg_cover_days) — run as base_stock"))
+        policy = "base_stock"
+    tally.value("products.fg_policy", pid, policy)
+    out["fg_policy"] = policy
+    return out
+
+
 def _build_product(
     row: ProductRow, *, price: float, capacity: float, mode: FulfillmentMode,
     mean: float, cv: float, kind: str, warnings: list[MappingWarning],
+    fg: Optional[dict[str, Any]] = None,
 ) -> Product:
     common = dict(
         id=row.id, name=str(row.name or row.id),
         unit_price=max(price, 1e-9), production_capacity=max(capacity, 1e-6),
         fulfillment_mode=mode,
     )
+    # FG policy and levels reach an MTS product only (WP 14.4); an MTO product
+    # holds no FG stock. A product that sets none keeps the entity defaults.
+    if fg and mode == FulfillmentMode.MTS:
+        common.update({k: v for k, v in fg.items() if v is not None and k != "fg_policy"})
+        if fg.get("fg_policy") and fg["fg_policy"] != "base_stock":
+            common["fg_policy"] = fg["fg_policy"]
     if kind in ("triangular", "triangular_av", "triangularav", ""):
         a, b, c = triangular_av(max(mean, 0.0), max(cv, 0.0))
         # Master-supplied explicit bounds win over the symmetric AV form
@@ -1098,12 +1463,235 @@ def _build_product(
     if kind == "negbin":
         return Product(demand_model=DemandModel.NEGBIN, demand_mode=mean,
                        negbin_dispersion=_negbin_k(mean, cv), **common)
+    if kind == "normal":
+        # A REAL normal since WP 14.1 (ADR 0002 decision 8; §4 D284 (b)). Before
+        # it, `normal` ran as triangularAV with demand_cv as its ± fraction.
+        warnings.append(MappingWarning(
+            "info", f"product:{row.id}", "demand_distribution",
+            f"normal demand: demand_cv {cv:g} is the coefficient of variation "
+            f"(σ = {cv:g} × {mean:g} = {cv * mean:g}/wk); negative draws are set to 0 and the "
+            f"run reports how many (for triangular, demand_cv is the ± fraction instead)"))
+        return Product(demand_model=DemandModel.NORMAL, demand_mode=max(mean, 0.0),
+                       demand_cv=max(cv, 0.0), **common)
     # bootstrap (needs history we don't have) / unknown → triangularAV fallback
     warnings.append(MappingWarning("warn", f"product:{row.id}", "demand_distribution",
-                                   f"demand kind {kind!r} unsupported here — using triangularAV"))
+                                   f"demand kind {kind!r} unsupported here — using triangularAV "
+                                   f"with demand_cv {cv:g} as its ± fraction"))
     a, b, c = triangular_av(max(mean, 0.0), max(cv, 0.0))
     return Product(demand_model=DemandModel.TRIANGULAR,
                    demand_mode=b, demand_min=a, demand_max=c, **common)
+
+
+# ── Demand per customer × product row (WP 14.1) ──────────────────────────────
+
+_ROW_KIND = {
+    "deterministic": "deterministic", "normal": "normal", "poisson": "poisson",
+    "triangular": "triangular",
+    "triangular_av": "triangular_av", "triangularav": "triangular_av",
+}
+
+
+def _row_demand_spec(o: OutboundArc, w: list[MappingWarning]) -> Optional[dict[str, Any]]:
+    """The CustomerLink demand fields an outbound row carries, normalized to
+    weeks — or None when it carries none (today's behaviour for the row)."""
+    ent = f"customer_row:{o.customer_id}::{o.product_id}"
+    raw_kind = (o.demand_distribution or "").strip().lower().replace("-", "_").replace(" ", "_")
+    has_any = raw_kind or o.forecast or any(
+        v is not None for v in (o.demand_mean, o.demand_variation, o.demand_min, o.demand_max))
+    if not has_any:
+        return None
+    spec: dict[str, Any] = {}
+    if raw_kind:
+        kind = _ROW_KIND.get(raw_kind)
+        if kind is None:
+            w.append(MappingWarning(
+                "warn", ent, "demand_distribution",
+                f"row demand distribution {o.demand_distribution!r} is not one of "
+                f"{sorted(set(_ROW_KIND.values()))} — the row keeps its product's distribution"))
+            return None
+        spec["demand_model"] = kind
+    elif o.forecast:
+        spec["demand_model"] = "deterministic"
+    for f in ("demand_mean", "demand_min", "demand_max"):
+        v = getattr(o, f)
+        if v is not None:
+            spec[f] = _rate_to_weekly(float(v), o.time_unit)
+    if o.demand_variation is not None:
+        spec["demand_variation"] = float(o.demand_variation)
+    if o.forecast:
+        spec["forecast"] = [float(x) for x in o.forecast]
+    return spec
+
+
+def _customer_links(cust_share: dict[tuple[str, str], float],
+                    row_spec: dict[tuple[str, str], dict[str, Any]],
+                    prod_ids: set[str], w: list[MappingWarning]) -> list[CustomerLink]:
+    """One CustomerLink per (product, customer) with volume or a demand spec.
+
+    A spec the engine rejects (a distribution missing a parameter it needs)
+    is dropped WITH a warning and the row keeps its product's distribution —
+    the pre-run gate blocks such a row before a run is dispatched (WP 14.2).
+    """
+    out: list[CustomerLink] = []
+    for key in sorted(set(cust_share) | set(row_spec)):
+        pid, cid = key
+        if pid not in prod_ids:
+            continue
+        spec = row_spec.get(key)
+        share = cust_share.get(key, 0.0)
+        if share <= 0 and spec is not None:
+            fc = spec.get("forecast") or []
+            share = spec.get("demand_mean") or (sum(fc) / len(fc) if fc else 0.0) or 1.0
+        if share <= 0:
+            continue
+        if spec is not None:
+            try:
+                out.append(CustomerLink(product_id=pid, customer_id=cid, share=share, **spec))
+                continue
+            except ValueError as exc:
+                errs = getattr(exc, "errors", None)
+                msg = (errs()[0]["msg"] if callable(errs) else str(exc)).removeprefix("Value error, ")
+                w.append(MappingWarning(
+                    "warn", f"customer_row:{cid}::{pid}", "demand_distribution",
+                    f"row demand spec not applied ({msg.strip()}) — the row keeps its "
+                    f"product's distribution"))
+        out.append(CustomerLink(product_id=pid, customer_id=cid, share=share))
+    return out
+
+
+# The Customer-row override keys (POLICY_BUNDLE_KEYS, `rows: customer`) and the
+# CustomerLink field each one sets.
+_ROW_OVERRIDE_FIELD = {
+    "row_demand_distribution": "demand_model",
+    "row_demand_mean": "demand_mean",
+    "row_demand_variation": "demand_variation",
+    "row_demand_min": "demand_min",
+    "row_demand_max": "demand_max",
+}
+# `MappingResult.resolved` field name → the spec field it reports.
+_ROW_RESOLVED = {
+    "outbound_logistics.demand_distribution": "demand_model",
+    "outbound_logistics.demand_mean": "demand_mean",
+    "outbound_logistics.demand_variation": "demand_variation",
+    "outbound_logistics.demand_min": "demand_min",
+    "outbound_logistics.demand_max": "demand_max",
+}
+
+
+def _tally_row_allocation(
+    tally: "_SourceTally", row_keys: frozenset[str], row_priority: dict[str, float],
+    row_floor: dict[str, float], masters: dict[str, dict[str, Any]],
+    rule: Optional[str] = None,
+) -> None:
+    """The Customer row's priority and service target as the engine resolves
+    them (page-equals-run, WP 14.3): the row's override → its customer's master
+    value → the engine default (priority 1.0; no floor, so the segment's tier
+    floor applies). Recorded per ROW, whatever the rule — the grid shows the
+    column only under a rule that reads it, and the cell must still be honest.
+    Counted in the run log only under the rule that reads the value."""
+    cp = rule in ("priority", "sla_tier")
+    cf = rule == "sla_tier"
+    for rid in sorted(row_keys):
+        cid = rid.partition("::")[0]
+        m = masters.get(cid, {})
+        if rid in row_priority:
+            tally.add("customers.priority_weight", "override", rid, count=cp)
+            tally.value("customers.priority_weight", rid, row_priority[rid])
+        elif m.get("priority_weight") is not None:
+            tally.add("customers.priority_weight", "master", rid, count=cp)
+            tally.value("customers.priority_weight", rid, float(m["priority_weight"]))
+        else:
+            tally.add("customers.priority_weight", "default", rid, count=cp)
+            tally.value("customers.priority_weight", rid, 1.0)
+        if rid in row_floor:
+            tally.add("customers.sla_fill_floor_pct", "override", rid, count=cf)
+            tally.value("customers.sla_fill_floor_pct", rid, row_floor[rid])
+        elif m.get("sla_fill_floor_pct") is not None:
+            tally.add("customers.sla_fill_floor_pct", "master", rid, count=cf)
+            tally.value("customers.sla_fill_floor_pct", rid, float(m["sla_fill_floor_pct"]))
+        else:
+            tally.add("customers.sla_fill_floor_pct", "default", rid, count=cf)
+            tally.value("customers.sla_fill_floor_pct", rid, None)
+
+
+def _apply_row_demand_overrides(
+    row_spec: dict[tuple[str, str], dict[str, Any]], policies: dict,
+    tally: "_SourceTally", w: list[MappingWarning],
+    all_rows: set[tuple[str, str]] = frozenset(),
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """The Customer stage's demand cells (PLAN.md §24 WP 14.2): an override on
+    `node:<customer>::<product>` (family `demand`) beats the row's uploaded spec,
+    field by field — override → data → the product's distribution × share.
+
+    Records each row's resolved value and source on `tally` (page-equals-run)
+    ONLY when the project specifies demand on some row, by data or override: a
+    project that sets none maps, and logs, exactly as before Phase 14.
+    """
+    overrides: dict[tuple[str, str], dict[str, Any]] = {}
+    for key in sorted(k for k in policies if isinstance(k, str) and k.startswith("node:")):
+        patch = (policies.get(key) or {}).get("demand") or {}
+        if not isinstance(patch, dict) or not any(f in patch for f in (*_ROW_OVERRIDE_FIELD, "row_demand_mode")):
+            continue
+        cid, sep, pid = key[len("node:"):].partition("::")
+        if not sep or not cid or not pid:
+            continue
+        overrides[(pid, cid)] = patch
+    if not overrides and not row_spec:
+        return row_spec
+
+    out = {k: dict(v) for k, v in row_spec.items()}
+    # Only rows that EXIST: a `node:<a>::<b>` key from another stage (a Plant row
+    # `<plant>::<product>`) must not invent a customer called `<plant>`.
+    keys = set(out) | set(all_rows)
+    for pid, cid in sorted(keys):
+        ent = f"customer_row:{cid}::{pid}"
+        spec = out.get((pid, cid), {})
+        data_spec = dict(spec)
+        patch = overrides.get((pid, cid), {})
+        src: dict[str, str] = {}
+        # Each key read as a literal, so the D90 gate sees the reader.
+        reads = {
+            "row_demand_distribution": patch.get("row_demand_distribution"),
+            "row_demand_mean": patch.get("row_demand_mean"),
+            "row_demand_variation": patch.get("row_demand_variation"),
+            "row_demand_min": patch.get("row_demand_min"),
+            "row_demand_max": patch.get("row_demand_max"),
+        }
+        for bkey, v in reads.items():
+            field = _ROW_OVERRIDE_FIELD[bkey]
+            if v in (None, ""):
+                continue
+            if bkey == "row_demand_distribution":
+                kind = _ROW_KIND.get(str(v).strip().lower().replace("-", "_").replace(" ", "_"))
+                if kind is None:
+                    w.append(MappingWarning("warn", ent, bkey,
+                                            f"/policies override {v!r} is not a distribution — "
+                                            f"ignored, the row's data decides"))
+                    continue
+                spec[field] = kind
+            else:
+                n = _override_num(v, entity=ent, field=bkey, domain="nonnegative", w=w)
+                if n is None:
+                    continue
+                spec[field] = n
+            src[field] = "override"
+        mode = patch.get("row_demand_mode")
+        if mode == "model" and spec.get("forecast") is not None:
+            spec.pop("forecast")
+            if spec.get("demand_model") is None:
+                spec["demand_model"] = "deterministic"
+        elif mode == "forecast" and spec.get("forecast") is None:
+            w.append(MappingWarning("warn", ent, "row_demand_mode",
+                                    "/policies sets this row to its forecast, and it has none "
+                                    "uploaded — the row plans on its mean"))
+        if spec:
+            out[(pid, cid)] = spec
+        rid = f"{cid}::{pid}"
+        for rfield, field in _ROW_RESOLVED.items():
+            source = src.get(field) or ("master" if data_spec.get(field) is not None else "default")
+            tally.add(rfield, source, rid)
+            tally.value(rfield, rid, spec.get(field))
+    return out
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
@@ -1300,17 +1888,34 @@ def from_project_data(data: ProjectData) -> MappingResult:
     out_demand: dict[str, float] = {}
     customers: set[str] = set(data.customers)
     cust_share: dict[tuple[str, str], float] = {}  # (product, customer) → weekly volume
+    row_spec: dict[tuple[str, str], dict[str, Any]] = {}  # WP 14.1: the row's demand spec
+    row_price: dict[tuple[str, str], float] = {}  # WP 14.3: the row's own unit price
     for o in data.outbound:
         customers.add(o.customer_id)
+        if o.unit_price is not None and float(o.unit_price) > 0:
+            row_price[(o.product_id, o.customer_id)] = float(o.unit_price)
         weekly = _rate_to_weekly(float(o.volume or 0.0), o.time_unit)
         out_demand[o.product_id] = out_demand.get(o.product_id, 0.0) + weekly
+        key = (o.product_id, o.customer_id)
+        spec = _row_demand_spec(o, w)
+        if spec is not None:
+            if key in row_spec:
+                w.append(MappingWarning(
+                    "warn", f"customer_row:{o.customer_id}::{o.product_id}", "demand_distribution",
+                    "two outbound rows for this customer × product both carry a demand spec — "
+                    "the first is used"))
+            else:
+                row_spec[key] = spec
         if weekly > 0:
-            key = (o.product_id, o.customer_id)
             cust_share[key] = cust_share.get(key, 0.0) + weekly
         if o.unit_price:
             wgt = max(weekly, 1e-9)
             out_price_num[o.product_id] = out_price_num.get(o.product_id, 0.0) + float(o.unit_price) * wgt
             out_price_den[o.product_id] = out_price_den.get(o.product_id, 0.0) + wgt
+
+    # WP 14.2 — /policies Customer-row overrides of the row's demand spec.
+    row_spec = _apply_row_demand_overrides(row_spec, data.policies, tally, w,
+                                           all_rows=set(cust_share) | set(row_spec))
 
     # ── Suppliers ──
     sup_master = {s.id: s for s in data.suppliers}
@@ -1435,7 +2040,9 @@ def from_project_data(data: ProjectData) -> MappingResult:
     # so the composite index is what makes a per-row line-capacity edit reach
     # the engine at all; the bare "node:<product>" form still wins nothing and
     # loses nothing (§4 D75).
-    prod_composite = _composite_patches(data.policies, "production", prod_ids, w)
+    prod_composite = _composite_patches(
+        data.policies, "production", prod_ids, w,
+        exclude=frozenset(f"{cid}::{pid}" for pid, cid in set(cust_share) | set(row_spec)))
     products: list[Product] = []
     product_modes: set[FulfillmentMode] = set()
     for p in data.products:
@@ -1526,8 +2133,19 @@ def from_project_data(data: ProjectData) -> MappingResult:
         tally.value("products.demand_mean", p.id, mean)
         tally.value("products.demand_cv", p.id, cv)
         kind = _resolve_demand_kind(p.demand_distribution, sc.demand_model)
+        # Each FG override read as a literal, so the D90 gate sees the reader.
+        fg = _resolve_fg(p.id, p, prod_row, {
+            "fg_base_stock": _ovr(prod_row, "fg_base_stock", ent, "fg_base_stock"),
+            "fg_reorder_point": _ovr(prod_row, "fg_reorder_point", ent, "fg_reorder_point"),
+            "fg_cover_days": _ovr(prod_row, "fg_cover_days", ent, "fg_cover_days"),
+            "fg_initial_on_hand": _ovr(prod_row, "fg_initial_on_hand", ent, "fg_initial_on_hand"),
+        }, tally, w)
+        if mode != FulfillmentMode.MTS and any(fg[k] is not None for k in fg if k != "fg_policy"):
+            w.append(MappingWarning("info", f"product:{p.id}", "fg_policy",
+                                    "FG policy / levels are set but the product is MTO — an MTO "
+                                    "product holds no finished-goods stock, so they are not read"))
         products.append(_build_product(p, price=price, capacity=cap, mode=mode,
-                                       mean=mean, cv=cv, kind=kind, warnings=w))
+                                       mean=mean, cv=cv, kind=kind, warnings=w, fg=fg))
     if not products:
         raise ValueError("project has no products to simulate")
 
@@ -1546,14 +2164,37 @@ def from_project_data(data: ProjectData) -> MappingResult:
         )
 
     prod_ids = {p.id for p in products}
+    # WP 14.3 — the row's price: the Customer row's `price` override → the
+    # outbound row's unit price → its product's (engine default). Read by
+    # `revenue_max` and by the per-row, per-customer fill rates.
+    clinks = _customer_links(cust_share, row_spec, prod_ids, w)
+    row_keys = frozenset(f"{cl.customer_id}::{cl.product_id}" for cl in clinks)
+    count_price = str(((data.policies.get("default") or {}).get("fulfillment") or {})
+                      .get("allocation") or "") == "revenue_max"
+    price_by_prod = {p.id: p.unit_price for p in products}
+    for i, cl in enumerate(clinks):
+        rid = f"{cl.customer_id}::{cl.product_id}"
+        patch = (data.policies.get(f"node:{rid}") or {}).get("fulfillment") or {}
+        v = patch.get("price")
+        n = (_override_num(v, entity=f"customer_row:{rid}", field="price", domain="positive", w=w)
+             if v not in (None, "") else None)
+        if n is not None:
+            price, src = n, "override"
+        elif (cl.product_id, cl.customer_id) in row_price:
+            price, src = row_price[(cl.product_id, cl.customer_id)], "master"
+        else:
+            price, src = None, "default"
+        if price is not None:
+            clinks[i] = cl.model_copy(update={"unit_price": price})
+        tally.add("outbound_logistics.unit_price", src, rid,
+                  count=count_price or src == "override")
+        tally.value("outbound_logistics.unit_price", rid,
+                    price if price is not None else price_by_prod.get(cl.product_id))
     network = Network(
         suppliers=suppliers, materials=materials, products=products,
         bom=bom, supplier_links=links,
         customers=_build_customers(customers, data.customer_rows, w),
-        customer_links=[
-            CustomerLink(product_id=pid, customer_id=cid, share=share)
-            for (pid, cid), share in sorted(cust_share.items()) if pid in prod_ids
-        ],
+        customer_links=clinks,
     )
 
     settings = _build_settings(sc, w)
@@ -1573,7 +2214,10 @@ def from_project_data(data: ProjectData) -> MappingResult:
     policies = _map_policies(data.policies, w, n_customers=len(customers),
                              sups_by_mat=sups_by_mat,
                              has_mts=(FulfillmentMode.MTS in product_modes),
-                             prod_ids=prod_ids)
+                             prod_ids=prod_ids, row_keys=row_keys, tally=tally,
+                             row_masters={c.id: {"priority_weight": c.priority_weight,
+                                                 "sla_fill_floor_pct": c.sla_fill_floor_pct}
+                                          for c in data.customer_rows if c.id})
 
     # Every override the user typed should reach SOME entity. A key whose
     # components name no supplier, material, product or customer joins
@@ -1764,6 +2408,8 @@ def _map_events(
 _ALLOCATION_RULE = {  # UI fulfillment.allocation → P-C.2 rule (engineBridge.json mirror)
     "priority": "priority", "fair_share": "fair_share",
     "proportional": "proportional", "sla_tier": "sla_tier",
+    # WP 14.3: real, by row price (the outbound row's unit price, else the product's).
+    "revenue_max": "revenue_max",
 }
 
 
@@ -1811,16 +2457,35 @@ def _multi_sourcing_weights(
     return weights
 
 
-# Fulfillment fields the engine consumes at the PROJECT default scope only
-# (P-C.1 unmet_demand_handling + P-C.2 customer_allocation). A per-node override
+# Fulfillment fields the engine does NOT consume on a node row (P-C.1
+# unmet_demand_handling + P-C.2 customer_allocation). A per-node override
 # carrying any of these is not applied — warned rather than dropped silently (doc §6).
 # (primary_source / sourcing_firm are firm-routing hints, never engine params, so
 # they are deliberately excluded here and never trigger the warning.)
+#
+# Since WP 14.3 (PLAN.md §24, ADR 0002 decisions 4–5) the six `_FULFILLMENT_ROW`
+# fields ARE consumed on a Customer row `node:<customer>::<product>` that names
+# an existing row — backorder, its window and cost, and the row's priority,
+# price and service target. The allocation RULE stays one per project.
 _FULFILLMENT_DEFAULT_ONLY = frozenset({
     "backorder_allowed", "max_backorder_days", "backorder_cost_per_day",
     "lost_sales_cost_per_unit", "allocation", "tier_overrides",
     "service_level_alpha", "service_level_beta", "price",
+    "row_priority", "sla_fill_floor_pct",
 })
+_FULFILLMENT_ROW = frozenset({
+    "backorder_allowed", "max_backorder_days", "backorder_cost_per_day",
+    "price", "row_priority", "sla_fill_floor_pct",
+})
+
+
+def _backorder_weeks(days: float, *, w: list["MappingWarning"], entity: str) -> int:
+    """Max backorder DAYS → whole WEEKS, rounded HALF UP (3 → 0, 4 → 1, 10 → 1,
+    11 → 2, 14 → 2), clamped to P-C.1's 0–26. One rule for the project default
+    and every row (WP 14.3) — it was Python's banker's ``round`` until then,
+    which differed only at a half week (3.5 days → 0, now 1)."""
+    weeks = math.floor(float(days) / 7.0 + 0.5)
+    return int(_clamp(weeks, 0, 26, w=w, entity=entity, field="max_backorder_days", unit=" wk"))
 
 
 def _build_customers(
@@ -1878,6 +2543,10 @@ def _build_customers(
             kwargs["segment"] = row.segment
         if row.priority_weight is not None:
             kwargs["priority_weight"] = float(row.priority_weight)
+        if row.sla_fill_floor_pct is not None:
+            kwargs["sla_fill_floor_pct"] = _clamp(
+                float(row.sla_fill_floor_pct), 0.0, 100.0, w=w, entity=f"customer:{cid}",
+                field="sla_fill_floor_pct", unit=" %")
         out.append(Customer(**kwargs))
     # ONLY WHEN THE COVERAGE IS PARTIAL, and the E1 gate is what settled that.
     #
@@ -1906,6 +2575,9 @@ def _map_policies(
     sups_by_mat: Optional[dict[str, set[str]]] = None,
     has_mts: bool = False,
     prod_ids: Optional[set[str]] = None,
+    row_keys: frozenset[str] = frozenset(),
+    tally: Optional["_SourceTally"] = None,
+    row_masters: Optional[dict[str, dict[str, Any]]] = None,
 ) -> dict[str, dict]:
     out: dict[str, dict] = {}
     default = policies.get("default") or {}
@@ -1915,21 +2587,30 @@ def _map_policies(
     recovery = default.get("recovery") or {}
     sups_by_mat = sups_by_mat or {}
 
-    # Surface per-node fulfillment overrides the engine will not apply.
+    # Surface per-node fulfillment overrides the engine will not apply: any of
+    # these fields on a node that is not an existing Customer row, and the
+    # project-only ones (the rule, tier floors, service levels) on any node.
+    def _unread(k: str, fams: dict) -> bool:
+        patch = fams.get("fulfillment") or {}
+        is_row = k[len("node:"):] in row_keys
+        return any(f in patch and (f not in _FULFILLMENT_ROW or not is_row)
+                   for f in _FULFILLMENT_DEFAULT_ONLY)
     dropped_fulfil = sum(
         1 for k, fams in policies.items()
-        if isinstance(k, str) and k.startswith("node:")
-        and any(f in (fams.get("fulfillment") or {}) for f in _FULFILLMENT_DEFAULT_ONLY)
+        if isinstance(k, str) and k.startswith("node:") and isinstance(fams, dict)
+        and _unread(k, fams)
     )
     if dropped_fulfil:
         w.append(MappingWarning(
             "warn", "policy:unmet_demand_handling", "fulfillment",
-            f"{dropped_fulfil} per-node fulfillment override(s) not applied — backorder, "
-            "allocation and service level are consumed at the project default scope only"))
+            f"{dropped_fulfil} per-node fulfillment override(s) not applied — the allocation "
+            "rule, tier floors and service levels are project-wide, and backorder, priority, "
+            "price and service target apply on a Customer row only"))
 
     type_map = {
         "min_max": "min_max", "s_S": "min_max", "continuous_review": "min_max",
         "base_stock": "base_stock", "rop": "rop_q", "periodic_review": "periodic",
+        "mrp": "mrp",  # WP 14.5 — ordered from the plan (design doc §3.4)
     }
 
     # Per-material replenishment overrides from the supplier grid. Its rows key
@@ -2069,26 +2750,52 @@ def _map_policies(
             f"{len(row_ss_days)} material(s) carry a Supplier-stage safety-stock "
             "days value — applied per material, over the project-wide method"))
 
-    if bool(fulfil.get("backorder_allowed", False)):
+    project_allows = bool(fulfil.get("backorder_allowed", False))
+    project_days = fulfil.get("max_backorder_days", 14)
+    project_cost = fulfil.get("backorder_cost_per_day", 0.0)
+    if project_allows:
         out["unmet_demand_handling"] = {
             "rule": "backorder",
-            "backorder_horizon": int(_clamp(
-                round(float(fulfil.get("max_backorder_days", 14)) / 7.0), 0, 26, w=w,
-                entity="policy:default", field="max_backorder_days", unit=" wk")),
-            "backorder_penalty": float(fulfil.get("backorder_cost_per_day", 0.0)) * 7.0,
+            "backorder_horizon": _backorder_weeks(project_days, w=w, entity="policy:default"),
+            "backorder_penalty": float(project_cost) * 7.0,
         }
     else:
         out["unmet_demand_handling"] = {"rule": "lost_sales"}
+
+    # Per-row fulfillment (WP 14.3, ADR 0002 decisions 4–5): a Customer row's
+    # backorder setting, window and cost. A row that names any of them gets ALL
+    # three resolved — row → project default → the defaults above — so the
+    # engine never falls to a parameter default the page does not show.
+    row_bo: dict[str, dict[str, Any]] = {}
+    row_patches = {k[len("node:"):]: ((policies.get(k) or {}).get("fulfillment") or {})
+                   for k in policies
+                   if isinstance(k, str) and k.startswith("node:") and k[len("node:"):] in row_keys}
+    for rid in sorted(row_patches):
+        patch = row_patches[rid]
+        ent = f"customer_row:{rid}"
+        allowed = patch.get("backorder_allowed")
+        days = patch.get("max_backorder_days")
+        cost = patch.get("backorder_cost_per_day")
+        if allowed is None and days is None and cost is None:
+            continue
+        waits = bool(allowed) if allowed is not None else project_allows
+        ov: dict[str, Any] = {"backorder_allowed": waits}
+        if waits:
+            ov["backorder_horizon"] = _backorder_weeks(
+                days if days is not None else project_days, w=w, entity=ent)
+            ov["backorder_penalty"] = float(cost if cost is not None else project_cost) * 7.0
+        row_bo[rid] = ov
+    if row_bo:
+        out["unmet_demand_handling"]["row_overrides"] = row_bo
 
     # P-C.2 customer allocation — the UI's fulfillment.allocation enum finally
     # reaches the engine. Inert (skipped) below two customers.
     alloc = str(fulfil.get("allocation", "") or "")
     if alloc and n_customers >= 2:
         if alloc == "revenue_max":
-            w.append(MappingWarning("warn", "policy:customer_allocation", "allocation",
-                                    "revenue_max needs per-customer pricing (deferred) — "
-                                    "mapped to priority"))
-            out["customer_allocation"] = {"rule": "priority"}
+            # The row price is CustomerLink.unit_price (override → the outbound
+            # row's unit price), else the product's — no param needed here.
+            out["customer_allocation"] = {"rule": "revenue_max"}
         elif alloc == "sla_tier":
             # G1 closure: the UI's tier fill floors (fractions) reach P-C.2.
             out["customer_allocation"] = {
@@ -2101,6 +2808,33 @@ def _map_policies(
             }
         elif alloc in _ALLOCATION_RULE:
             out["customer_allocation"] = {"rule": _ALLOCATION_RULE[alloc]}
+    # The row's priority and service target (WP 14.3): an override on the
+    # Customer row beats the customer's master value. Read only by the rules
+    # that use them; the grid shows each column only under those rules.
+    # The row's value is resolved whatever the rule (the cell shows it); the
+    # engine receives it only under a rule that reads it.
+    rule = (out.get("customer_allocation") or {}).get("rule")
+    row_priority: dict[str, float] = {}
+    row_floor: dict[str, float] = {}
+    for rid in sorted(row_patches):
+        patch = row_patches[rid]
+        ent = f"customer_row:{rid}"
+        v = patch.get("row_priority")
+        if v not in (None, ""):
+            n = _override_num(v, entity=ent, field="row_priority", domain="nonnegative", w=w)
+            if n is not None:
+                row_priority[rid] = n
+        v = patch.get("sla_fill_floor_pct")
+        if v not in (None, ""):
+            n = _override_num(v, entity=ent, field="sla_fill_floor_pct", domain="percent", w=w)
+            if n is not None:
+                row_floor[rid] = n
+    if row_priority and rule in ("priority", "sla_tier"):
+        out["customer_allocation"]["row_priority"] = row_priority
+    if row_floor and rule == "sla_tier":
+        out["customer_allocation"]["row_floor_pct"] = row_floor
+    if tally is not None:
+        _tally_row_allocation(tally, row_keys, row_priority, row_floor, row_masters or {}, rule)
 
     # P-S.2 proactive multi-sourcing — sourcing.ratios finally reach the
     # engine (G1's flagship loss). Empty weights are valid: the plugin
@@ -2183,6 +2917,9 @@ def _map_policies(
         priority: dict[str, float] = {}
         for key, families in policies.items():
             if not isinstance(key, str) or not key.startswith("node:") or "::" not in key:
+                continue
+            # Nor a Customer row (WP 14.4 — the same reach `_composite_patches` had).
+            if key[len("node:"):] in row_keys:
                 continue
             _node, _, prod = key[len("node:"):].partition("::")
             v = (families.get("production") or {}).get("allocation_priority_weight")

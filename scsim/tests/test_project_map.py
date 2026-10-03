@@ -449,20 +449,64 @@ def test_fg_safety_stock_skipped_when_no_mts_product_despite_strategy():
     assert any(w.level == "warn" and w.field == "fulfillment_strategy" for w in res.warnings)
 
 
-def test_per_node_fulfillment_override_is_warned_not_dropped_silently():
-    """Fulfillment is consumed at the project default scope only; a per-node
-    backorder override must surface a warning (doc §4/§6)."""
+def _fulfillment_warned(res) -> bool:
+    return any(w.level == "warn" and w.entity == "policy:unmet_demand_handling"
+               and w.field == "fulfillment" for w in res.warnings)
+
+
+def test_a_customer_row_backorder_override_is_applied_not_warned():
+    """PLAN.md §24 WP 14.3 (D284 c): backorder, its window and cost are per
+    customer × product row. Until then this override was dropped with a
+    warning — the test that pinned the warning now pins its absence and the
+    row's resolved settings (the project's window and the row's cost × 7)."""
     d = _base()
     d.policies = {
         "default": {"fulfillment": {"backorder_allowed": True}},
         "node:c1::p1": {"fulfillment": {"backorder_cost_per_day": 5.0}},
     }
     res = from_project_data(d)
-    assert any(
-        w.level == "warn" and w.entity == "policy:unmet_demand_handling"
-        and w.field == "fulfillment"
-        for w in res.warnings
-    )
+    assert not _fulfillment_warned(res)
+    assert res.scenario.policies["unmet_demand_handling"]["row_overrides"] == {
+        "c1::p1": {"backorder_allowed": True, "backorder_horizon": 2, "backorder_penalty": 35.0}}
+
+
+def test_a_row_may_backorder_in_a_lost_sales_project_and_vice_versa():
+    d = _base()
+    d.policies = {"node:c1::p1": {"fulfillment": {"backorder_allowed": True,
+                                                  "max_backorder_days": 10}}}
+    pol = from_project_data(d).scenario.policies["unmet_demand_handling"]
+    assert pol["rule"] == "lost_sales"
+    assert pol["row_overrides"]["c1::p1"] == {"backorder_allowed": True, "backorder_horizon": 1,
+                                              "backorder_penalty": 0.0}
+    d.policies = {"default": {"fulfillment": {"backorder_allowed": True}},
+                  "node:c1::p1": {"fulfillment": {"backorder_allowed": False}}}
+    pol = from_project_data(d).scenario.policies["unmet_demand_handling"]
+    assert pol["rule"] == "backorder"
+    assert pol["row_overrides"]["c1::p1"] == {"backorder_allowed": False}
+
+
+def test_per_node_fulfillment_override_is_warned_not_dropped_silently():
+    """What stays project-wide still warns on a node: the allocation RULE (one
+    per project, decision 4), and any fulfillment field on a node that is not
+    an existing Customer row (doc §4/§6)."""
+    d = _base()
+    d.policies = {"node:c1::p1": {"fulfillment": {"allocation": "priority"}}}
+    assert _fulfillment_warned(from_project_data(d))
+    d.policies = {"node:Plant::p1": {"fulfillment": {"backorder_allowed": True}}}
+    res = from_project_data(d)
+    assert _fulfillment_warned(res)
+    assert "row_overrides" not in res.scenario.policies["unmet_demand_handling"]
+
+
+@pytest.mark.parametrize("days,weeks", [(3, 0), (4, 1), (10, 1), (11, 2), (14, 2), (3.5, 1)])
+def test_max_backorder_days_round_half_up_to_weeks(days, weeks):
+    d = _base()
+    d.policies = {"default": {"fulfillment": {"backorder_allowed": True,
+                                              "max_backorder_days": days}},
+                  "node:c1::p1": {"fulfillment": {"max_backorder_days": days}}}
+    pol = from_project_data(d).scenario.policies["unmet_demand_handling"]
+    assert pol["backorder_horizon"] == weeks
+    assert pol["row_overrides"]["c1::p1"]["backorder_horizon"] == weeks
 
 
 def test_per_node_routing_hint_does_not_trigger_fulfillment_warning():
@@ -985,3 +1029,64 @@ def test_a_production_capacity_override_shadows_the_line_capacity_and_says_which
     assert res.scenario.network.products[0].production_capacity == pytest.approx(150.0)
     assert any(w.field == "production_capacity" and "the /policies override" in w.reason
                for w in res.warnings)
+
+
+# ── FG policy per product (PLAN.md §24 WP 14.4, D284 d) ─────────────────────
+
+def _mts_base(**fg) -> ProjectData:
+    d = _base()
+    d.products = [ProductRow(id="p1", sell_price=20.0, demand_mean=100.0,
+                             production_capacity=200.0, fulfillment_mode="mts", **fg)]
+    return d
+
+
+def test_the_fg_policy_and_levels_reach_an_mts_product_from_the_master():
+    res = from_project_data(_mts_base(fg_policy="min_max", fg_base_stock=400.0,
+                                      fg_reorder_point=100.0, fg_initial_on_hand=250.0))
+    p = res.scenario.network.products[0]
+    assert (p.fg_policy.value, p.fg_base_stock, p.fg_reorder_point, p.fg_initial_on_hand) == (
+        "min_max", 400.0, 100.0, 250.0)
+    assert res.resolved["products.fg_policy"]["p1"] == {"source": "master", "value": "min_max"}
+
+
+def test_a_plant_row_override_beats_the_master():
+    d = _mts_base(fg_policy="base_stock", fg_base_stock=300.0)
+    d.policies = {"node:Plant::p1": {"production": {"fg_policy": "days_of_cover",
+                                                    "fg_cover_days": 14}}}
+    p = from_project_data(d).scenario.network.products[0]
+    assert (p.fg_policy.value, p.fg_cover_days, p.fg_base_stock) == ("days_of_cover", 14.0, 300.0)
+
+
+def test_an_incomplete_policy_runs_as_base_stock_and_says_so():
+    res = from_project_data(_mts_base(fg_policy="min_max", fg_base_stock=400.0))
+    assert res.scenario.network.products[0].fg_policy.value == "base_stock"
+    assert any(w.field == "fg_policy" and "min_max needs" in w.reason for w in res.warnings)
+
+
+def test_an_mto_product_reads_no_fg_policy_and_the_run_says_so():
+    d = _base()
+    d.products = [ProductRow(id="p1", sell_price=20.0, demand_mean=100.0,
+                             production_capacity=200.0, fg_base_stock=300.0)]
+    res = from_project_data(d)
+    assert res.scenario.network.products[0].fg_base_stock is None
+    assert any(w.field == "fg_policy" and "MTO" in w.reason for w in res.warnings)
+
+
+def test_a_customer_row_no_longer_reaches_the_product():
+    """WP 14.2 found `_composite_patches` sent any `node:<x>::<product>` key to the
+    product; WP 14.4 closed it — a Customer row's patch is the row's own."""
+    d = _base()
+    d.policies = {"node:c1::p1": {"production": {"sell_price": 999.0}}}
+    assert from_project_data(d).scenario.network.products[0].unit_price == 20.0
+
+
+# ── MRP (PLAN.md §24 WP 14.5, D284 a) ───────────────────────────────────────
+
+def test_mrp_reaches_the_engine_as_the_project_type_and_per_material():
+    d = _base()
+    d.policies = {"default": {"inventory": {"type": "mrp"}}}
+    assert from_project_data(d).scenario.policies["inventory_control"]["policy_type"] == "mrp"
+    d.policies = {"node:s1::m1": {"inventory": {"type": "mrp"}}}
+    pol = from_project_data(d).scenario.policies["inventory_control"]
+    assert pol["policy_type"] == "min_max"
+    assert pol["material_overrides"]["m1"]["policy_type"] == "mrp"

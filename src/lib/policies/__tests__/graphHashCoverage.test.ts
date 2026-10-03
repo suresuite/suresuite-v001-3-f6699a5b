@@ -220,11 +220,13 @@ describe("the snapshot covers every tier-2 value column", () => {
     .filter(([, t]) => String(t.tier) === "2")
     .map(([name, t]) => [name, (t.columns ?? []).map((c) => c.name)] as const);
 
-  it("the contract still describes eleven tier-2 tables", () => {
+  it("the contract still describes twelve tier-2 tables", () => {
     // If this number moves, a tier-2 table was added or described and the two
     // tests below are about to become interesting. It is asserted so the change
     // is noticed HERE rather than in whichever of them happens to fail.
-    expect(tier2.length).toBe(11);
+    // Twelve since PLAN.md §24 WP 14.2 added `demand_forecasts`, hashed in the
+    // `inputs` domain because the engine reads it.
+    expect(tier2.length).toBe(12);
   });
 
   it.each(

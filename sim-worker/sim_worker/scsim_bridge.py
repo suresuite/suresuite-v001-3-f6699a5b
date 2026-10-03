@@ -214,7 +214,10 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
         # Audit F-13 — getattr-guarded so an older engine wheel keeps working.
         "stopping_rule": getattr(result.stats, "stopping_rule", "fixed"),
         "mapping_warnings": (mapping.warning_dicts + _truncation_warnings(result)
-                             + _event_shift_warnings(result) + _feasibility_warnings(result)),
+                             + _event_shift_warnings(result) + _feasibility_warnings(result)
+                             # WP 14.1: normal draws clipped at 0, forecasts shorter
+                             # than the horizon — said where the run panel reads.
+                             + list(getattr(result, "demand_warnings", None) or [])),
         "warmup_detected_at": (result.warmup.adopted_week if result.warmup else None),
         "feasibility_warnings": [
             {"code": w.code, "message": w.message} for w in result.feasibility_warnings

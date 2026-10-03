@@ -43,12 +43,12 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "rpc ensure_item_masters"
     grain: table
-    evidence: "src/hooks/useItemMasters.tsx:205"
+    evidence: "src/hooks/useItemMasters.tsx:236"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc ensure_item_masters"
     grain: table
-    evidence: "src/hooks/useItemMasters.tsx:205"
+    evidence: "src/hooks/useItemMasters.tsx:236"
     confirmed: true
 
 governance:
@@ -205,8 +205,9 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The period `volume` is quoted over — day, week, month, quarter, year. It
-      describes the VOLUME only. It says nothing about `expected_lead_time`.
+      The period `volume` is quoted over — day, week, month, quarter, year — and,
+      since WP 14.2, the period of the row's `demand_mean`, `demand_min` and
+      `demand_max` too. It says nothing about `expected_lead_time`.
     grain: metadata
     engine:
       consumed_by: "project_map.py::_duration_to_weeks (via UNIT_DAYS)"
@@ -267,8 +268,8 @@ fields:
       What the customer pays for one unit of this product.
     grain: level
     engine:
-      consumed_by: "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset"
-      transform: "demand-weighted mean across this product's outbound arcs"
+      consumed_by: "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset; and (WP 14.3) CustomerLink.unit_price, the row's own price under `revenue_max` and in its fill rates"
+      transform: "demand-weighted mean across this product's outbound arcs (the product's price); as is for the row's price, which a Customer-row `price` override beats"
       missing_default: "the engine's ENGINE_DEFAULT_PRICE"
     substitutions:
       - when: "`products.sell_price` is unset for this product"
@@ -302,6 +303,123 @@ fields:
       The user types `unit_price`; the engine field it feeds is `sell_price` on
       the product, and inside scsim it is `unit_price` again on the product model.
       The manual leads with the CSV header (D21).
+  demand_distribution:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The SHAPE of this customer × product row's weekly demand — deterministic,
+      normal, triangular, triangular_av or poisson (PLAN.md §24 WP 14.2, ADR 0002
+      decision 2). Blank: the row takes its product's distribution, scaled by its
+      share of the product's volume, which is how every project ran before Phase 14.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_row_demand_spec -> CustomerLink.demand_model"
+      transform: "lower-cased; `triangularAV` spellings → triangular_av; an unknown value is warned and the row keeps its product's distribution"
+      missing_default: "the product's distribution × the row's volume share"
+    substitutions:
+      - when: "blank"
+        value: "the product's own distribution, scaled by the row's share of the product's outbound volume"
+        provenance: derived
+        visible_as: "the Customer table's distribution cell on /policies"
+    ingest:
+      csv_header: "demand_distribution"
+      required: false
+      validate: "one of deterministic, normal, triangular, triangular_av, poisson; blank lands nothing"
+      rule: {kind: enum, values: [deterministic, normal, triangular, triangular_av, poisson], blank: "null"}
+    surfaces: []
+    resolution: null
+  demand_mean:
+    type: "numeric"
+    unit: "units per time_unit"
+    unit_source: column
+    unit_column: time_unit
+    normalize_at_promotion: {conversion: rate, canonical: week}
+    meaning: >-
+      This row's mean demand — the MODE for a triangular row, as
+      `products.demand_mean` is a product's. A RATE in the row's `time_unit`,
+      weekly after promotion. With a forecast series it is the value the plan uses
+      past the series' end.
+    grain: rate
+    engine:
+      consumed_by: "project_map.py::_row_demand_spec -> CustomerLink.demand_mean"
+      transform: "rateToWeekly(demand_mean, time_unit) — normalized to weeks at promotion"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "demand_mean"
+      required: false
+      validate: "numeric >= 0; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: "null"}
+    surfaces: []
+    resolution: null
+  demand_variation:
+    type: "numeric"
+    unit: "dimensionless — read by the distribution"
+    unit_source: fixed
+    meaning: >-
+      How much the row's weekly demand varies, READ BY ITS DISTRIBUTION: for
+      `normal` it is the coefficient of variation (σ = variation × centre); for
+      `triangular_av` it is the ± fraction of the centre (0.3 → 70…130 around
+      100). Deterministic, poisson and triangular (whose bounds are explicit)
+      ignore it.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_row_demand_spec -> CustomerLink.demand_variation"
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "demand_variation"
+      required: false
+      validate: "numeric >= 0; triangular_av needs <= 1; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: "null"}
+    surfaces: []
+    resolution: null
+  demand_min:
+    type: "numeric"
+    unit: "units per time_unit"
+    unit_source: column
+    unit_column: time_unit
+    normalize_at_promotion: {conversion: rate, canonical: week}
+    meaning: >-
+      A triangular row's lower bound — a rate in the row's `time_unit`, weekly
+      after promotion. Read by `triangular` only.
+    grain: rate
+    engine:
+      consumed_by: "project_map.py::_row_demand_spec -> CustomerLink.demand_min"
+      transform: "rateToWeekly(demand_min, time_unit)"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "demand_min"
+      required: false
+      validate: "numeric >= 0; triangular only; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: "null"}
+    surfaces: []
+    resolution: null
+  demand_max:
+    type: "numeric"
+    unit: "units per time_unit"
+    unit_source: column
+    unit_column: time_unit
+    normalize_at_promotion: {conversion: rate, canonical: week}
+    meaning: >-
+      A triangular row's upper bound — a rate in the row's `time_unit`, weekly
+      after promotion. Read by `triangular` only.
+    grain: rate
+    engine:
+      consumed_by: "project_map.py::_row_demand_spec -> CustomerLink.demand_max"
+      transform: "rateToWeekly(demand_max, time_unit)"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "demand_max"
+      required: false
+      validate: "numeric >= 0; triangular only; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: "null"}
+    surfaces: []
+    resolution: null
   created_at:
     type: "timestamp with time zone"
     unit: null

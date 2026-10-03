@@ -31,6 +31,7 @@ import FieldIndex from "./FieldIndex";
 // 3 · Input tables (WP 5.2b)
 import InboundLogistics from "./InboundLogistics";
 import OutboundLogistics from "./OutboundLogistics";
+import DemandForecasts from "./DemandForecasts";
 import BomSingleLevel from "./BomSingleLevel";
 import BomMultiLevel from "./BomMultiLevel";
 import Materials from "./Materials";
@@ -44,6 +45,7 @@ import UnitsAndTimePeriods from "./UnitsAndTimePeriods";
 
 // 5 · Policies, 6 · Verification (WP 5.2c)
 import HowPoliciesWork from "./HowPoliciesWork";
+import HowPlanningWorks from "./HowPlanningWorks";
 import SupplierStage from "./SupplierStage";
 import PlantStage from "./PlantStage";
 import CustomerStage from "./CustomerStage";
@@ -125,6 +127,7 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   // 3 · Input tables
   "inbound-logistics": InboundLogistics,
   "outbound-logistics": OutboundLogistics,
+  "demand-forecasts": DemandForecasts,
   "bom-single-level": BomSingleLevel,
   "bom-multi-level": BomMultiLevel,
   materials: Materials,
@@ -144,6 +147,7 @@ export const DOC_BODIES: Record<string, ComponentType> = {
 
   // 5 · Policies
   "how-policies-work": HowPoliciesWork,
+  "how-planning-works": HowPlanningWorks,
   "supplier-stage": SupplierStage,
   "plant-stage": PlantStage,
   "customer-stage": CustomerStage,

@@ -31,6 +31,12 @@ export interface EngineDataset {
   inbound: Record<string, unknown>[];
   bom: Record<string, unknown>[];
   outbound: Record<string, unknown>[];
+  /** PLAN.md §24 WP 14.3 — `customers` (priority, segment, contracted floor)
+   *  and WP 14.2's `demand_forecasts`: the loaded-tables fallback carried
+   *  neither, so a browser run without a dataset version ran every customer at
+   *  the entity defaults and every row without its forecast. */
+  customers?: Record<string, unknown>[];
+  demand_forecasts?: Record<string, unknown>[];
 }
 
 export interface RunArgs {

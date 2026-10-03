@@ -1,25 +1,25 @@
 {
   "$generator": "scripts/data-contract/generate.mjs",
   "$doc": "The data contract: the introspected schema merged with the authored sidecars and the engine registry snapshot. Generated — do not edit; `npm run contract:check` fails on drift.",
-  "engine_version": "0.2.11",
+  "engine_version": "0.6.0",
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 398,
-      "migrations_applied": 390,
-      "last_migration": "20261002000010_policy_snapshot_resolves_defaults.sql"
+      "migrations_found": 400,
+      "migrations_applied": 392,
+      "last_migration": "20261003000002_fg_policy_per_product.sql"
     },
-    "sidecars": 75,
+    "sidecars": 76,
     "registry": {
-      "engine_version": "0.2.11",
+      "engine_version": "0.6.0",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 92,
-    "tables_covered": 75,
-    "columns_covered": 972,
-    "check_constraints": 89,
+    "tables_in_schema": 93,
+    "tables_covered": 76,
+    "columns_covered": 995,
+    "check_constraints": 94,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -3760,14 +3760,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:205",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:205",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         }
       ],
@@ -4824,7 +4824,7 @@
           "grain": "rate",
           "computed_by": null,
           "engine": {
-            "consumed_by": "P-C.2 customer_allocation — Customer.priority_weight, the fallback ordering under the `priority` rule wherever the `priority_weights` param does not name the customer",
+            "consumed_by": "P-C.2 customer_allocation — Customer.priority_weight, the default priority of each of the customer's rows under the `priority` and `sla_tier` rules wherever the `priority_weights` param does not name the customer and no Customer-row override (`row_priority`, WP 14.3) does",
             "transform": null,
             "missing_default": "1.0 (Customer.priority_weight's own default) — every customer equal, so the `priority` rule cannot order anything"
           },
@@ -4861,19 +4861,25 @@
           "grain": "rate",
           "computed_by": null,
           "engine": {
-            "consumed_by": null,
-            "transform": null,
-            "missing_default": null
+            "consumed_by": "project_map.py::_build_customers -> Customer.sla_fill_floor_pct; P-C.2 customer_allocation — each of the customer's rows' default service target under the `sla_tier` rule",
+            "transform": "clamped 0-100 (warned); a Customer-row override on /policies (`sla_fill_floor_pct`) beats it for that row",
+            "missing_default": "no floor — the segment's `sla_tiers` floor applies, else none"
           },
           "substitutions": [],
           "ingest": {
-            "csv_header": null,
+            "csv_header": "sla_fill_floor_pct",
             "required": false,
-            "validate": null
+            "validate": "optional; 0-100 (a percentage of the row's demand). Blank lands nothing — no floor, not 0",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "max": 100,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
-          "note": "NOT TRACED, and the REASON is now different from `priority_weight`'s — the two were given the same one and only this column's survives (§4 D69, D94). `P-C.2 customer_allocation` IS implemented, and it does guarantee fill floors: `sla_tiers`, keyed BY SEGMENT. This column is per CUSTOMER, and `Customer` has no field for it at all, so there is nothing to carry it into. Mapping per-customer floors onto a per-segment param needs a rule for what happens when two customers in one segment disagree, and inventing that rule is not a reader change. Declared gap, not a silent one.",
+          "note": "CONSUMED SINCE PLAN.md §24 WP 14.3 (§4 D284 c). The floor is per CUSTOMER × PRODUCT ROW now, not per segment, so this column is the default service target of each of the customer's rows under `sla_tier`, and the segment's `sla_tiers` floor applies only where it is empty. The question that kept it out — two customers of one segment disagreeing — has no answer to invent once the floor belongs to the row. UPLOADABLE SINCE WP 14.3 too: the customers template withheld it on purpose while nothing read it (§4 D18), and offers it now that the engine does. Before WP 14.3: NOT TRACED — `Customer` had no field for it and the per-segment param could not hold a per-customer floor (§4 D69, D94).",
           "engine_requirement": null
         },
         {
@@ -6210,6 +6216,602 @@
         }
       ],
       "note": "Expiry and revocation are both applied inside `effective_project_role()` rather than by each caller, so \"did you remember to check expires_at\" is not a question any future reader has to answer. Verified against a live PostgreSQL in WP 2.2: a grant exceeding the grantor's level is rejected, one with no expiry is rejected, and a grant whose expiry passes stops granting (PLAN.md §16).",
+      "analysis_kinds": null
+    },
+    "demand_forecasts": {
+      "table": "demand_forecasts",
+      "schema_name": "public",
+      "tier": "2",
+      "tier_name": "canonical — the only tier humans edit",
+      "grain": "One forecast BUCKET of one customer × product row: from `period_start`, for one week or one calendar month, this customer is expected to take `quantity` of this product (PLAN.md §24 WP 14.2, ADR 0002 decisions 2 and 7). A series is the row's buckets in date order. The plan reads it as the centre of the row's weekly demand; the simulated world draws actual demand around it.",
+      "owner": "data-ingestion",
+      "created_by": "20261003000001_demand_per_row.sql",
+      "sidecar": "supabase/contract/demand_forecasts.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "demand_forecasts_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "customer_id",
+            "product_id",
+            "period_start"
+          ],
+          "name": "demand_forecasts_natural_key"
+        }
+      ],
+      "natural_key_intended": [
+        "project_id",
+        "customer_id",
+        "product_id",
+        "period_start"
+      ],
+      "ingest_dataset": {
+        "wizard_id": "demand_forecasts",
+        "fact_class": "transactional",
+        "server_set": [
+          "project_id"
+        ]
+      },
+      "surfaces": [],
+      "governance": {
+        "read": "project_member",
+        "write": "project_modeler_or_admin",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "RLS with NO `anon` policy: §4 D28's list of unconditional policies is meant to shrink, and nothing needs one. The run reads through the snapshot (SECURITY DEFINER), the worker as service role, and /policies and the Data map through `get_project_demand_forecasts`, which names its caller. Writes: the project's modeler or an admin, as on `customers`. The three WP 2.3 audit triggers and the WP 10.1 graph-state triggers are created with the table."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Demand forecasts: modifiers only",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = demand_forecasts.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
+            "with_check": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = demand_forecasts.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
+            "added_by": "20261003000001_demand_per_row.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "demand_forecasts_time_unit_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (time_unit IS NULL OR lower(time_unit) IN ('week', 'month'))",
+          "added_by": "20261003000001_demand_per_row.sql"
+        },
+        {
+          "name": "demand_forecasts_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261003000001_demand_per_row.sql"
+        },
+        {
+          "name": "demand_forecasts_quantity_check",
+          "kind": "CHECK",
+          "columns": [
+            "quantity"
+          ],
+          "definition": "CHECK (quantity >= 0)",
+          "implicit": true,
+          "added_by": "20261003000001_demand_per_row.sql"
+        },
+        {
+          "name": "demand_forecasts_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20261003000001_demand_per_row.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "demand_forecasts_natural_key",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "customer_id",
+            "product_id",
+            "period_start"
+          ],
+          "nulls_not_distinct": true,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20261003000001_demand_per_row.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate row identifier. Carries no meaning and joins to nothing.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this bucket belongs to. Every read is scoped by it.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "datamap.py::load_project_data -> per-project fetch",
+            "transform": "filter, never read as a value",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "set from the selected project, never from the CSV"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "customer_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The customer, spelled as `outbound_logistics.customer_id` spells it — the bucket belongs to that outbound row.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "datamap.py::forecast_series -> OutboundArc.forecast of the matching (product, customer) row",
+            "transform": "str()",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "customer_id",
+            "required": true,
+            "validate": "non-empty",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "product_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The finished product, spelled as `outbound_logistics.product_id` spells it.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "datamap.py::forecast_series -> OutboundArc.forecast of the matching (product, customer) row",
+            "transform": "str()",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "product_id",
+            "required": true,
+            "validate": "non-empty",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "period_start",
+          "type": "date",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The first day of the bucket. The project's EARLIEST `period_start` is simulated week 0; simulated week w is the seven days starting w·7 days later.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "datamap.py::forecast_series -> which simulated weeks the bucket covers",
+            "transform": "days since the project's earliest period_start",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "period_start",
+            "required": true,
+            "validate": "a calendar date written YYYY-MM-DD",
+            "rule": {
+              "kind": "date",
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "time_unit",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How long the bucket is: `week` or `month` (a calendar month from `period_start`). Blank means week. Kept AS UPLOADED — unlike a lane's `time_unit` it is not rewritten at promotion, because it is the bucket's length and the spread below needs it.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "demand_forecast_spread() -> period_end",
+            "transform": null,
+            "missing_default": "week"
+          },
+          "substitutions": [
+            {
+              "when": "blank",
+              "value": "a one-week bucket",
+              "provenance": "default",
+              "visible_as": null
+            }
+          ],
+          "ingest": {
+            "csv_header": "time_unit",
+            "required": false,
+            "validate": "week or month; blank means week",
+            "rule": {
+              "kind": "enum",
+              "values": [
+                "week",
+                "month"
+              ],
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": "units over the bucket",
+          "unit_source": "column",
+          "unit_column": "time_unit",
+          "normalize_at_promotion": null,
+          "meaning": "How much the customer is forecast to take over the WHOLE bucket — 1 000 for a month is 1 000 over that month. Spread evenly over the bucket's days at promotion (decision 7) into `weekly_quantity`; nothing reads this column as a rate.",
+          "grain": "rate",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "demand_forecast_spread() -> weekly_quantity",
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "quantity",
+            "required": true,
+            "validate": "numeric >= 0",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "reject"
+            }
+          },
+          "surfaces": [],
+          "resolution": {
+            "default_mode": "asserted",
+            "assertable_by": [
+              "csv_upload"
+            ],
+            "estimable_from": [],
+            "hybrid": null,
+            "on_conflict": "assertion_wins",
+            "threshold_pct": null,
+            "note": "A forecast is the user's statement of what they expect; it is not estimated here. History-based forecasting (P-F.1) is out of scope for Phase 14 (design doc §8)."
+          },
+          "note": "`unit_source: column` with NO `normalize_at_promotion`, deliberately. The generic `rate` conversion rewrites the unit column to `week`, which would erase the bucket's length; the conversion this column needs is the calendar spread `demand_forecast_spread()` applies in the promoting statement, which writes `period_end` and `weekly_quantity` and leaves `time_unit` as uploaded.",
+          "engine_requirement": null
+        },
+        {
+          "name": "period_end",
+          "type": "date",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The bucket's EXCLUSIVE end: `period_start` + 1 week, or + 1 calendar month. Server-computed at promotion; never uploaded.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "datamap.py::forecast_series -> which days the bucket covers",
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "computed by demand_forecast_spread()"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "weekly_quantity",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": "units per week",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The bucket's quantity spread evenly over its own days, as a weekly rate: quantity × 7 / days in the bucket (decision 7). A 30-day month of 1 000 units is 233.33 per week. Server-computed at promotion; the only quantity the run reads.",
+          "grain": "rate",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "datamap.py::forecast_series -> the daily rate weekly_quantity / 7 over the bucket's days",
+            "transform": "summed per simulated week over the days that week shares with the bucket",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "computed by demand_forecast_spread()"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row, and through it the file, the uploader and who approved the promotion. Set by `ingest_apply_run` and by nothing else.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from; its `source_row_number` is the physical line of the uploaded file. `ON DELETE SET NULL`, DEFERRABLE.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was inserted. Server-set.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row last changed. Server-set.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
       "analysis_kinds": null
     },
     "disruption_scenario_effects": {
@@ -10439,14 +11041,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:205",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:205",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         }
       ],
@@ -22468,14 +23070,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:205",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:205",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         }
       ],
@@ -22550,6 +23152,13 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "outbound_logistics_demand_spec_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ( (demand_distribution IS NULL OR demand_distribution IN ('deterministic', 'normal', 'triangular', 'triangular_av', 'poisson')) AND (demand_mean IS NULL OR demand_mean >= 0) AND (demand_variation IS NULL OR demand_variation >= 0) AND (demand_min IS NULL OR demand_min >= 0) AND (demand_max IS NULL OR demand_max >= 0) )",
+          "added_by": "20261003000001_demand_per_row.sql"
         }
       ],
       "indexes": [
@@ -22836,7 +23445,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The period `volume` is quoted over — day, week, month, quarter, year. It describes the VOLUME only. It says nothing about `expected_lead_time`.",
+          "meaning": "The period `volume` is quoted over — day, week, month, quarter, year — and, since WP 14.2, the period of the row's `demand_mean`, `demand_min` and `demand_max` too. It says nothing about `expected_lead_time`.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -22930,8 +23539,8 @@
           "grain": "level",
           "computed_by": null,
           "engine": {
-            "consumed_by": "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset",
-            "transform": "demand-weighted mean across this product's outbound arcs",
+            "consumed_by": "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset; and (WP 14.3) CustomerLink.unit_price, the row's own price under `revenue_max` and in its fill rates",
+            "transform": "demand-weighted mean across this product's outbound arcs (the product's price); as is for the row's price, which a Customer-row `price` override beats",
             "missing_default": "the engine's ENGINE_DEFAULT_PRICE"
           },
           "substitutions": [
@@ -23096,6 +23705,213 @@
             "csv_header": null,
             "required": false,
             "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "demand_distribution",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The SHAPE of this customer × product row's weekly demand — deterministic, normal, triangular, triangular_av or poisson (PLAN.md §24 WP 14.2, ADR 0002 decision 2). Blank: the row takes its product's distribution, scaled by its share of the product's volume, which is how every project ran before Phase 14.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_row_demand_spec -> CustomerLink.demand_model",
+            "transform": "lower-cased; `triangularAV` spellings → triangular_av; an unknown value is warned and the row keeps its product's distribution",
+            "missing_default": "the product's distribution × the row's volume share"
+          },
+          "substitutions": [
+            {
+              "when": "blank",
+              "value": "the product's own distribution, scaled by the row's share of the product's outbound volume",
+              "provenance": "derived",
+              "visible_as": "the Customer table's distribution cell on /policies"
+            }
+          ],
+          "ingest": {
+            "csv_header": "demand_distribution",
+            "required": false,
+            "validate": "one of deterministic, normal, triangular, triangular_av, poisson; blank lands nothing",
+            "rule": {
+              "kind": "enum",
+              "values": [
+                "deterministic",
+                "normal",
+                "triangular",
+                "triangular_av",
+                "poisson"
+              ],
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "demand_mean",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": "units per time_unit",
+          "unit_source": "column",
+          "unit_column": "time_unit",
+          "normalize_at_promotion": {
+            "conversion": "rate",
+            "canonical": "week"
+          },
+          "meaning": "This row's mean demand — the MODE for a triangular row, as `products.demand_mean` is a product's. A RATE in the row's `time_unit`, weekly after promotion. With a forecast series it is the value the plan uses past the series' end.",
+          "grain": "rate",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_row_demand_spec -> CustomerLink.demand_mean",
+            "transform": "rateToWeekly(demand_mean, time_unit) — normalized to weeks at promotion",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "demand_mean",
+            "required": false,
+            "validate": "numeric >= 0; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "demand_variation",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": "dimensionless — read by the distribution",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How much the row's weekly demand varies, READ BY ITS DISTRIBUTION: for `normal` it is the coefficient of variation (σ = variation × centre); for `triangular_av` it is the ± fraction of the centre (0.3 → 70…130 around 100). Deterministic, poisson and triangular (whose bounds are explicit) ignore it.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_row_demand_spec -> CustomerLink.demand_variation",
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "demand_variation",
+            "required": false,
+            "validate": "numeric >= 0; triangular_av needs <= 1; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "demand_min",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": "units per time_unit",
+          "unit_source": "column",
+          "unit_column": "time_unit",
+          "normalize_at_promotion": {
+            "conversion": "rate",
+            "canonical": "week"
+          },
+          "meaning": "A triangular row's lower bound — a rate in the row's `time_unit`, weekly after promotion. Read by `triangular` only.",
+          "grain": "rate",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_row_demand_spec -> CustomerLink.demand_min",
+            "transform": "rateToWeekly(demand_min, time_unit)",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "demand_min",
+            "required": false,
+            "validate": "numeric >= 0; triangular only; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "demand_max",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000001_demand_per_row.sql",
+          "unit": "units per time_unit",
+          "unit_source": "column",
+          "unit_column": "time_unit",
+          "normalize_at_promotion": {
+            "conversion": "rate",
+            "canonical": "week"
+          },
+          "meaning": "A triangular row's upper bound — a rate in the row's `time_unit`, weekly after promotion. Read by `triangular` only.",
+          "grain": "rate",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_row_demand_spec -> CustomerLink.demand_max",
+            "transform": "rateToWeekly(demand_max, time_unit)",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "demand_max",
+            "required": false,
+            "validate": "numeric >= 0; triangular only; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -26031,6 +26847,20 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000020_item_masters_land.sql"
+        },
+        {
+          "name": "products_fg_policy_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (fg_policy IS NULL OR fg_policy IN ('base_stock', 'min_max', 'days_of_cover'))",
+          "added_by": "20261003000002_fg_policy_per_product.sql"
+        },
+        {
+          "name": "products_fg_levels_nonnegative",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (coalesce(fg_base_stock, 0) >= 0 AND coalesce(fg_reorder_point, 0) >= 0 AND coalesce(fg_cover_days, 0) >= 0 AND coalesce(fg_initial_on_hand, 0) >= 0)",
+          "added_by": "20261003000002_fg_policy_per_product.sql"
         }
       ],
       "indexes": [],
@@ -26355,7 +27185,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The SHAPE of weekly demand for this product — constant, normal, triangular and so on. What the user types here is `demand_distribution`; the engine calls the resolved value `demand_model`.",
+          "meaning": "The SHAPE of weekly demand for this product — constant, normal, triangular and so on. What the user types here is `demand_distribution`; the engine calls the resolved value `demand_model`. `normal` IS A REAL NORMAL since engine 0.3.0 (PLAN.md §24 WP 14.1, ADR 0002 decision 8): N(mean, σ = demand_cv × mean), negative draws set to 0 and counted on the run — before it, `normal` ran as triangularAV with a mapping warning. A customer × product row may state its own distribution on `outbound_logistics` (WP 14.2); this product-level one is what a row that states none runs on, scaled by its volume share.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -26480,7 +27310,7 @@
           "unit_source": "fixed",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "How much weekly demand varies, as a coefficient of variation.",
+          "meaning": "How much weekly demand varies — READ BY THE DISTRIBUTION (PLAN.md §24 WP 14.1): for `normal` it is the coefficient of variation (σ = cv × mean); for `triangular` / `triangularAV` it is the ± fraction of the triangularAV form, triangular(mean·(1−cv), mean, mean·(1+cv)), unless explicit `demand_min` / `demand_max` are given; Poisson and deterministic ignore it. The two readings are not interchangeable: 0.3 is σ = 30 % of the mean under normal and a ±30 % range under triangular.",
           "grain": "level",
           "computed_by": null,
           "engine": {
@@ -26876,6 +27706,209 @@
             "csv_header": null,
             "required": false,
             "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_policy",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The finished-goods inventory policy of an MTS product (PLAN.md §24 WP 14.4, ADR 0002 decision 3): `base_stock` fills to S, `min_max` fills to S only when the stock left after the week's demand is below s, `days_of_cover` fills to D/7 × the projected weekly demand, so its target moves with the forecast. NULL is base-stock with today's derived target. An MTO product holds no FG stock and does not read it.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_policy (MTS)",
+            "transform": "the Plant-stage override, else this; an incomplete min_max or days_of_cover runs as base_stock, warned",
+            "missing_default": "base_stock"
+          },
+          "substitutions": [
+            {
+              "when": "NULL",
+              "value": "base_stock",
+              "provenance": "default",
+              "visible_as": "the Plant cell's empty note"
+            }
+          ],
+          "ingest": {
+            "csv_header": "fg_policy",
+            "required": false,
+            "validate": "base_stock | min_max | days_of_cover; blank lands nothing",
+            "rule": {
+              "kind": "enum",
+              "values": [
+                "base_stock",
+                "min_max",
+                "days_of_cover"
+              ],
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_base_stock",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": "units of product",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "S — the end-of-week finished-goods target in units, for `base_stock` and `min_max` (WP 14.4). A STATED S is the target: P-P.4's safety stock is never added on top of it (one source per number). Empty under base-stock is the derived target: one week of forecast, plus P-P.4's buffer when it is on.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_base_stock (MTS)",
+            "transform": "the Plant-stage override, else this",
+            "missing_default": "derived: one week of forecast (+ P-P.4)"
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "fg_base_stock",
+            "required": false,
+            "validate": "numeric >= 0; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_reorder_point",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": "units of product",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "s — `min_max` only: the plant builds up to S when the stock left after the week's demand falls below s, and builds nothing otherwise (WP 14.4). Must be below S.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_reorder_point (MTS, min_max)",
+            "transform": "the Plant-stage override, else this",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "fg_reorder_point",
+            "required": false,
+            "validate": "numeric >= 0; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_cover_days",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": "days",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "D — `days_of_cover` only: how many days of FUTURE demand the stock should cover. The target is D/7 × the projected weekly demand, so it moves with the forecast (WP 14.4). Days, not converted: the engine divides by 7 itself.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_cover_days (MTS, days_of_cover)",
+            "transform": "the Plant-stage override, else this; target = D/7 x projected weekly demand",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "fg_cover_days",
+            "required": false,
+            "validate": "numeric >= 0; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_initial_on_hand",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": "units of product",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The finished-goods stock an MTS product starts the run with — engine RFC 4, closed by WP 14.4 (the capability first, then this column, in RFC 4's own order). Empty starts the run at the policy target, which is today's behaviour.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_initial_on_hand (MTS)",
+            "transform": "the Plant-stage override, else this",
+            "missing_default": "the policy target"
+          },
+          "substitutions": [
+            {
+              "when": "NULL",
+              "value": "the FG target",
+              "provenance": "default",
+              "visible_as": "the Plant cell's empty note"
+            }
+          ],
+          "ingest": {
+            "csv_header": "fg_initial_on_hand",
+            "required": false,
+            "validate": "numeric >= 0; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -30640,7 +31673,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "component ItemSeriesExplorer (mounted by RunValidateStage) → select kind,item_id from run_item_series",
           "grain": "table",
-          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
           "confirmed": true,
           "note": "Run & Validate is where an inspection run is STARTED, and the explorer sits under it: it first reads the run's item index (ids only), then fetches one item's `series` on demand — the payload is a few MB for a large project, so it is never read whole."
         },
@@ -30648,7 +31681,7 @@
           "page": "SimulationLab.tsx",
           "via": "component ItemSeriesExplorer (mounted by ResultsDashboard) → select kind,item_id from run_item_series",
           "grain": "table",
-          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
           "confirmed": true,
           "note": "Simulation Lab dispatches no inspection run, so this panel shows rows only for a run started from Run & Validate, and says so rather than rendering empty without a reason (§4 D113's shape)."
         }
@@ -30880,14 +31913,14 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
               "confirmed": true
             },
             {
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
               "confirmed": true
             }
           ],
@@ -30927,14 +31960,14 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
               "confirmed": true
             },
             {
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
               "confirmed": true
             }
           ],
@@ -30974,14 +32007,14 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:109",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:118",
               "confirmed": true
             },
             {
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:109",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:118",
               "confirmed": true
             }
           ],
@@ -39192,7 +40225,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc assign_material_supplier",
           "grain": "table",
-          "evidence": "src/components/policies/StagePolicyTable.tsx:370",
+          "evidence": "src/components/policies/StagePolicyTable.tsx:378",
           "confirmed": true
         },
         {
@@ -42746,5 +43779,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "0f63c0936a2a"
+  "contract_version": "d0d4a59f9d20"
 }

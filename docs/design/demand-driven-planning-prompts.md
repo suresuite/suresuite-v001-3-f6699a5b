@@ -37,7 +37,10 @@ Non-negotiables:
 2. STAY IN SCOPE. A defect that belongs to another package goes into §16 and into that
    package's text in §24, not into your diff.
 3. BEHAVIOUR-NEUTRAL BY DEFAULT. A project that sets none of the new fields must run
-   byte-identically: the golden traces in scsim/tests must not move. A deliberate
+   byte-identically: the golden traces in scsim/tests must not move — since WP 14.0 that
+   means the frozen digests scsim/tests/data/golden_digests.json and
+   sim-worker/tests/data/golden_runs.json (regenerate them only for a declared change,
+   with SCSIM_WRITE_GOLDEN=1 / SIMWORKER_WRITE_GOLDEN=1, and name what moved). A deliberate
    behaviour change needs an ENGINE_VERSION bump (scsim/scsim/__init__.py), a line in
    scsim/docs/adr/0002-demand-driven-planning.md and a §16 note.
 4. THE PLAN NEVER READS REALIZED FUTURE DEMAND. Any planner you write reads the projected
@@ -260,6 +263,12 @@ DO:
    - Warn: a forecast shorter than the horizon.
 6. Manual: the demand input pages and the CSV template doc. Edit sidecars, never
    docs/data/tables/*.md (generated).
+   Inherited from WP 14.1 (§16): the products sidecar's demand_cv meaning says it is
+   read by the distribution (CV for normal, ± fraction for triangular/triangularAV);
+   demand_distribution's says normal is real since engine 0.3.0. datamap must fill
+   OutboundArc's demand_* fields and weekly `forecast` list (the engine side exists).
+   Decide and record how a forecast's period_start maps to a simulated week
+   (design doc §9, point 4).
 7. If useful, add a §15 probe for the new table in its OWN push (CLAUDE.md: the probe
    travels separately).
 
@@ -298,6 +307,17 @@ DO:
      P-P.1's material_overrides pattern).
    - P-C.1 stays the ONLY writer of FULFILLMENT and ST_BACKLOG.
    - Add ctx.backlog_rows; ctx.backlog stays the product sum for every existing reader.
+   Inherited from WP 14.1: use the demand rows (model.row_*, row_ptr, ctx.demand_rows).
+   P-C.2's cust_share spreads a product no link names over ALL customers; the demand
+   rows give it one implicit row — make the two agree.
+   Inherited from WP 14.2: the Customer stage already carries per-row cells and the
+   override entity "row" (<customer>::<product>, entityOverrides.ts), the composite master
+   pointer idFrom "customer_id::product_id" onto outbound_logistics, and the mapper's
+   per-row reader _apply_row_demand_overrides (literal patch.get("row_...") reads, for the
+   D90 gate). Seven production keys, sell_price among them, declare "customer" scope
+   because _composite_patches resolves any node:<x>::<product> key to the PRODUCT: a
+   sell_price patch on a Customer row sets the product's price, not the row's. A per-row
+   price for revenue_max needs its own row key; decide whether to close that latent scope.
 2. Engine, P-C.2:
    - Publish the rule and per-row priority / price / floor at setup (the P-C.6
      publish-at-setup pattern).
@@ -384,6 +404,17 @@ DO:
    ingestion template, snapshot simulation scope, and Plant-table cells on /policies as
    overrides (scope declared in POLICY_BUNDLE_KEYS). Close RFC 4 in PLAN.md §14.
 6. Inspection series per product: projected demand, requirement, planned, built.
+   Inherited from WP 14.3: per-row backorder settings are in P-C.1's row_overrides and
+   in ctx.policy_state["unmet_demand_handling.rows"] (accept, horizon) after its first
+   PH-60. ctx.backlog_rows is TRACKED only on the per-row path (else a share-split view),
+   and P-C.1 decides "per row or not" lazily at PH-60 — the plan at PH-40 needs that
+   decision earlier (design doc §9 point 8): move it where both can read it. The rule and
+   row inputs are ctx.row_allocation (P-C.2 setup), else fair share.
+   Inherited from WP 14.2: uploaded per-row specs and dated forecasts reach the engine
+   (design doc §9 point 5 is the calendar). A new products column copies the outbound
+   demand columns' route: rate conversion at promotion, jsonb_strip_nulls in
+   _build_dataset_snapshot_v2 (a project that sets none hashes as before), and datamap's
+   projection names it.
 
 TESTS:
 - The design doc's §2 example, built as a test: two rows, capacity 180, fair_share. Week
@@ -414,6 +445,14 @@ PRECONDITIONS — verify:
 - ctx.pipeline_arrivals_between and ctx.pipeline_on_order exist (in-transit + queue).
 - P-S.2 (multi-sourcing) and P-S.1 (backup) act on PH-80 orders. Read their hook
   priorities so MRP orders still flow through them.
+
+   Inherited from WP 14.4: ctx.planned_production is [products × H], H =
+   model.plan_horizon (1 today; set it at compile, before a SimContext is built — the
+   context sizes its plan arrays from it). core/planning.plan_ahead runs inside
+   mech.default_plan at PH-40; its later columns already carry only backorder rows'
+   shortfall (core/rowbacklog.step_rows, the step P-C.1 runs). Extend the honesty test
+   test_the_plan_does_not_read_future_draws; golden #7's plan side is already pinned by
+   test_the_worked_example_plans_160_in_week_5_when_both_rows_backorder.
 
 DO:
 1. policy_type "mrp" in InventoryControlParams and MaterialInventoryOverride.
@@ -463,6 +502,12 @@ GOAL. Show, with statistics, what MRP changes versus reorder point, and make eve
 Phase 14 rule a named, CI-enforced gate.
 
 PRECONDITIONS — verify: WP 14.1–14.5 merged; D284 (a)–(d) closed.
+
+Inherited from WP 14.5: MRP is inventory_control.policy_type "mrp" (or a per-material
+override); mrp_late_receipt_weeks / material_shortage_weeks appear only with MRP
+materials. Phase 14's MRP plans from the customer-table forecast, so the appendix's
+"unforecast step" is a forecast-bias case (design doc §9 point 15). Golden #7 and the two
+honesty tests are named in PLAN.md §24 WP 14.6.
 
 DO:
 1. A study script (for example scsim/scripts/study_demand_driven_planning.py) that runs

@@ -1,4 +1,48 @@
 {
+  "backorder": {
+    "days_per_week": 7,
+    "examples": [
+      {
+        "days": 0,
+        "weeks": 0
+      },
+      {
+        "days": 3,
+        "weeks": 0
+      },
+      {
+        "days": 3.5,
+        "weeks": 1
+      },
+      {
+        "days": 4,
+        "weeks": 1
+      },
+      {
+        "days": 10,
+        "weeks": 1
+      },
+      {
+        "days": 10.5,
+        "weeks": 2
+      },
+      {
+        "days": 11,
+        "weeks": 2
+      },
+      {
+        "days": 14,
+        "weeks": 2
+      },
+      {
+        "days": 200,
+        "weeks": 26
+      }
+    ],
+    "max_weeks": 26,
+    "min_weeks": 0,
+    "rounding": "half_up"
+  },
   "base_data_requirements": [
     {
       "condition": null,
@@ -146,7 +190,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.2.11",
+  "engine_version": "0.6.0",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -202,6 +246,23 @@
           "title": "Segment",
           "type": "string",
           "unit": "-"
+        },
+        "sla_fill_floor_pct": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Default per-row service target under sla_tier; None = the segment floor.",
+          "scope": "C",
+          "title": "Sla Fill Floor Pct",
+          "unit": "%"
         }
       },
       "required": [
@@ -525,7 +586,8 @@
             "triangular",
             "poisson",
             "negbin",
-            "bootstrap"
+            "bootstrap",
+            "normal"
           ],
           "title": "DemandModel",
           "type": "string"
@@ -533,7 +595,8 @@
         "FgPolicy": {
           "enum": [
             "base_stock",
-            "min_max"
+            "min_max",
+            "days_of_cover"
           ],
           "title": "FgPolicy",
           "type": "string"
@@ -560,6 +623,22 @@
       },
       "description": "Product + demand model + fulfillment mode (CODP) \u2014 \u00a73.1\u20133.3.",
       "properties": {
+        "demand_cv": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Coefficient of variation for demand_model=normal: \u03c3 = cv \u00b7 demand_mode. Negative draws are set to 0 and counted (ADR 0002, decision 8). Read only by normal; triangular uses demand_floor_factor / explicit bounds.",
+          "scope": "P",
+          "title": "Demand Cv",
+          "unit": "-"
+        },
         "demand_floor_factor": {
           "anyOf": [
             {
@@ -645,17 +724,65 @@
             }
           ],
           "default": null,
-          "notes": "S^FG_p; derived if None. MTS only.",
+          "notes": "S^FG_p: the order-up-to level (base_stock, min_max); derived if None under base_stock. MTS only.",
           "scope": "P",
           "title": "Fg Base Stock",
+          "unit": "units"
+        },
+        "fg_cover_days": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "D: days_of_cover only \u2014 target = D/7 \u00d7 projected weekly demand; moves with the forecast.",
+          "scope": "P",
+          "title": "Fg Cover Days",
+          "unit": "days"
+        },
+        "fg_initial_on_hand": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "FG opening stock (engine RFC 4). None = start at the policy target.",
+          "scope": "P",
+          "title": "Fg Initial On Hand",
           "unit": "units"
         },
         "fg_policy": {
           "$ref": "#/$defs/FgPolicy",
           "default": "base_stock",
-          "notes": "MTS only.",
+          "notes": "base_stock (S) \u00b7 min_max (s, S) \u00b7 days_of_cover (D). MTS only.",
           "scope": "P",
           "unit": "enum"
+        },
+        "fg_reorder_point": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "s: min_max only \u2014 produce up to S when the stock left after this week's demand falls below s.",
+          "scope": "P",
+          "title": "Fg Reorder Point",
+          "unit": "units"
         },
         "forecast_bias": {
           "default": 0.0,
@@ -1228,12 +1355,13 @@
         ]
       },
       {
-        "description": "Update the demand forecast from history (\u00a73.3 models), then draw D_p[t] from the world demand stream.",
+        "description": "Update the demand forecast from history (\u00a73.3 models), then read D_p[t] \u2014 and per customer \u00d7 product row, D_r[t] \u2014 from the pre-drawn world demand stream.",
         "id": "PH-10",
         "name": "demand_realization",
         "owns": [
           "demand",
-          "forecast"
+          "forecast",
+          "demand_rows"
         ]
       },
       {
@@ -1259,7 +1387,8 @@
         "owns": [
           "production_plan",
           "overtime_capacity",
-          "substitutions"
+          "substitutions",
+          "planned_production"
         ]
       },
       {
@@ -1284,7 +1413,8 @@
         "name": "material_planning",
         "owns": [
           "material_demand",
-          "inventory_levels"
+          "inventory_levels",
+          "gross_requirements"
         ]
       },
       {
@@ -1324,6 +1454,7 @@
           "priority": 50,
           "reads": [
             "demand",
+            "demand_rows",
             "fg_fulfillment",
             "production_output"
           ],
@@ -1339,6 +1470,55 @@
       "id": "unmet_demand_handling",
       "milestone": null,
       "params_schema": {
+        "$defs": {
+          "RowFulfillment": {
+            "additionalProperties": false,
+            "description": "One customer \u00d7 product row's fulfillment settings (WP 14.3). A field left\nNone takes the project's value.",
+            "properties": {
+              "backorder_allowed": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Backorder Allowed"
+              },
+              "backorder_horizon": {
+                "anyOf": [
+                  {
+                    "maximum": 26,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Backorder Horizon"
+              },
+              "backorder_penalty": {
+                "anyOf": [
+                  {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Backorder Penalty"
+              }
+            },
+            "title": "RowFulfillment",
+            "type": "object"
+          }
+        },
         "additionalProperties": false,
         "properties": {
           "backorder_horizon": {
@@ -1368,6 +1548,16 @@
             "title": "Partial Accept Prob",
             "type": "number",
             "unit": "-"
+          },
+          "row_overrides": {
+            "additionalProperties": {
+              "$ref": "#/$defs/RowFulfillment"
+            },
+            "notes": "Per customer \u00d7 product row, keyed '<customer>::<product>': backorder allowed, horizon (weeks), penalty (\u20ac/unit/wk). Any row here runs fulfillment per row (WP 14.3).",
+            "scope": "PC",
+            "title": "Row Overrides",
+            "type": "object",
+            "unit": "row \u2192 settings"
           },
           "rule": {
             "default": "lost_sales",
@@ -1451,6 +1641,36 @@
             "type": "object",
             "unit": "weight per customer"
           },
+          "row_floor_pct": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "notes": "'<customer>::<product>' \u2192 the row's service target under sla_tier; beats Customer.sla_fill_floor_pct and sla_tiers.",
+            "scope": "PC",
+            "title": "Row Floor Pct",
+            "type": "object",
+            "unit": "row \u2192 fill floor %"
+          },
+          "row_price": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "notes": "'<customer>::<product>' \u2192 price revenue_max orders by; beats the row's own unit price.",
+            "scope": "PC",
+            "title": "Row Price",
+            "type": "object",
+            "unit": "\u20ac/unit per row"
+          },
+          "row_priority": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "notes": "'<customer>::<product>' \u2192 priority; beats priority_weights and Customer.priority_weight for that row.",
+            "scope": "PC",
+            "title": "Row Priority",
+            "type": "object",
+            "unit": "weight per row"
+          },
           "rule": {
             "default": "fcfs",
             "enum": [
@@ -1458,9 +1678,10 @@
               "proportional",
               "fair_share",
               "priority",
-              "sla_tier"
+              "sla_tier",
+              "revenue_max"
             ],
-            "notes": "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata); priority and sla_tier reorder.",
+            "notes": "fcfs/proportional/fair_share coincide at weekly buckets (pro-rata); priority, sla_tier and revenue_max (by row price) reorder.",
             "scope": "C",
             "title": "Rule",
             "type": "string",
@@ -1635,7 +1856,10 @@
           "phase": "PH-80",
           "priority": 50,
           "reads": [
+            "gross_requirements",
             "inventory_levels",
+            "planned_production",
+            "production_output",
             "state.on_hand",
             "state.pipeline",
             "state.queue"
@@ -1644,6 +1868,15 @@
           "writes": [
             "purchase_orders"
           ]
+        },
+        {
+          "phase": "PH-90",
+          "priority": 95,
+          "reads": [
+            "arrivals"
+          ],
+          "resolution": null,
+          "writes": []
         }
       ],
       "id": "inventory_control",
@@ -1694,7 +1927,8 @@
                       "min_max",
                       "base_stock",
                       "rop_q",
-                      "periodic"
+                      "periodic",
+                      "mrp"
                     ],
                     "type": "string"
                   },
@@ -1703,7 +1937,7 @@
                   }
                 ],
                 "default": null,
-                "notes": "Row-level policy type; absent \u2192 project default.",
+                "notes": "Row-level policy type; absent \u2192 project default. mrp orders from the plan (WP 14.5).",
                 "scope": "M",
                 "title": "Policy Type",
                 "unit": "enum"
@@ -1816,9 +2050,10 @@
               "min_max",
               "base_stock",
               "rop_q",
-              "periodic"
+              "periodic",
+              "mrp"
             ],
-            "notes": "min_max \u2705 (manuscript).",
+            "notes": "min_max \u2705 (manuscript). mrp: BOM \u00d7 planned production over the lead time, net of stock and the pipeline (WP 14.5).",
             "scope": "M",
             "title": "Policy Type",
             "type": "string",
@@ -3328,7 +3563,7 @@
         "supplier"
       ],
       "target": "inventory_control.policy_type",
-      "transform": "enum map \u2014 min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max"
+      "transform": "enum map \u2014 min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic, mrp -> mrp (WP 14.5: ordered from the plan); anything unrecognised falls back to min_max"
     },
     {
       "catalog_ref": "P-X.2",
@@ -3607,6 +3842,243 @@
       ],
       "target": "inventory_control.material_overrides[*].order_up_to",
       "transform": "absolute units replacing S = E[D]\u00b7(T_s+\u03ba) for that material only; dropped with a warning when it does not exceed the row's reorder point. Not read at default scope"
+    },
+    {
+      "catalog_ref": "P-C.4",
+      "family": "demand",
+      "key": "row_demand_mode",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.forecast",
+      "transform": "empty = the engine's rule (forecast when the row has an uploaded series, else model). Enum \u2014 'model' plans and draws on the row's mean even when a forecast series is uploaded (the series is set aside); 'forecast' uses the series and is warned and ignored when the row has none"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "distribution",
+      "empty_default": null,
+      "empty_note": "the product's distribution, scaled by the row's volume share",
+      "family": "demand",
+      "key": "row_demand_distribution",
+      "master": "outbound_logistics.demand_distribution",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_model",
+      "transform": "enum deterministic | normal | triangular | triangular_av | poisson. Order: the Customer-stage row -> outbound_logistics.demand_distribution -> the product's distribution \u00d7 share"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "the product's mean \u00d7 the row's volume share",
+      "family": "demand",
+      "key": "row_demand_mean",
+      "master": "outbound_logistics.demand_mean",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_mean",
+      "transform": "units per week, >= 0 (the mode for triangular). Order: the Customer-stage row -> outbound_logistics.demand_mean (weekly after promotion)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 the distribution needs no variation, or the row is not specified",
+      "family": "demand",
+      "key": "row_demand_variation",
+      "master": "outbound_logistics.demand_variation",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_variation",
+      "transform": "read by the distribution: CV for normal, \u00b1 fraction for triangular_av. Order: the Customer-stage row -> outbound_logistics.demand_variation"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular rows need it",
+      "family": "demand",
+      "key": "row_demand_min",
+      "master": "outbound_logistics.demand_min",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_min",
+      "transform": "units per week, triangular only. Order: the Customer-stage row -> outbound_logistics.demand_min"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular rows need it",
+      "family": "demand",
+      "key": "row_demand_max",
+      "master": "outbound_logistics.demand_max",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_max",
+      "transform": "units per week, triangular only. Order: the Customer-stage row -> outbound_logistics.demand_max"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "fg_policy",
+      "empty_default": null,
+      "empty_note": "base_stock",
+      "family": "production",
+      "key": "fg_policy",
+      "master": "products.fg_policy",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_policy",
+      "transform": "enum \u2014 base_stock (S) \u00b7 min_max (s, S) \u00b7 days_of_cover (D). Order: the Plant-stage row -> products.fg_policy -> base_stock. An incomplete min_max or days_of_cover runs as base_stock, warned. MTS only"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "derived: one week of forecast, plus P-P.4's buffer when it is on",
+      "family": "production",
+      "key": "fg_base_stock",
+      "master": "products.fg_base_stock",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_base_stock",
+      "transform": "units, >= 0: S, the end-of-week FG target (base_stock, min_max). Order: the Plant-stage row -> products.fg_base_stock -> derived. MTS only"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 read by min_max only",
+      "family": "production",
+      "key": "fg_reorder_point",
+      "master": "products.fg_reorder_point",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_reorder_point",
+      "transform": "units, >= 0: s \u2014 min_max builds up to S only when the stock left after the week's demand is below s. MTS only"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 read by days_of_cover only",
+      "family": "production",
+      "key": "fg_cover_days",
+      "master": "products.fg_cover_days",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_cover_days",
+      "transform": "days, >= 0: D \u2014 the target is D/7 x the projected weekly demand, so it moves with the forecast. MTS only"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "the policy target \u2014 the run starts at it",
+      "family": "production",
+      "key": "fg_initial_on_hand",
+      "master": "products.fg_initial_on_hand",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_initial_on_hand",
+      "transform": "units, >= 0: FG opening stock (engine RFC 4). Order: the Plant-stage row -> products.fg_initial_on_hand -> the target. MTS only"
+    },
+    {
+      "catalog_ref": "P-C.1",
+      "family": "fulfillment",
+      "key": "backorder_allowed",
+      "scopes": [
+        "default",
+        "customer"
+      ],
+      "target": "unmet_demand_handling.rule / row_overrides[row].backorder_allowed",
+      "transform": "boolean. Project: backorder (else lost_sales). Row: whether this customer \u00d7 product row waits; empty = the project's setting"
+    },
+    {
+      "catalog_ref": "P-C.1",
+      "family": "fulfillment",
+      "key": "max_backorder_days",
+      "scopes": [
+        "default",
+        "customer"
+      ],
+      "target": "unmet_demand_handling.backorder_horizon / row_overrides[row].backorder_horizon",
+      "transform": "days -> whole weeks rounded HALF UP (3 -> 0, 4 -> 1, 10 -> 1, 11 -> 2), clamped 0-26; empty = the project's, else 14 days. Read only for a project or row that backorders"
+    },
+    {
+      "catalog_ref": "P-C.1",
+      "family": "fulfillment",
+      "key": "backorder_cost_per_day",
+      "scopes": [
+        "default",
+        "customer"
+      ],
+      "target": "unmet_demand_handling.backorder_penalty / row_overrides[row].backorder_penalty",
+      "transform": "per unit per day x 7 -> per unit per week; empty = the project's, else 0. Read only for a project or row that backorders"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": 1.0,
+      "family": "fulfillment",
+      "key": "row_priority",
+      "master": "customers.priority_weight",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "customer_allocation.row_priority",
+      "transform": "weight, >= 0; higher serves first. Order: the Customer-stage row -> customers.priority_weight of the row's customer -> 1.0. Read under the priority and sla_tier rules"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "empty_default": null,
+      "empty_note": "the product's sell price",
+      "family": "fulfillment",
+      "key": "price",
+      "master": "outbound_logistics.unit_price",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.unit_price",
+      "transform": "per unit, > 0. Order: the Customer-stage row -> outbound_logistics.unit_price -> the product's sell price. What revenue_max orders rows by and what values a row's fill rate"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "percent",
+      "empty_default": null,
+      "empty_note": "no contracted floor \u2014 the segment's tier floor applies, else none",
+      "family": "fulfillment",
+      "key": "sla_fill_floor_pct",
+      "master": "customers.sla_fill_floor_pct",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "customer_allocation.row_floor_pct",
+      "transform": "% of the row's demand guaranteed first, 0-100. Order: the Customer-stage row -> customers.sla_fill_floor_pct of the row's customer -> the segment's tier floor. Read under the sla_tier rule"
     }
   ],
   "run_window": {

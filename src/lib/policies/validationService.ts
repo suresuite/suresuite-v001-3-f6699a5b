@@ -81,6 +81,8 @@ export interface ManifestInput {
    * them (`loadGateDataset`); without them a value set on /policies grades as
    * missing here while the gate and the run use it. */
   overrides?: Row[];
+  /** `customers` rows (PLAN.md §24 WP 14.3) — the gate loads them too. */
+  customers?: Row[];
 }
 
 const STAGE_BY_DATASET: Record<string, StageKey> = {
@@ -144,6 +146,7 @@ function gradeInput(input: ManifestInput): { dataset: GradingDataset; graded: Gr
     outbound: input.outbound ?? [],
     bom: input.bom ?? [],
     overrides: input.overrides,
+    customers: input.customers ?? [],
   };
   const graded = gradeManifest(
     dataset,

@@ -266,7 +266,13 @@ fields:
     meaning: >-
       The SHAPE of weekly demand for this product — constant, normal, triangular
       and so on. What the user types here is `demand_distribution`; the engine
-      calls the resolved value `demand_model`.
+      calls the resolved value `demand_model`. `normal` IS A REAL NORMAL since
+      engine 0.3.0 (PLAN.md §24 WP 14.1, ADR 0002 decision 8): N(mean, σ =
+      demand_cv × mean), negative draws set to 0 and counted on the run — before
+      it, `normal` ran as triangularAV with a mapping warning. A customer × product
+      row may state its own distribution on `outbound_logistics` (WP 14.2); this
+      product-level one is what a row that states none runs on, scaled by its
+      volume share.
     grain: metadata
     engine:
       consumed_by: "project_map.py::_resolve_demand_kind -> demand kind"
@@ -347,7 +353,13 @@ fields:
     unit: "coefficient of variation (dimensionless)"
     unit_source: fixed
     meaning: >-
-      How much weekly demand varies, as a coefficient of variation.
+      How much weekly demand varies — READ BY THE DISTRIBUTION (PLAN.md §24
+      WP 14.1): for `normal` it is the coefficient of variation (σ = cv × mean);
+      for `triangular` / `triangularAV` it is the ± fraction of the triangularAV
+      form, triangular(mean·(1−cv), mean, mean·(1+cv)), unless explicit
+      `demand_min` / `demand_max` are given; Poisson and deterministic ignore it.
+      The two readings are not interchangeable: 0.3 is σ = 30 % of the mean under
+      normal and a ±30 % range under triangular.
     grain: level
     engine:
       consumed_by: "project_map.py::_map_products -> demand cv"
@@ -375,6 +387,124 @@ fields:
         The SPREAD half of demand's hybrid. Falls back to the scenario-level
         demand_cv rather than to zero, so an unset CV does not silently make
         demand deterministic.
+  fg_policy:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The finished-goods inventory policy of an MTS product (PLAN.md §24 WP 14.4,
+      ADR 0002 decision 3): `base_stock` fills to S, `min_max` fills to S only when
+      the stock left after the week's demand is below s, `days_of_cover` fills to
+      D/7 × the projected weekly demand, so its target moves with the forecast.
+      NULL is base-stock with today's derived target. An MTO product holds no FG
+      stock and does not read it.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_resolve_fg -> Product.fg_policy (MTS)"
+      transform: "the Plant-stage override, else this; an incomplete min_max or days_of_cover runs as base_stock, warned"
+      missing_default: "base_stock"
+    substitutions:
+      - when: "NULL"
+        value: "base_stock"
+        provenance: default
+        visible_as: "the Plant cell's empty note"
+    ingest:
+      csv_header: "fg_policy"
+      required: false
+      validate: "base_stock | min_max | days_of_cover; blank lands nothing"
+      rule: {kind: enum, values: [base_stock, min_max, days_of_cover], blank: 'null'}
+    surfaces: []
+    resolution: null
+  fg_base_stock:
+    type: "numeric"
+    unit: "units of product"
+    unit_source: fixed
+    meaning: >-
+      S — the end-of-week finished-goods target in units, for `base_stock` and
+      `min_max` (WP 14.4). A STATED S is the target: P-P.4's safety stock is never
+      added on top of it (one source per number). Empty under base-stock is the
+      derived target: one week of forecast, plus P-P.4's buffer when it is on.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_resolve_fg -> Product.fg_base_stock (MTS)"
+      transform: "the Plant-stage override, else this"
+      missing_default: "derived: one week of forecast (+ P-P.4)"
+    substitutions: []
+    ingest:
+      csv_header: "fg_base_stock"
+      required: false
+      validate: "numeric >= 0; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: 'null'}
+    surfaces: []
+    resolution: null
+  fg_reorder_point:
+    type: "numeric"
+    unit: "units of product"
+    unit_source: fixed
+    meaning: >-
+      s — `min_max` only: the plant builds up to S when the stock left after the
+      week's demand falls below s, and builds nothing otherwise (WP 14.4). Must be
+      below S.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_resolve_fg -> Product.fg_reorder_point (MTS, min_max)"
+      transform: "the Plant-stage override, else this"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "fg_reorder_point"
+      required: false
+      validate: "numeric >= 0; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: 'null'}
+    surfaces: []
+    resolution: null
+  fg_cover_days:
+    type: "numeric"
+    unit: "days"
+    unit_source: fixed
+    meaning: >-
+      D — `days_of_cover` only: how many days of FUTURE demand the stock should
+      cover. The target is D/7 × the projected weekly demand, so it moves with the
+      forecast (WP 14.4). Days, not converted: the engine divides by 7 itself.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_resolve_fg -> Product.fg_cover_days (MTS, days_of_cover)"
+      transform: "the Plant-stage override, else this; target = D/7 x projected weekly demand"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "fg_cover_days"
+      required: false
+      validate: "numeric >= 0; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: 'null'}
+    surfaces: []
+    resolution: null
+  fg_initial_on_hand:
+    type: "numeric"
+    unit: "units of product"
+    unit_source: fixed
+    meaning: >-
+      The finished-goods stock an MTS product starts the run with — engine RFC 4,
+      closed by WP 14.4 (the capability first, then this column, in RFC 4's own
+      order). Empty starts the run at the policy target, which is today's
+      behaviour.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_resolve_fg -> Product.fg_initial_on_hand (MTS)"
+      transform: "the Plant-stage override, else this"
+      missing_default: "the policy target"
+    substitutions:
+      - when: "NULL"
+        value: "the FG target"
+        provenance: default
+        visible_as: "the Plant cell's empty note"
+    ingest:
+      csv_header: "fg_initial_on_hand"
+      required: false
+      validate: "numeric >= 0; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: 'null'}
+    surfaces: []
+    resolution: null
   updated_at:
     type: "timestamp with time zone"
     unit: null

@@ -462,6 +462,6 @@ A human-readable stage label the external service reported while the job ran ("I
 
 ---
 
-*Generated from data contract `0f63c0936a2a`, engine `0.2.11`,
+*Generated from data contract `d0d4a59f9d20`, engine `0.6.0`,
 sidecar `supabase/contract/simulation_jobs.contract.yaml`, table created by `20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

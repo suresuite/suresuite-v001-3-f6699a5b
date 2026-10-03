@@ -32,7 +32,6 @@ const read = (...p: string[]) => readFileSync(join(ROOT, ...p), "utf8");
 const LANDING_SQL = read("supabase", "migrations", "20260916000015_ingest_landing.sql");
 const DEDUP_SQL = read("supabase", "migrations", "20260916000017_dedup_natural_keys.sql");
 const KEYS_SQL = read("supabase", "migrations", "20260916000018_natural_key_unique.sql");
-const UPSERT_SQL = read("supabase", "migrations", "20260916000019_promotion_upsert.sql");
 const WIZARD = read("src", "components", "UploadWizard.tsx");
 const FUNCTION = read("supabase", "functions", "ingest-file", "index.ts");
 
@@ -68,7 +67,7 @@ describe("the promotable-target list exists twice and must agree", () => {
       .toEqual([...PROMOTABLE_TARGETS].sort());
   });
 
-  it("covers every CSV dataset the contract describes — TEN since WP 6.2", () => {
+  it("covers every CSV dataset the contract describes — ELEVEN since WP 14.2", () => {
     // Six from WP 3.2, plus the three item masters (D55). They were left out
     // deliberately then: `bulk_upsert_*` already upserted on their composite
     // primary key, and a landing whose promotion was an INSERT would have been a
@@ -85,10 +84,15 @@ describe("the promotable-target list exists twice and must agree", () => {
     // a gate pinned to a value a migration moves has to move with it in the same
     // commit; naming the count out loud is what makes a stale one obvious rather
     // than arithmetic nobody re-reads.
+    //
+    // `demand_forecasts` is the ELEVENTH (PLAN.md §24 WP 14.2): the per-row
+    // forecast series the engine reads since WP 14.1, landing like every other
+    // dataset rather than skipping a tier.
     expect(PROMOTABLE_TARGETS).toEqual([
       "bom_multi_level",
       "bom_single_level",
       "customers",
+      "demand_forecasts",
       "inbound_logistics",
       "materials",
       "outbound_logistics",
@@ -97,7 +101,7 @@ describe("the promotable-target list exists twice and must agree", () => {
       "tier2_suppliers",
       "tier3_suppliers",
     ]);
-    expect(PROMOTABLE_TARGETS).toHaveLength(10);
+    expect(PROMOTABLE_TARGETS).toHaveLength(11);
   });
 
   it("no CSV dataset writes tier 2 from the browser any more (no-tier-skip, I2)", () => {
@@ -255,11 +259,21 @@ describe("the natural keys exist in three places and must agree", () => {
 });
 
 describe("the promotion's unit conversions exist twice and must agree", () => {
+  // THE LIVE DEFINITION, NOT THE FIRST ONE (§24 WP 14.2). This read
+  // `20260916000019` by name, and `20261003000001` replaces the function to add
+  // the outbound row's demand rates — a parity pinned to the first file would
+  // have gone on comparing a list nothing executes, the trap the promotable-target
+  // reader above already documents.
   const fromSql = (() => {
-    const from = UPSERT_SQL.indexOf("CREATE OR REPLACE FUNCTION public.ingest_normalize_at_promotion");
-    expect(from).toBeGreaterThan(-1);
-    const body = UPSERT_SQL.slice(from, UPSERT_SQL.indexOf("$$;", from));
-    return [...body.matchAll(/\('(\w+)',\s*'(\w+)',\s*'(\w+)',\s*'(\w+)',\s*'(\w+)'\)/g)].map(
+    const dir = join(ROOT, "supabase", "migrations");
+    let body: string | null = null;
+    for (const f of readdirSync(dir).filter((x) => x.endsWith(".sql")).sort()) {
+      const src = readFileSync(join(dir, f), "utf8");
+      const from = src.indexOf("CREATE OR REPLACE FUNCTION public.ingest_normalize_at_promotion");
+      if (from > -1) body = src.slice(from, src.indexOf("$$;", from));
+    }
+    expect(body, "no migration defines ingest_normalize_at_promotion").toBeTruthy();
+    return [...body!.matchAll(/\('(\w+)',\s*'(\w+)',\s*'(\w+)',\s*'(\w+)',\s*'(\w+)'\)/g)].map(
       (m) => ({ target: m[1], column: m[2], unitColumn: m[3], conversion: m[4], canonical: m[5] }),
     );
   })();

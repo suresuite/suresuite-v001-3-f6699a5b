@@ -747,6 +747,7 @@ export function RunValidateStage({
       suppliers: itemMasters.suppliers,
       inbound: itemMasters.lanes.inbound,
       outbound: itemMasters.lanes.outbound,
+      customers: itemMasters.lanes.customers,
       bom: itemMasters.lanes.bom,
       dataReady: !itemMasters.loading && itemMasters.lanes.loaded,
     });
@@ -864,6 +865,8 @@ export function RunValidateStage({
     inbound: itemMasters.lanes.inbound,
     bom: itemMasters.lanes.bom,
     outbound: itemMasters.lanes.outbound,
+    customers: itemMasters.lanes.customers,
+    demand_forecasts: itemMasters.lanes.forecasts as unknown as Record<string, unknown>[],
   });
 
   // Full run: gate + queued row via sim-command, then compute on the

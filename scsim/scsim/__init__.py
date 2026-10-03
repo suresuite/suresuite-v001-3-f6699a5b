@@ -23,7 +23,7 @@ __version__ = "0.2.0"
 # Engine semantic version. Bump per change-governance tiers (Part IX §9.5):
 #   Tier 2 (new variable, behavior-neutral default) -> patch
 #   Tier 3 (new phase / contract change)            -> minor or major + ADR
-ENGINE_VERSION = "0.2.11"  # §23 WP 13.4 · §4 D204 (b): a P-P.9 allocation priority is read from a product's row only (a Supplier-stage row's production family no longer folds in as a product)
+ENGINE_VERSION = "0.6.0"  # §24 WP 14.5 · ADR 0002 · §4 D284 (a): MRP for materials (new transient key `gross_requirements`, PH-70, Tier 3 → minor; P-P.1 policy_type `mrp`); the planning horizon H is the longest MRP lead time + 1
 
 from scsim.entities.config import SimulationSettings, StatisticsReport  # noqa: E402,F401
 from scsim.entities.network import (  # noqa: E402,F401

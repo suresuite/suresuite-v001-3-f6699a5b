@@ -25,7 +25,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { STAGE_TABLE_SPEC, type ColSpec } from "../columnSpecs";
-import { resolveCell, type DerivedMaps, type MasterRowMaps } from "../resolveEffective";
+import { masterIdOf, resolveCell, type DerivedMaps, type MasterRowMaps } from "../resolveEffective";
+import { customerRowMasters, type ForecastBucket } from "../customerRows";
 import {
   derivedMaterialCost,
   derivedMaterialCostDetails,
@@ -41,10 +42,10 @@ import { familiesForStage } from "../columnSpecs";
 type Row = Record<string, unknown>;
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const FX = JSON.parse(readFileSync(join(ROOT, "scripts", "example_project", "page_equals_run.json"), "utf8")) as {
-  tables: Record<"suppliers" | "materials" | "products" | "inbound" | "outbound" | "bom", Row[]>;
+  tables: Record<"suppliers" | "materials" | "products" | "inbound" | "outbound" | "bom" | "demand_forecasts" | "customers", Row[]>;
   plant: string;
   policy: { defaults: PolicyBundle; overrides: OverrideRow[] };
-  engine: Record<string, Record<string, { source: string; value: number | null }>>;
+  engine: Record<string, Record<string, { source: string; value: number | string | null }>>;
 };
 
 const T = FX.tables;
@@ -55,6 +56,10 @@ const masters: MasterRowMaps = {
   materials: new Map(T.materials.map((m) => [String(m.material_id), m])),
   products: new Map(T.products.map((p) => [String(p.product_id), p])),
   suppliers: new Map(T.suppliers.map((s) => [String(s.supplier_id), s])),
+  // PLAN.md §24 WP 14.2 — the Customer stage's base: the rows' own demand spec.
+  outbound_logistics: customerRowMasters(T.outbound, (T.demand_forecasts ?? []) as unknown as ForecastBucket[]),
+  // WP 14.3 — the base under a Customer row's priority and service target.
+  customers: new Map((T.customers ?? []).map((c) => [String(c.customer_id), c])),
 };
 const derived: DerivedMaps = {
   materialCost: derivedMaterialCost(T.inbound),
@@ -65,9 +70,10 @@ const derived: DerivedMaps = {
 };
 
 /** The grid's rows, keyed exactly as the stages key their overrides. */
-const ROWS: Record<"supplier" | "plant", Row[]> = {
+const ROWS: Record<"supplier" | "plant" | "customer", Row[]> = {
   supplier: T.inbound.map((a) => ({ key: `${a.supplier_id}::${a.material_id}`, supplier_id: a.supplier_id, material_id: a.material_id })),
   plant: T.products.map((p) => ({ key: `${FX.plant}::${p.product_id}`, item_id: FX.plant, product_id: p.product_id })),
+  customer: T.outbound.map((o) => ({ key: `${o.customer_id}::${o.product_id}`, customer_id: o.customer_id, product_id: o.product_id })),
 };
 
 /** The source a cell may claim for each engine source. */
@@ -80,13 +86,15 @@ const SAME_SOURCE: Record<string, string[]> = {
 };
 
 function cells() {
-  const out: Array<{ where: string; engine: { source: string; value: number | null }; cell: ReturnType<typeof resolveCell> }> = [];
-  for (const stage of ["supplier", "plant"] as const) {
+  const out: Array<{ where: string; engine: { source: string; value: number | string | null }; cell: ReturnType<typeof resolveCell> }> = [];
+  for (const stage of ["supplier", "plant", "customer"] as const) {
     const cols = STAGE_TABLE_SPEC[stage].cols.filter((c) => c.master);
     const masterColByField = new Map<string, ColSpec>(cols.map((c) => [c.field, c]));
     for (const row of ROWS[stage]) {
       for (const col of cols) {
-        const id = String(row[col.master!.idFrom]);
+        // The engine reports a Customer cell per ROW, whatever its master's
+        // grain (WP 14.3: a row's priority sits over its customer's value).
+        const id = stage === "customer" ? String(row.key) : masterIdOf(col, row);
         const engine = FX.engine[`${col.master!.table}.${col.master!.field}`]?.[id];
         const cell = resolveCell({
           rowKey: String(row.key), row, col, families: familiesForStage(stage) as PolicyFamily[],
@@ -116,7 +124,8 @@ describe("gate page-equals-run — zero differing cells", () => {
   it("every master-backed cell shows the value the engine receives, from the source the engine used", () => {
     const differs: string[] = [];
     for (const { where, engine, cell } of cells()) {
-      const shown = typeof cell.value === "number" ? cell.value : undefined;
+      // An ENUM master (the Customer row's distribution, WP 14.2) shows a token.
+      const shown = typeof cell.value === "number" || typeof cell.value === "string" ? cell.value : undefined;
       // An empty cell may show the declared RULE instead of a number — "unlimited",
       // "the engine's own opening stock", "the scenario's CV, else 0.30" — when the
       // engine fell through to its default (or an empty master column). That is the
@@ -126,7 +135,11 @@ describe("gate page-equals-run — zero differing cells", () => {
         shown === undefined && !!cell.placeholder && cell.provenance === "contract" &&
         (engine.value === null || engine.source === "default");
       const valueOk =
-        saysTheRule || (engine.value !== null && shown !== undefined && Math.abs(shown - engine.value) < 1e-9);
+        saysTheRule ||
+        (engine.value !== null && shown !== undefined &&
+          (typeof engine.value === "string"
+            ? shown === engine.value
+            : typeof shown === "number" && Math.abs(shown - engine.value) < 1e-9));
       const sourceOk = saysTheRule || (SAME_SOURCE[engine.source] ?? []).includes(cell.provenance);
       if (!valueOk || !sourceOk) {
         differs.push(`${where}: page ${String(shown ?? cell.placeholder)} (${cell.provenance}) · engine ${engine.value} (${engine.source})`);

@@ -25,9 +25,30 @@ sub-weekly tick ever lands):
 - ``sla_tier``: two passes — first guarantee each segment's fill floor
   (``sla_tiers``: segment → floor %, scaled down pro-rata when supply
   cannot honor all floors), then distribute the remainder by priority.
+- ``revenue_max`` (WP 14.3): serve the highest-priced row first — the row's
+  own price (``row_price``, else the outbound row's unit price, else the
+  product's).
+
+PER ROW (WP 14.3, ADR 0002 decision 4 — one rule per project, priority /
+price / service target per row). ``setup`` PUBLISHES the rule and the per-row
+inputs on ``ctx.row_allocation`` (the P-C.6 publish-at-setup pattern), and
+P-C.1 — the single writer of fulfillment and backlog — splits each product's
+supply with them. A row's priority is ``row_priority`` → ``priority_weights``
+→ ``Customer.priority_weight``; its service target is ``row_floor_pct`` →
+``Customer.sla_fill_floor_pct`` → the segment's ``sla_tiers`` floor → 0. When
+the rule needs a per-row input (``revenue_max``, a row priority, a row or
+customer floor under ``sla_tier``) or a row carries its own backorder
+settings, fulfillment runs per row and this policy's segment KPIs are summed
+from P-C.1's rows, so the two cannot disagree; an implicit row (a product no
+customer row names) belongs to no segment. Otherwise the split below runs as
+before, read-only.
 
 The split is value-weighted with the product's unit price, matching the
-engine's value-based fill-rate convention. Distribution does not alter
+engine's value-based fill-rate convention. Since WP 14.0 the split itself is
+``core/allocation.py::allocate_batched`` — the one allocation function per-row
+fulfillment (WP 14.3) and the plan's shortfall split (WP 14.4) also call — with
+one row per (product, customer); its outputs are the ones this module computed
+inline before, pinned by ``tests/test_allocation.py``. Distribution does not alter
 product-level physics (totals are conserved); its output is the per-segment
 service view — the §7 interaction-8 path made observable.
 
@@ -43,6 +64,7 @@ from typing import ClassVar, Literal
 import numpy as np
 from pydantic import Field
 
+from scsim.core.allocation import allocate_batched
 from scsim.core.context import SimContext
 from scsim.core.phases import DEMAND, FULFILLMENT, Hook, PhaseId
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
@@ -57,11 +79,25 @@ from scsim.policies.base import (
 from scsim.policies.registry import register_plugin
 
 
+# The helper's rule for each P-C.2 rule. fcfs, proportional and fair_share all
+# split pro-rata to demand at weekly buckets (module docstring).
+_HELPER_RULE = {
+    "fcfs": "fair_share",
+    "proportional": "fair_share",
+    "fair_share": "fair_share",
+    "priority": "priority",
+    "sla_tier": "sla_tier",
+    "revenue_max": "revenue_max",
+}
+
+
 class CustomerAllocationParams(PolicyParams):
-    rule: Literal["fcfs", "proportional", "fair_share", "priority", "sla_tier"] = Field(
+    rule: Literal["fcfs", "proportional", "fair_share", "priority", "sla_tier",
+                  "revenue_max"] = Field(
         "fcfs", json_schema_extra={"unit": "enum", "scope": "C",
                                    "notes": "fcfs/proportional/fair_share coincide at weekly "
-                                            "buckets (pro-rata); priority and sla_tier reorder."})
+                                            "buckets (pro-rata); priority, sla_tier and "
+                                            "revenue_max (by row price) reorder."})
     priority_weights: dict[str, float] = Field(
         default_factory=dict,
         json_schema_extra={"unit": "weight per customer", "scope": "C",
@@ -71,6 +107,21 @@ class CustomerAllocationParams(PolicyParams):
         json_schema_extra={"unit": "segment → fill floor %", "scope": "C",
                            "notes": "Guaranteed first-pass fill per segment; scaled down "
                                     "pro-rata when supply cannot honor all floors."})
+    row_priority: dict[str, float] = Field(
+        default_factory=dict,
+        json_schema_extra={"unit": "weight per row", "scope": "PC",
+                           "notes": "'<customer>::<product>' → priority; beats priority_weights "
+                                    "and Customer.priority_weight for that row."})
+    row_price: dict[str, float] = Field(
+        default_factory=dict,
+        json_schema_extra={"unit": "€/unit per row", "scope": "PC",
+                           "notes": "'<customer>::<product>' → price revenue_max orders by; "
+                                    "beats the row's own unit price."})
+    row_floor_pct: dict[str, float] = Field(
+        default_factory=dict,
+        json_schema_extra={"unit": "row → fill floor %", "scope": "PC",
+                           "notes": "'<customer>::<product>' → the row's service target under "
+                                    "sla_tier; beats Customer.sla_fill_floor_pct and sla_tiers."})
 
 
 @register_plugin
@@ -162,7 +213,17 @@ class CustomerAllocation(PolicyPlugin):
                 "warning", "unknown_sla_segment",
                 f"sla_tiers name unknown segment(s): {unknown_seg[:5]}",
             ))
-        bad = {k: v for k, v in p.sla_tiers.items() if not 0.0 <= v <= 100.0}
+        rows = {f"{cl.customer_id}::{cl.product_id}" for cl in net.customer_links}
+        unknown_rows = sorted((set(p.row_priority) | set(p.row_price) | set(p.row_floor_pct))
+                              - rows)
+        if unknown_rows:
+            issues.append(FeasibilityIssue(
+                "warning", "unknown_row",
+                f"per-row allocation inputs name customer × product row(s) no customer "
+                f"link describes: {unknown_rows[:5]}",
+            ))
+        bad = {k: v for k, v in {**p.sla_tiers, **p.row_floor_pct}.items()
+               if not 0.0 <= v <= 100.0}
         if bad:
             return FeasibilityResult(False, tuple(issues) + (FeasibilityIssue(
                 "error", "sla_floor_out_of_range",
@@ -185,18 +246,54 @@ class CustomerAllocation(PolicyPlugin):
             p.priority_weights.get(cid, m.cust_priority[c])
             for c, cid in enumerate(m.cust_ids)
         ]) if m.n_custs else np.zeros(0)
-        floors = np.array([
-            p.sla_tiers.get(seg, 0.0) / 100.0 for seg in m.cust_segment
+        floors_pct = np.array([
+            p.sla_tiers.get(seg, 0.0) for seg in m.cust_segment
         ]) if m.n_custs else np.zeros(0)
+        P, C = m.n_prods, m.n_custs
         ctx.policy_state[self.id] = {
             "seg_ids": seg_ids,
             "seg_of": seg_of,
-            # Priority order: descending weight, id as the deterministic tiebreak.
-            "order": np.lexsort((np.arange(m.n_custs), -weights)),
-            "floors": floors,
+            # Rows are (product, customer), product-major, so product p owns
+            # rows p·C .. (p+1)·C. Priority: descending weight, customer index
+            # (= row order) as the deterministic tiebreak — the helper's rule.
+            "row_ptr": np.arange(P + 1) * C,
+            "row_priority": np.tile(weights, P),
+            "row_floor_pct": np.tile(floors_pct, P),
             "demand_seg": np.zeros((len(seg_ids), T)),
             "served_seg": np.zeros((len(seg_ids), T)),
         }
+        ctx.row_allocation = self._publish(m, p, weights, seg_index)
+
+    @staticmethod
+    def _publish(m, p: CustomerAllocationParams, weights: np.ndarray,
+                 seg_index: dict[str, int]) -> dict:
+        """The project's rule and its per-row inputs, over the demand rows
+        (WP 14.3). ``row_level`` says whether the rule NEEDS per-row
+        fulfillment — without it a project-wide run keeps its product path."""
+        R = m.n_rows
+        priority = np.array([
+            float(weights[c]) if c >= 0 else 1.0 for c in m.row_cust]) if R else np.zeros(0)
+        price = m.row_price.copy()
+        cust_floor = m.row_cust_floor
+        seg_floor = np.array([
+            p.sla_tiers.get(m.cust_segment[c], 0.0) if c >= 0 else 0.0 for c in m.row_cust])
+        floor = np.where(np.isnan(cust_floor), seg_floor, cust_floor) if R else np.zeros(0)
+        for r, rid in enumerate(m.row_ids):
+            if rid in p.row_priority:
+                priority[r] = float(p.row_priority[rid])
+            if rid in p.row_price:
+                price[r] = float(p.row_price[rid])
+            if rid in p.row_floor_pct:
+                floor[r] = float(p.row_floor_pct[rid])
+        rule = p.rule
+        row_level = (
+            rule == "revenue_max"
+            or (rule in ("priority", "sla_tier") and bool(p.row_priority))
+            or (rule == "sla_tier" and (bool(p.row_floor_pct)
+                                       or bool((~np.isnan(cust_floor)).any())))
+        )
+        return {"rule": _HELPER_RULE[rule], "priority": priority, "price": price,
+                "floor_pct": floor, "row_level": row_level}
 
     def on_phase(self, phase: PhaseId, ctx: SimContext) -> None:
         m = ctx.model
@@ -205,38 +302,38 @@ class CustomerAllocation(PolicyPlugin):
         p: CustomerAllocationParams = self.params
         state = ctx.policy_state[self.id]
         t = ctx.week
+        if ctx.served_new_rows is not None:
+            # Fulfillment ran per row (P-C.1): the segments are sums of ITS
+            # rows, value-weighted at each row's price. Implicit rows (no
+            # customer) belong to no segment.
+            named = m.row_cust >= 0
+            price = m.row_price
+            d_c = np.bincount(m.row_cust[named], weights=(ctx.demand_rows * price)[named],
+                              minlength=m.n_custs)
+            s_c = np.bincount(m.row_cust[named], weights=(ctx.served_new_rows * price)[named],
+                              minlength=m.n_custs)
+            state["demand_seg"][:, t] = state["seg_of"] @ d_c
+            state["served_seg"][:, t] = state["seg_of"] @ s_c
+            return
+        P, C = m.n_prods, m.n_custs
         # Value-weighted weekly split (engine fill-rate convention).
         d_pc = (ctx.demand * m.unit_price)[:, None] * m.cust_share       # (P, C)
         avail = ctx.served_new_week * m.unit_price                       # (P,)
 
-        if p.rule in ("fcfs", "proportional", "fair_share"):
-            with np.errstate(invalid="ignore", divide="ignore"):
-                fill = np.where(ctx.demand > 0, ctx.served_new_week / ctx.demand, 1.0)
-            s_pc = d_pc * fill[:, None]
-        elif p.rule == "priority":
-            s_pc = self._fill_in_order(d_pc, avail, state["order"])
-        else:  # sla_tier: floors first (scaled if needed), remainder by priority
-            g_pc = d_pc * state["floors"][None, :]
-            g_tot = g_pc.sum(axis=1)
-            with np.errstate(invalid="ignore", divide="ignore"):
-                scale = np.where(g_tot > 0, np.minimum(1.0, avail / g_tot), 0.0)
-            g_pc = g_pc * scale[:, None]
-            s_pc = g_pc + self._fill_in_order(
-                d_pc - g_pc, avail - g_pc.sum(axis=1), state["order"])
+        # One row per (product, customer), product-major: the shared
+        # allocation helper (core/allocation.py, WP 14.0) splits each
+        # product's supply across its rows. fcfs / proportional / fair_share
+        # coincide at weekly buckets, so all three are the helper's
+        # equal-fill-rate rule.
+        _, s_new = allocate_batched(
+            avail, np.zeros((P * C, 0)), d_pc.ravel(), state["row_ptr"],
+            _HELPER_RULE[p.rule],
+            priority=state["row_priority"], floor_pct=state["row_floor_pct"],
+        )
+        s_pc = s_new.reshape(P, C)
 
         state["demand_seg"][:, t] = state["seg_of"] @ d_pc.sum(axis=0)
         state["served_seg"][:, t] = state["seg_of"] @ s_pc.sum(axis=0)
-
-    @staticmethod
-    def _fill_in_order(d_pc: np.ndarray, avail: np.ndarray, order: np.ndarray) -> np.ndarray:
-        """Serve customers left→right in ``order``: each fills completely
-        before the next sees a unit (vectorized over products)."""
-        d_sorted = d_pc[:, order]
-        before = np.cumsum(d_sorted, axis=1) - d_sorted
-        s_sorted = np.clip(avail[:, None] - before, 0.0, d_sorted)
-        s_pc = np.empty_like(d_pc)
-        s_pc[:, order] = s_sorted
-        return s_pc
 
     def kpi_contribution(self, ctx: SimContext, t_w: int, window_end: int) -> dict[str, float]:
         if ctx.model.n_custs < 2:

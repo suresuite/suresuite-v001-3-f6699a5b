@@ -33,6 +33,8 @@ interface VerifyInput {
    */
   inbound?: Record<string, unknown>[];
   outbound?: Record<string, unknown>[];
+  /** PLAN.md §24 WP 14.3 — `customers` rows, graded like the gate grades them. */
+  customers?: Record<string, unknown>[];
   /** Single- OR multi-level BOM rows — the shared grader normalizes shape. */
   bom?: Record<string, unknown>[];
   /**
@@ -67,7 +69,7 @@ export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
   const {
     defaults, overrides,
     supplierRows, plantRows, customerRows, timeUnit,
-    materials, products, suppliers, inbound, outbound, bom,
+    materials, products, suppliers, inbound, outbound, customers, bom,
   } = input;
 
   /**
@@ -202,6 +204,7 @@ export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
       suppliers: suppliers as unknown as Record<string, unknown>[] | undefined,
       inbound,
       outbound,
+      customers,
       // BOM rows pass through RAW in either shape — the shared grader itself
       // normalizes multi-level rows (grading.ts::normalizeBomRows), the exact
       // code path the sim-command gate runs, so both §8.1 surfaces grade the

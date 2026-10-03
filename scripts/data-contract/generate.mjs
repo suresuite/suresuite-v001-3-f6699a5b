@@ -1183,7 +1183,7 @@ export function renderIngestSpecModule(contract) {
     "// assumed.",
     "",
     "export type IngestRule = {",
-    "  kind: 'text' | 'numeric' | 'integer' | 'unit' | 'enum' | 'boolean';",
+    "  kind: 'text' | 'numeric' | 'integer' | 'unit' | 'enum' | 'boolean' | 'date';",
     "  min?: number;",
     "  exclusive_min?: number;",
     "  max?: number;",

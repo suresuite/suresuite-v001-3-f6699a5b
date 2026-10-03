@@ -8,13 +8,12 @@
 // their own headers. Here the file's name is the heading and the engine's name
 // is inside "Technical details", which is read from the contract.
 
-import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { HowItLoads, TypedColumns, FilledColumns, DatabaseRules, TemplateHeaders } from "@/components/docs/tableRef";
 import { refTable } from "@/components/docs/tableFacts";
 
 export default function Products() {
   const t = refTable("products");
-  const hasOnHand = t.columns.some((c) => c.name === "initial_on_hand");
 
   return (
     <>
@@ -82,21 +81,35 @@ export default function Products() {
         />
       </Section>
 
-      <Callout tone="limit" title="There is no opening stock for finished goods">
-        <p>
-          <DocLink to="materials">Materials</DocLink> has an <Term>initial_on_hand</Term> column and
-          this file {hasOnHand ? "has one too" : "does not"}. That is not an oversight in the
-          template: the strategic engine builds opening inventory from materials only, so there is
-          no finished-goods opening stock for the column to feed.
-        </p>
-        <p>
-          The policy grid used to attribute a plant-stage <Term>initial_on_hand</Term> cell to this
-          file's item master. It pointed at a column that has never existed, so the cell fell
-          through to the policy bundle while the header said it came from your data. The attribution
-          has been removed. Adding the column for real is a schema change <em>and</em> an engine
-          capability, and it has not been made.
-        </p>
-      </Callout>
+      <Section id="fg-policy" title="Finished-goods policy and opening stock (make to stock)">
+        <P>
+          A make-to-stock product keeps finished goods, and five columns say how much. Each is
+          optional; a product that sets none runs exactly as before. All levels are end-of-week
+          finished-goods targets, in units.
+        </P>
+        <P>
+          <Term>fg_policy</Term> picks the rule: <Term>base_stock</Term> builds up to{" "}
+          <Term>fg_base_stock</Term> (S) every week; <Term>min_max</Term> builds up to S only when
+          the stock left after the week's demand falls below <Term>fg_reorder_point</Term> (s), and
+          builds nothing otherwise; <Term>days_of_cover</Term> targets{" "}
+          <Term>fg_cover_days</Term> (D) days of the projected weekly demand — D/7 × demand — so the
+          target rises and falls with the forecast. Empty is base-stock with the derived target: one
+          week of forecast, plus the finished-goods safety stock when that is switched on.
+        </P>
+        <P>
+          A level you type <em>is</em> the target: the safety-stock buffer is never added on top of
+          it, so nothing is counted twice. Planned production is the policy's requirement, plus any
+          backlog, capped at the product's capacity.
+        </P>
+        <P>
+          <Term>fg_initial_on_hand</Term> is the stock the run starts with — empty starts it at the
+          policy target. An incomplete policy (min-max
+          without both levels, or with s not below S; days of cover without D) runs as base-stock,
+          and the run's mapping report says so. A make-to-order product holds no finished goods and
+          ignores all five. Each can also be set per product on the{" "}
+          <DocLink to="plant-stage">Plant stage</DocLink>, as an override.
+        </P>
+      </Section>
 
       <Section id="template" title="The template">
         <TemplateHeaders table={t} />

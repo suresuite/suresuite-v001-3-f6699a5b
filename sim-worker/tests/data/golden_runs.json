@@ -1,0 +1,49 @@
+{
+  "example_backorder": {
+    "sha256": "c0de7d503edc8908457bb3828ca3b9ee4069d88e880096bdd99265d8da5f7118",
+    "mapping_warnings": [
+      "{\"entity\": \"policy:inventory_control\", \"field\": \"order_up_to\", \"level\": \"info\", \"reason\": \"legacy absolute order_up_to replaced by coverage-based \u03ba (\u22488 weeks); a supplier-grid row's absolute s/S IS applied to that material\"}",
+      "{\"entity\": \"scenario\", \"field\": \"analysis_window\", \"level\": \"info\", \"reason\": \"52 wk is outside the engine range [13, 39] wk \u2192 39 wk used\"}",
+      "{\"entity\": \"source\", \"field\": \"materials.cost\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2\"}",
+      "{\"entity\": \"source\", \"field\": \"materials.initial_on_hand\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2\"}",
+      "{\"entity\": \"source\", \"field\": \"materials.moq\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): default 2\"}",
+      "{\"entity\": \"source\", \"field\": \"products.demand_cv\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1\"}",
+      "{\"entity\": \"source\", \"field\": \"products.demand_mean\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1\"}",
+      "{\"entity\": \"source\", \"field\": \"products.production_capacity\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1\"}",
+      "{\"entity\": \"source\", \"field\": \"products.sell_price\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1\"}",
+      "{\"entity\": \"source\", \"field\": \"suppliers.capacity_per_week\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 3\"}",
+      "{\"entity\": \"source\", \"field\": \"suppliers.reliability_score\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 3\"}"
+    ]
+  },
+  "example_outage": {
+    "sha256": "98619f7fc28514c58c149a33b151758a18ebb6732ffbadbf08a6ff4661e3fd98",
+    "mapping_warnings": [
+      "{\"entity\": \"policy:inventory_control\", \"field\": \"order_up_to\", \"level\": \"info\", \"reason\": \"legacy absolute order_up_to replaced by coverage-based \u03ba (\u22488 weeks); a supplier-grid row's absolute s/S IS applied to that material\"}",
+      "{\"entity\": \"scenario\", \"field\": \"analysis_window\", \"level\": \"info\", \"reason\": \"52 wk is outside the engine range [13, 39] wk \u2192 39 wk used\"}",
+      "{\"entity\": \"source\", \"field\": \"materials.cost\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2\"}",
+      "{\"entity\": \"source\", \"field\": \"materials.initial_on_hand\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2\"}",
+      "{\"entity\": \"source\", \"field\": \"materials.moq\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): default 2\"}",
+      "{\"entity\": \"source\", \"field\": \"products.demand_cv\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1\"}",
+      "{\"entity\": \"source\", \"field\": \"products.demand_mean\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1\"}",
+      "{\"entity\": \"source\", \"field\": \"products.production_capacity\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1\"}",
+      "{\"entity\": \"source\", \"field\": \"products.sell_price\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1\"}",
+      "{\"entity\": \"source\", \"field\": \"suppliers.capacity_per_week\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 3\"}",
+      "{\"entity\": \"source\", \"field\": \"suppliers.reliability_score\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 3\"}"
+    ]
+  },
+  "tron_supplier_965": {
+    "sha256": "5a29a238dc880bc2b81d252e262208b4280341b87578813cdf6814844f300b97",
+    "mapping_warnings": [
+      "{\"entity\": \"policy:inventory_control\", \"field\": \"order_up_to\", \"level\": \"info\", \"reason\": \"legacy absolute order_up_to replaced by coverage-based \u03ba (\u22488 weeks); a supplier-grid row's absolute s/S IS applied to that material\"}",
+      "{\"entity\": \"source\", \"field\": \"materials.cost\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 560\"}",
+      "{\"entity\": \"source\", \"field\": \"materials.initial_on_hand\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): default 560\"}",
+      "{\"entity\": \"source\", \"field\": \"materials.moq\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 558 \u00b7 default 2\"}",
+      "{\"entity\": \"source\", \"field\": \"products.demand_cv\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 17\"}",
+      "{\"entity\": \"source\", \"field\": \"products.demand_mean\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 17\"}",
+      "{\"entity\": \"source\", \"field\": \"products.production_capacity\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 17\"}",
+      "{\"entity\": \"source\", \"field\": \"products.sell_price\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 17\"}",
+      "{\"entity\": \"source\", \"field\": \"suppliers.capacity_per_week\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 60\"}",
+      "{\"entity\": \"source\", \"field\": \"suppliers.reliability_score\", \"level\": \"info\", \"reason\": \"value sources (override \u2192 item master \u2192 lanes \u2192 default): master 60\"}"
+    ]
+  }
+}

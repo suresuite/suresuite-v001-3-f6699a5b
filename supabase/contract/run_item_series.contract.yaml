@@ -65,7 +65,7 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "component ItemSeriesExplorer (mounted by RunValidateStage) → select kind,item_id from run_item_series"
     grain: table
-    evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+    evidence: "src/components/sim/ItemSeriesExplorer.tsx:88"
     confirmed: true
     note: >-
       Run & Validate is where an inspection run is STARTED, and the explorer sits
@@ -75,7 +75,7 @@ surfaces:
   - page: "SimulationLab.tsx"
     via: "component ItemSeriesExplorer (mounted by ResultsDashboard) → select kind,item_id from run_item_series"
     grain: table
-    evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+    evidence: "src/components/sim/ItemSeriesExplorer.tsx:88"
     confirmed: true
     note: >-
       Simulation Lab dispatches no inspection run, so this panel shows rows only
@@ -142,12 +142,12 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:88"
         confirmed: true
       - page: "SimulationLab.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:88"
         confirmed: true
     resolution: null
   item_id:
@@ -170,12 +170,12 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:88"
         confirmed: true
       - page: "SimulationLab.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:88"
         confirmed: true
     resolution: null
   series:
@@ -202,12 +202,12 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/sim/ItemSeriesExplorer.tsx:109"
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:118"
         confirmed: true
       - page: "SimulationLab.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/sim/ItemSeriesExplorer.tsx:109"
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:118"
         confirmed: true
     resolution: null
     note: >-

@@ -323,6 +323,24 @@ const UploadWizard = ({
         'expected_lead_time',
         'unit_price',
       ],
+      // PLAN.md §24 WP 14.2 — the row's own demand spec. OPTIONAL, like
+      // `lead_time_unit` inbound: a file without them is today's file, and the
+      // row keeps its product's distribution scaled by its share. The rates are
+      // in the row's `time_unit` and land weekly (normalized at promotion).
+      optionalHeaders: ['demand_distribution', 'demand_mean', 'demand_variation', 'demand_min', 'demand_max'],
+      category: 'outbound',
+    },
+    {
+      // PLAN.md §24 WP 14.2 — the forecast series per customer × product. One
+      // row per week or calendar month; a month is spread evenly over its own
+      // days at promotion (ADR 0002 decision 7) and the review screen says so.
+      id: 'demand_forecasts',
+      name: 'Demand Forecast',
+      description: 'Forecast quantity per customer × product, per week or per month — the centre the run draws demand around',
+      templateFile: '/template/demand_forecasts.csv',
+      guideFile: '/docs/csv-upload-guide.md',
+      expectedHeaders: ['customer_id', 'product_id', 'period_start', 'quantity'],
+      optionalHeaders: ['time_unit'],
       category: 'outbound',
     },
     {
@@ -359,6 +377,9 @@ const UploadWizard = ({
         'demand_mean',
         'demand_cv',
       ],
+      // PLAN.md §24 WP 14.4 — the FG policy and levels of an MTS product, and its
+      // FG opening stock (engine RFC 4). Optional: an MTO product leaves them blank.
+      optionalHeaders: ['fg_policy', 'fg_base_stock', 'fg_reorder_point', 'fg_cover_days', 'fg_initial_on_hand'],
       category: 'item-master',
     },
     {
@@ -379,19 +400,18 @@ const UploadWizard = ({
       // declared them. It was right: this is the missing surface, not a gate to
       // relax.
       //
-      // `sla_fill_floor_pct` is DELIBERATELY NOT OFFERED. The column exists and
-      // no engine field carries it — `scsim`'s `Customer` has no per-customer
-      // floor and `sla_tiers` is keyed by SEGMENT (§4 D95) — so a header for it
-      // would be a column a user fills that changes nothing, which is exactly
-      // the defect §4 D18 is. It comes back when the engine has somewhere to put
-      // it.
+      // `sla_fill_floor_pct` was deliberately NOT offered until PLAN.md §24 WP
+      // 14.3: no engine field carried it (§4 D95), so a header for it would have
+      // been a column that changes nothing (§4 D18). The engine has somewhere to
+      // put it now — `Customer.sla_fill_floor_pct`, each of the customer's rows'
+      // default service target under the sla_tier rule — so it is offered.
       id: 'item_master_customers',
       name: 'Customers Master',
-      description: 'Per-customer segment and allocation priority the simulation reads under scarcity',
+      description: 'Per-customer segment, allocation priority and contracted fill floor the simulation reads under scarcity',
       templateFile: '/template/customers.csv',
       guideFile: '/docs/csv-upload-guide.md',
       expectedHeaders: ['customer_id'],
-      optionalHeaders: ['name', 'segment', 'priority_weight'],
+      optionalHeaders: ['name', 'segment', 'priority_weight', 'sla_fill_floor_pct'],
       category: 'item-master',
     },
     {

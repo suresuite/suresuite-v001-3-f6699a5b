@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "0f63c0936a2a";
-export const ENGINE_VERSION = "0.2.11";
-export const LAST_MIGRATION = "20261002000010_policy_snapshot_resolves_defaults.sql";
+export const CONTRACT_VERSION = "d0d4a59f9d20";
+export const ENGINE_VERSION = "0.6.0";
+export const LAST_MIGRATION = "20261003000002_fg_policy_per_product.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 92,
-  "tablesDescribed": 75,
-  "columnsDescribed": 972,
+  "tablesInSchema": 93,
+  "tablesDescribed": 76,
+  "columnsDescribed": 995,
   "tablesUndescribed": 17
 } as const;
 
@@ -109,6 +109,12 @@ export const TIERS: GlanceTier[] = [
         "owner": "data-ingestion"
       },
       {
+        "table": "demand_forecasts",
+        "grain": "One forecast BUCKET of one customer × product row: from `period_start`, for one week or one calendar month, this customer is expected to take `quantity` of this product (PLAN.md §24 WP 14.2, ADR 0002 decisions 2 and 7). A series is the row's buckets in date order. The plan reads it as the centre of the row's weekly demand; the simulated world draws actual demand around it.",
+        "columns": 13,
+        "owner": "data-ingestion"
+      },
+      {
         "table": "inbound_logistics",
         "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed).",
         "columns": 14,
@@ -129,13 +135,13 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "outbound_logistics",
         "grain": "One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed).",
-        "columns": 13,
+        "columns": 18,
         "owner": "data-ingestion"
       },
       {
         "table": "products",
         "grain": "One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs.",
-        "columns": 18,
+        "columns": 23,
         "owner": "data-ingestion"
       },
       {

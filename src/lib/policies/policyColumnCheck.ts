@@ -226,7 +226,7 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   "supplier:type": {
     shows: "override → project default → min_max",
     savedTo: "override inventory.type",
-    engine: "per-material policy type (inventory_control.material_overrides); s_S / continuous_review run as min_max",
+    engine: "per-material policy type (inventory_control.material_overrides); s_S / continuous_review run as min_max; mrp orders from the plan (WP 14.5)",
     verdict: "works",
     note: "853 stored.",
   },
@@ -388,12 +388,43 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   "plant:order_up_to": { shows: "override → 200", savedTo: "override inventory.order_up_to (plant row)", engine: "plant rows are DROPPED", verdict: "ignored" },
   "plant:rop_q_quantity": { shows: "override → 0", savedTo: "override inventory.rop_q_quantity (plant row)", engine: "plant rows are DROPPED", verdict: "ignored" },
   "plant:review_period_days": { shows: "override → 1", savedTo: "override inventory.review_period_days", engine: "not read", verdict: "ignored" },
-  "plant:initial_on_hand": {
-    shows: "override ('Initial FG')",
-    savedTo: "override inventory.initial_on_hand",
-    engine: "no reader — the engine keeps no finished-goods starting stock",
-    verdict: "ignored",
+  // PLAN.md §24 WP 14.4 — the FG policy per product and FG opening stock. The
+  // opening-stock cell replaced `initial_on_hand`, which had no reader (D89).
+  "plant:fg_initial_on_hand": {
+    shows: "your override → products.fg_initial_on_hand → empty (the run starts at the target)",
+    savedTo: "override production.fg_initial_on_hand (Plant row — /policies never writes the master)",
+    engine: "the MTS product's FG opening stock (engine RFC 4)",
+    verdict: "conditional",
+    note: "MTS products only.",
     refs: ["D89"],
+  },
+  "plant:fg_policy": {
+    shows: "your override → products.fg_policy → empty (base-stock)",
+    savedTo: "override production.fg_policy (Plant row)",
+    engine: "Product.fg_policy: base-stock, min-max or days of cover; an incomplete policy runs as base-stock, warned",
+    verdict: "conditional",
+    note: "MTS products only.",
+  },
+  "plant:fg_base_stock": {
+    shows: "your override → products.fg_base_stock → empty (derived: a week of forecast + P-P.4)",
+    savedTo: "override production.fg_base_stock (Plant row)",
+    engine: "S — the end-of-week FG target (base-stock, min-max); P-P.4 adds nothing on top of a typed S",
+    verdict: "conditional",
+    note: "MTS products only.",
+  },
+  "plant:fg_reorder_point": {
+    shows: "your override → products.fg_reorder_point",
+    savedTo: "override production.fg_reorder_point (Plant row)",
+    engine: "s — min-max builds up to S only below it",
+    verdict: "conditional",
+    note: "Read under min-max only, MTS products only.",
+  },
+  "plant:fg_cover_days": {
+    shows: "your override → products.fg_cover_days",
+    savedTo: "override production.fg_cover_days (Plant row)",
+    engine: "D — target = D/7 × the projected weekly demand",
+    verdict: "conditional",
+    note: "Read under days of cover only, MTS products only.",
   },
   "plant:safety_stock_days": { shows: "override → 7", savedTo: "override inventory.safety_stock_days (plant row)", engine: DROPPED_PER_ROW, verdict: "ignored" },
   "plant:holding_cost_pct": { shows: "override → 0.2", savedTo: "override inventory.holding_cost_pct (plant row)", engine: DROPPED_PER_ROW, verdict: "ignored" },
@@ -429,6 +460,94 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     engine: "not read (the engine is single-plant)",
     verdict: "ignored",
     note: "10 stored. The pre-run gate requires it.",
+  },
+  // PLAN.md §24 WP 14.2 — demand per customer × product row.
+  "customer:row_demand_mode": {
+    shows: "your override, else empty — the engine's rule: the row's forecast when one is uploaded, else its model",
+    savedTo: "override demand.row_demand_mode (Customer row)",
+    engine: "'model' sets an uploaded forecast aside; 'forecast' without one is warned and ignored",
+    verdict: "works",
+  },
+  "customer:row_forecast": {
+    shows: "the row's uploaded forecast buckets (demand_forecasts), summarized",
+    savedTo: "—",
+    engine: "the per-week centre of the row's demand, spread evenly over each bucket at promotion",
+    verdict: "info",
+  },
+  "customer:row_demand_distribution": {
+    shows: "your override → outbound_logistics.demand_distribution → empty (the product's distribution × share)",
+    savedTo: "override demand.row_demand_distribution (per row — /policies never writes the data)",
+    engine: "override → the row's uploaded distribution → the product's distribution scaled by the row's volume share",
+    verdict: "works",
+  },
+  "customer:row_demand_mean": {
+    shows: "your override → outbound_logistics.demand_mean (weekly) → empty (the product's mean × share)",
+    savedTo: "override demand.row_demand_mean (per row)",
+    engine: "override → the row's uploaded mean → the product's mean × share",
+    verdict: "works",
+  },
+  "customer:row_demand_variation": {
+    shows: "your override → outbound_logistics.demand_variation",
+    savedTo: "override demand.row_demand_variation (per row)",
+    engine: "read by the distribution: CV for normal, ± fraction for triangularAV",
+    verdict: "conditional",
+    note: "Read only when the row's distribution is normal or triangularAV.",
+  },
+  "customer:row_demand_min": {
+    shows: "your override → outbound_logistics.demand_min (weekly)",
+    savedTo: "override demand.row_demand_min (per row)",
+    engine: "the triangular row's lower bound",
+    verdict: "conditional",
+    note: "Read only when the row's distribution is triangular.",
+  },
+  "customer:row_demand_max": {
+    shows: "your override → outbound_logistics.demand_max (weekly)",
+    savedTo: "override demand.row_demand_max (per row)",
+    engine: "the triangular row's upper bound",
+    verdict: "conditional",
+    note: "Read only when the row's distribution is triangular.",
+  },
+  // PLAN.md §24 WP 14.3 — fulfillment per customer × product row.
+  "customer:backorder_allowed": {
+    shows: "your override, else the project's setting (Customer allocation card)",
+    savedTo: "override fulfillment.backorder_allowed (Customer row)",
+    engine: "P-C.1: this row waits (backorder) or loses (lost sales); its own backlog",
+    verdict: "works",
+  },
+  "customer:max_backorder_days": {
+    shows: "your override, else the project's; the note says the whole weeks the run uses",
+    savedTo: "override fulfillment.max_backorder_days (Customer row)",
+    engine: "the row's horizon in weeks — days ÷ 7 rounded half up, clamped 0–26",
+    verdict: "conditional",
+    note: "Read only for a row that backorders.",
+  },
+  "customer:backorder_cost_per_day": {
+    shows: "your override, else the project's",
+    savedTo: "override fulfillment.backorder_cost_per_day (Customer row)",
+    engine: "× 7 → the row's backorder penalty per unit per week",
+    verdict: "conditional",
+    note: "Read only for a row that backorders.",
+  },
+  "customer:row_priority": {
+    shows: "your override → customers.priority_weight of the row's customer → 1.0",
+    savedTo: "override fulfillment.row_priority (per row — /policies never writes the customer)",
+    engine: "P-C.2 row priority: higher serves first",
+    verdict: "conditional",
+    note: "Read under the priority and sla_tier rules; the cell is shown only then.",
+  },
+  "customer:price": {
+    shows: "your override → outbound_logistics.unit_price → the product's sell price",
+    savedTo: "override fulfillment.price (per row)",
+    engine: "the row's price: what revenue_max serves first, and what values its fill rate",
+    verdict: "works",
+    note: "Shown under revenue_max, the rule that orders by it.",
+  },
+  "customer:sla_fill_floor_pct": {
+    shows: "your override → customers.sla_fill_floor_pct of the row's customer → empty (the segment's tier floor)",
+    savedTo: "override fulfillment.sla_fill_floor_pct (per row)",
+    engine: "P-C.2 sla_tier: this % of the row's demand is served first",
+    verdict: "conditional",
+    note: "Read under the sla_tier rule; the cell is shown only then.",
   },
 };
 
@@ -479,7 +598,7 @@ export const FULFILLMENT_CARD_CHECK: Record<string, ColumnCheck> = {
   max_backorder_days: {
     shows: "saved value; never saved → 14 (visible when backorder is on)",
     savedTo: "policy_defaults.fulfillment",
-    engine: "backorder horizon in weeks (days ÷ 7, clamped 0–26); never saved → 14",
+    engine: "backorder horizon in weeks (days ÷ 7 rounded half up, clamped 0–26); never saved → 14",
     verdict: "works",
   },
   backorder_cost_per_day: {

@@ -52,15 +52,18 @@ class PhaseId(str, Enum):
 # Transient keys — owned by exactly one phase, recomputed weekly.
 DISRUPTION_STATE = "disruption_state"
 DEMAND = "demand"
+DEMAND_ROWS = "demand_rows"  # WP 14.1 / ADR 0002: demand per customer × product row; Σ = demand
 FORECAST = "forecast"  # ADR 0001: produced at PH-10, consumed by PH-40/PH-70 (MTS)
 FIRM_KNOWLEDGE = "firm_knowledge"
 FG_FULFILLMENT = "fg_fulfillment"
 PRODUCTION_PLAN = "production_plan"
+PLANNED_PRODUCTION = "planned_production"  # WP 14.4 / ADR 0002: [products × H]; column 0 = production_plan
 OVERTIME_CAPACITY = "overtime_capacity"
 SUBSTITUTIONS = "substitutions"
 PRODUCTION_OUTPUT = "production_output"
 FULFILLMENT = "fulfillment"
 MATERIAL_DEMAND = "material_demand"
+GROSS_REQUIREMENTS = "gross_requirements"  # WP 14.5 / ADR 0002: [materials × H] = BOMᵀ × planned_production
 INVENTORY_LEVELS = "inventory_levels"
 PURCHASE_ORDERS = "purchase_orders"
 ARRIVALS = "arrivals"
@@ -88,20 +91,20 @@ class PhaseSpec:
 PIPELINE: tuple[PhaseSpec, ...] = (
     PhaseSpec(PhaseId.PH00, "week_start", (DISRUPTION_STATE,),
               "Onset/recovery profiles → physical disruption state for the week."),
-    PhaseSpec(PhaseId.PH10, "demand_realization", (DEMAND, FORECAST),
-              "Update the demand forecast from history (§3.3 models), then draw D_p[t] "
-              "from the world demand stream."),
+    PhaseSpec(PhaseId.PH10, "demand_realization", (DEMAND, FORECAST, DEMAND_ROWS),
+              "Update the demand forecast from history (§3.3 models), then read D_p[t] — and "
+              "per customer × product row, D_r[t] — from the pre-drawn world demand stream."),
     PhaseSpec(PhaseId.PH20, "detection", (FIRM_KNOWLEDGE,),
               "Firm-visible events (t ≥ start + detection_lag). P-S.4 / P-X.1 evaluate here."),
     PhaseSpec(PhaseId.PH30, "fulfill_from_stock", (FG_FULFILLMENT,),
               "MTS serves D_p from I^FG; no-op for MTO products."),
-    PhaseSpec(PhaseId.PH40, "production_planning", (PRODUCTION_PLAN, OVERTIME_CAPACITY, SUBSTITUTIONS),
+    PhaseSpec(PhaseId.PH40, "production_planning", (PRODUCTION_PLAN, OVERTIME_CAPACITY, SUBSTITUTIONS, PLANNED_PRODUCTION),
               "Plan production: default greedy plan; P-P.5/P-P.9 et al. adjust here."),
     PhaseSpec(PhaseId.PH50, "production_execute", (PRODUCTION_OUTPUT,),
               "Pure mechanics (Eqs. 8/9): produce Q_p, consume materials."),
     PhaseSpec(PhaseId.PH60, "fulfillment", (FULFILLMENT,),
               "F_p, B_p, L_p — P-C.1/P-C.2/P-C.3 resident."),
-    PhaseSpec(PhaseId.PH70, "material_planning", (MATERIAL_DEMAND, INVENTORY_LEVELS),
+    PhaseSpec(PhaseId.PH70, "material_planning", (MATERIAL_DEMAND, INVENTORY_LEVELS, GROSS_REQUIREMENTS),
               "D_m projection (Eq. 1); s_m/S_m levels (Eqs. 2–3) + safety stock."),
     PhaseSpec(PhaseId.PH80, "procurement", (PURCHASE_ORDERS,),
               "Order release (Eqs. 4–6) and sourcing decisions; orders enter the supplier queue."),

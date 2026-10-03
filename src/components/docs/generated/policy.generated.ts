@@ -364,7 +364,7 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic, mrp -> mrp (WP 14.5: ordered from the plan); anything unrecognised falls back to min_max",
         "evidence": null
       }
     ],
@@ -928,6 +928,146 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "plant",
+    "field": "fg_policy",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fg_policy` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fg_policy` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_policy (MTS)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
+    "field": "fg_base_stock",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fg_base_stock` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fg_base_stock` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units of product`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_base_stock (MTS)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
+    "field": "fg_reorder_point",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fg_reorder_point` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fg_reorder_point` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units of product`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_reorder_point (MTS, min_max)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
+    "field": "fg_cover_days",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fg_cover_days` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fg_cover_days` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`days`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_cover_days (MTS, days_of_cover)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
     "field": "type",
     "family": "inventory",
     "hops": [
@@ -948,7 +1088,7 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic, mrp -> mrp (WP 14.5: ordered from the plan); anything unrecognised falls back to min_max",
         "evidence": null
       }
     ],
@@ -1127,32 +1267,38 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "plant",
-    "field": "initial_on_hand",
-    "family": "inventory",
+    "field": "fg_initial_on_hand",
+    "family": "production",
     "hops": [
       {
         "kind": "hook",
-        "detail": "rendered by the plant grid as `initial_on_hand` (family `inventory`)",
+        "detail": "rendered by the plant grid as `fg_initial_on_hand` (family `production`)",
         "evidence": "src/lib/policies/columnSpecs.ts"
       },
       {
         "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "detail": "`products.fg_initial_on_hand` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units of product`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_initial_on_hand (MTS)",
         "evidence": null
       },
       {
         "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
         "evidence": null
       }
     ],
-    "breaks": [
-      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/datamap.py:112."
-    ],
-    "breakClass": "legacy-only",
-    "breakEvidence": [
-      "sim-worker/sim_worker/datamap.py:112"
-    ]
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   },
   {
     "stage": "plant",
@@ -1443,13 +1589,438 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:756, src/hooks/useStageRows.tsx:771."
+      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:770, src/hooks/useStageRows.tsx:785."
     ],
     "breakClass": "app-routing",
     "breakEvidence": [
-      "src/hooks/useStageRows.tsx:756",
-      "src/hooks/useStageRows.tsx:771"
+      "src/hooks/useStageRows.tsx:770",
+      "src/hooks/useStageRows.tsx:785"
     ]
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_mode",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_mode` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → CustomerLink.forecast (P-C.4). Transform: empty = the engine's rule (forecast when the row has an uploaded series, else model). Enum — 'model' plans and draws on the row's mean even when a forecast series is uploaded (the series is set aside); 'forecast' uses the series and is warned and ignored when the row has none",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_forecast",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_forecast` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_distribution",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_distribution` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_distribution` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_model",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_mean",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_mean` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_mean` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units per time_unit`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_mean",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_variation",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_variation` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_variation` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`dimensionless — read by the distribution`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_variation",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_min",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_min` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_min` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units per time_unit`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_min",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_max",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_max` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_max` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units per time_unit`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_max",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "backorder_allowed",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `backorder_allowed` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → unmet_demand_handling.rule / row_overrides[row].backorder_allowed (P-C.1). Transform: boolean. Project: backorder (else lost_sales). Row: whether this customer × product row waits; empty = the project's setting",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "max_backorder_days",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `max_backorder_days` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → unmet_demand_handling.backorder_horizon / row_overrides[row].backorder_horizon (P-C.1). Transform: days -> whole weeks rounded HALF UP (3 -> 0, 4 -> 1, 10 -> 1, 11 -> 2), clamped 0-26; empty = the project's, else 14 days. Read only for a project or row that backorders",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "backorder_cost_per_day",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `backorder_cost_per_day` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → unmet_demand_handling.backorder_penalty / row_overrides[row].backorder_penalty (P-C.1). Transform: per unit per day x 7 -> per unit per week; empty = the project's, else 0. Read only for a project or row that backorders",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_priority",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_priority` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`customers.priority_weight` (item master, keyed from `customer_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "P-C.2 customer_allocation — Customer.priority_weight, the default priority of each of the customer's rows under the `priority` and `sla_tier` rules wherever the `priority_weights` param does not name the customer and no Customer-row override (`row_priority`, WP 14.3) does",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "price",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `price` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.unit_price` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`currency per unit of product`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset; and (WP 14.3) CustomerLink.unit_price, the row's own price under `revenue_max` and in its fill rates",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "sla_fill_floor_pct",
+    "family": "fulfillment",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `sla_fill_floor_pct` (family `fulfillment`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`customers.sla_fill_floor_pct` (item master, keyed from `customer_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_build_customers -> Customer.sla_fill_floor_pct; P-C.2 customer_allocation — each of the customer's rows' default service target under the `sla_tier` rule",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   }
 ];
 
@@ -1457,8 +2028,7 @@ export const CHAINS: PolicyChain[] = [
 export const BREAKS_BY_CLASS: Record<string, string[]> = {
   "legacy-only": [
     "supplier.review_period_days",
-    "plant.review_period_days",
-    "plant.initial_on_hand"
+    "plant.review_period_days"
   ],
   "unread": [
     "customer.primary_source"
@@ -1987,6 +2557,13 @@ export const UPLOAD_ASSETS: UploadAsset[] = [
     "guideFile": "/docs/csv-upload-guide.md"
   },
   {
+    "id": "demand_forecasts",
+    "name": "Demand Forecast",
+    "description": "Forecast quantity per customer × product, per week or per month — the centre the run draws demand around",
+    "templateFile": "/template/demand_forecasts.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
     "id": "item_master_materials",
     "name": "Materials Master",
     "description": "Per-material economics the simulation reads (cost, MOQ, holding, lead-time shape)",
@@ -2010,7 +2587,7 @@ export const UPLOAD_ASSETS: UploadAsset[] = [
   {
     "id": "item_master_customers",
     "name": "Customers Master",
-    "description": "Per-customer segment and allocation priority the simulation reads under scarcity",
+    "description": "Per-customer segment, allocation priority and contracted fill floor the simulation reads under scarcity",
     "templateFile": "/template/customers.csv",
     "guideFile": "/docs/csv-upload-guide.md"
   },
@@ -2337,6 +2914,21 @@ export const ITEM_SERIES: ItemSeries[] = [
   },
   {
     "kind": "product",
+    "key": "projected_demand",
+    "label": "Projected demand (plan)"
+  },
+  {
+    "kind": "product",
+    "key": "requirement",
+    "label": "Requirement (plan)"
+  },
+  {
+    "kind": "product",
+    "key": "planned",
+    "label": "Planned production"
+  },
+  {
+    "kind": "product",
     "key": "production",
     "label": "Production"
   },
@@ -2354,6 +2946,26 @@ export const ITEM_SERIES: ItemSeries[] = [
     "kind": "product",
     "key": "lost_units",
     "label": "Lost units"
+  },
+  {
+    "kind": "material",
+    "key": "mrp_need",
+    "label": "MRP need (next lead time)"
+  },
+  {
+    "kind": "material",
+    "key": "mrp_on_hand",
+    "label": "MRP on hand (after production)"
+  },
+  {
+    "kind": "material",
+    "key": "mrp_on_the_way",
+    "label": "MRP on the way"
+  },
+  {
+    "kind": "material",
+    "key": "mrp_net",
+    "label": "MRP net"
   }
 ];
 
@@ -3676,8 +4288,8 @@ export type ProjectDeletion = {
 };
 
 export const PROJECT_DELETION: ProjectDeletion = {
-  "projectScoped": 54,
-  "cascade": 43,
+  "projectScoped": 55,
+  "cascade": 44,
   "detached": [
     "chat_threads",
     "user_files"
@@ -3784,7 +4396,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 75,
+  "described": 76,
   "open": [
     {
       "table": "analysis_kinds",
@@ -4022,5 +4634,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 42;
-export const BROKEN_COUNT = 5;
+export const CHAIN_COUNT = 59;
+export const BROKEN_COUNT = 4;

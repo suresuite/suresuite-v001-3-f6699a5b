@@ -1,0 +1,283 @@
+# AUTHORED — the data contract's sidecar for `demand_forecasts`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md, which
+# are generated from the two together.
+table: demand_forecasts
+tier: "2"
+schema_name: public
+grain: >-
+  One forecast BUCKET of one customer × product row: from `period_start`, for one
+  week or one calendar month, this customer is expected to take `quantity` of this
+  product (PLAN.md §24 WP 14.2, ADR 0002 decisions 2 and 7). A series is the row's
+  buckets in date order. The plan reads it as the centre of the row's weekly
+  demand; the simulated world draws actual demand around it.
+ingest_dataset:
+  # The eleventh landable dataset (`20261003000001`). `transactional` like the
+  # lanes it describes: a bucket is a fact about one customer × product, not an
+  # entity the project has. `server_set` is `project_id` alone — a forecast belongs
+  # to the project, and this table has no `plant_name` (the row it describes is
+  # the customer × product pair, which `outbound_logistics` keys within the
+  # project's one plant).
+  wizard_id: demand_forecasts
+  fact_class: transactional
+  server_set: [project_id]
+owner: data-ingestion
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "demand_forecasts_pkey"
+  - source: "UNIQUE index (NULLS NOT DISTINCT)"
+    columns: [project_id, customer_id, product_id, period_start]
+    name: "demand_forecasts_natural_key"
+natural_key_intended: [project_id, customer_id, product_id, period_start]
+
+governance:
+  read: project_member
+  write: project_modeler_or_admin
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    RLS with NO `anon` policy: §4 D28's list of unconditional policies is meant to
+    shrink, and nothing needs one. The run reads through the snapshot (SECURITY
+    DEFINER), the worker as service role, and /policies and the Data map through
+    `get_project_demand_forecasts`, which names its caller. Writes: the project's
+    modeler or an admin, as on `customers`. The three WP 2.3 audit triggers and the
+    WP 10.1 graph-state triggers are created with the table.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: Surrogate row identifier. Carries no meaning and joins to nothing.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: The project this bucket belongs to. Every read is scoped by it.
+    grain: identifier
+    engine:
+      consumed_by: "datamap.py::load_project_data -> per-project fetch"
+      transform: "filter, never read as a value"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: null
+      required: false
+      validate: "set from the selected project, never from the CSV"
+    surfaces: []
+    resolution: null
+  customer_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The customer, spelled as `outbound_logistics.customer_id` spells it — the
+      bucket belongs to that outbound row.
+    grain: identifier
+    engine:
+      consumed_by: "datamap.py::forecast_series -> OutboundArc.forecast of the matching (product, customer) row"
+      transform: "str()"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "customer_id"
+      required: true
+      validate: "non-empty"
+      rule: {kind: text, blank: reject}
+    surfaces: []
+    resolution: null
+  product_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: The finished product, spelled as `outbound_logistics.product_id` spells it.
+    grain: identifier
+    engine:
+      consumed_by: "datamap.py::forecast_series -> OutboundArc.forecast of the matching (product, customer) row"
+      transform: "str()"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "product_id"
+      required: true
+      validate: "non-empty"
+      rule: {kind: text, blank: reject}
+    surfaces: []
+    resolution: null
+  period_start:
+    type: "date"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The first day of the bucket. The project's EARLIEST `period_start` is
+      simulated week 0; simulated week w is the seven days starting w·7 days later.
+    grain: identifier
+    engine:
+      consumed_by: "datamap.py::forecast_series -> which simulated weeks the bucket covers"
+      transform: "days since the project's earliest period_start"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "period_start"
+      required: true
+      validate: "a calendar date written YYYY-MM-DD"
+      rule: {kind: date, blank: reject}
+    surfaces: []
+    resolution: null
+  time_unit:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      How long the bucket is: `week` or `month` (a calendar month from
+      `period_start`). Blank means week. Kept AS UPLOADED — unlike a lane's
+      `time_unit` it is not rewritten at promotion, because it is the bucket's
+      length and the spread below needs it.
+    grain: metadata
+    engine:
+      consumed_by: "demand_forecast_spread() -> period_end"
+      transform: null
+      missing_default: "week"
+    substitutions:
+      - when: "blank"
+        value: "a one-week bucket"
+        provenance: default
+        visible_as: null
+    ingest:
+      csv_header: "time_unit"
+      required: false
+      validate: "week or month; blank means week"
+      rule: {kind: enum, values: [week, month], blank: "null"}
+    surfaces: []
+    resolution: null
+  quantity:
+    type: "numeric"
+    unit: "units over the bucket"
+    unit_source: column
+    unit_column: time_unit
+    meaning: >-
+      How much the customer is forecast to take over the WHOLE bucket — 1 000 for
+      a month is 1 000 over that month. Spread evenly over the bucket's days at
+      promotion (decision 7) into `weekly_quantity`; nothing reads this column as a
+      rate.
+    grain: rate
+    engine:
+      consumed_by: "demand_forecast_spread() -> weekly_quantity"
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "quantity"
+      required: true
+      validate: "numeric >= 0"
+      rule: {kind: numeric, min: 0, blank: reject}
+    surfaces: []
+    resolution:
+      default_mode: asserted
+      assertable_by: [csv_upload]
+      estimable_from: []
+      hybrid: null
+      on_conflict: assertion_wins
+      threshold_pct: null
+      note: >-
+        A forecast is the user's statement of what they expect; it is not
+        estimated here. History-based forecasting (P-F.1) is out of scope for
+        Phase 14 (design doc §8).
+    note: >-
+      `unit_source: column` with NO `normalize_at_promotion`, deliberately. The
+      generic `rate` conversion rewrites the unit column to `week`, which would
+      erase the bucket's length; the conversion this column needs is the calendar
+      spread `demand_forecast_spread()` applies in the promoting statement, which
+      writes `period_end` and `weekly_quantity` and leaves `time_unit` as uploaded.
+  period_end:
+    type: "date"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The bucket's EXCLUSIVE end: `period_start` + 1 week, or + 1 calendar month.
+      Server-computed at promotion; never uploaded.
+    grain: metadata
+    engine:
+      consumed_by: "datamap.py::forecast_series -> which days the bucket covers"
+      transform: null
+      missing_default: null
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "computed by demand_forecast_spread()"}
+    surfaces: []
+    resolution: null
+  weekly_quantity:
+    type: "numeric"
+    unit: "units per week"
+    unit_source: fixed
+    meaning: >-
+      The bucket's quantity spread evenly over its own days, as a weekly rate:
+      quantity × 7 / days in the bucket (decision 7). A 30-day month of 1 000
+      units is 233.33 per week. Server-computed at promotion; the only quantity
+      the run reads.
+    grain: rate
+    engine:
+      consumed_by: "datamap.py::forecast_series -> the daily rate weekly_quantity / 7 over the bucket's days"
+      transform: "summed per simulated week over the days that week shares with the bucket"
+      missing_default: null
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "computed by demand_forecast_spread()"}
+    surfaces: []
+    resolution: null
+  ingest_run_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The ingestion run that last wrote this row, and through it the file, the
+      uploader and who approved the promotion. Set by `ingest_apply_run` and by
+      nothing else.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  source_row_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The tier-1 staged row this was promoted from; its `source_row_number` is the
+      physical line of the uploaded file. `ON DELETE SET NULL`, DEFERRABLE.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: When the row was inserted. Server-set.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: When the row last changed. Server-set.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

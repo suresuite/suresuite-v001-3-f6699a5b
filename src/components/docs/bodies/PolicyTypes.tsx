@@ -55,7 +55,7 @@ export default function PolicyTypes() {
 
   return (
     <>
-      <PageTitle lead="Min-max, base stock, (R, Q) and periodic review — and which parameters each one actually uses.">
+      <PageTitle lead="Min-max, base stock, (R, Q), periodic review and MRP — and which parameters each one actually uses.">
         Policy types
       </PageTitle>
 
@@ -100,6 +100,27 @@ export default function PolicyTypes() {
           </div>
         </Section>
       ))}
+
+      <Section id="mrp" title="MRP — ordering from the plan">
+        <P>
+          The four reorder-point types order from <em>consumption</em>: when stock runs down, refill
+          it. <Term>MRP</Term> orders from the <em>plan</em>. Each week it looks at what the plant
+          will build over the material's lead time — planned production, which comes from your
+          customer demand — multiplies it out through the BOM, and orders the difference between that
+          need and what is already on hand or on the way:
+        </P>
+        <P>
+          order = need over the next lead time + safety stock − on hand − on the way, rounded up to
+          the MOQ when it is positive, sent to the material's primary supplier.
+        </P>
+        <P>
+          It has no level of its own to type. Its buffer is the row's safety-stock days, counted
+          once. A demand step that is in your forecast is ordered for before it arrives; one that
+          nobody forecast is caught only by what is on hand — the plan never reads demand that has
+          not happened. MRP and reorder-point materials can sit in one project, and an inspection run
+          shows each MRP material's record week by week: need, on hand, on the way, net and order.
+        </P>
+      </Section>
 
       {(rop?.breaks.length || oup?.breaks.length) && (
         <Callout tone="limit" title="Two of these parameters do not change a run">
