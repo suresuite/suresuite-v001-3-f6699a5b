@@ -129,7 +129,7 @@
      "supplier_id": "S2",
      "material_id": "M1",
      "cost": 12.0,
-     "lead_time_weeks": 3,
+     "lead_time_weeks": 5,
      "lead_time_dist": "deterministic",
      "lead_time_cv": 0.0,
      "moq": 5.0,
@@ -149,7 +149,7 @@
      "supplier_id": "S3",
      "material_id": "M3",
      "cost": 7.0,
-     "lead_time_weeks": 1,
+     "lead_time_weeks": 2,
      "lead_time_dist": "deterministic",
      "lead_time_cv": 0.0,
      "moq": 0.0,
@@ -1097,6 +1097,34 @@
    "entity": "C2::P2",
    "source": "default",
    "value": null
+  },
+  {
+   "target": "SupplierLink.lead_time_weeks",
+   "master": "inbound_logistics.lead_time",
+   "entity": "S1::M1",
+   "source": "master",
+   "value": 2
+  },
+  {
+   "target": "SupplierLink.lead_time_weeks",
+   "master": "inbound_logistics.lead_time",
+   "entity": "S2::M1",
+   "source": "override",
+   "value": 5
+  },
+  {
+   "target": "SupplierLink.lead_time_weeks",
+   "master": "inbound_logistics.lead_time",
+   "entity": "S2::M2",
+   "source": "master",
+   "value": 2
+  },
+  {
+   "target": "SupplierLink.lead_time_weeks",
+   "master": "inbound_logistics.lead_time",
+   "entity": "S3::M3",
+   "source": "default",
+   "value": 2
   },
   {
    "target": "Material.cost",
@@ -2086,6 +2114,12 @@
  ],
  "warnings": [
   {
+   "level": "warn",
+   "entity": "supply:S3->M3",
+   "field": "lead_time",
+   "reason": "missing lead_time → defaulted to 2 weeks"
+  },
+  {
    "level": "info",
    "entity": "material:M2",
    "field": "cost",
@@ -2150,6 +2184,12 @@
    "entity": "source",
    "field": "customers.priority_weight",
    "reason": "value sources (override → item master → lanes → default): override 1 · master 2"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "inbound_logistics.lead_time",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 2 · default 1"
   },
   {
    "level": "info",

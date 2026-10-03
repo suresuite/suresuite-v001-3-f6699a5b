@@ -2,7 +2,7 @@
 
 Draft review batch, not a declaration that the entire manual is finished.
 
-Initial source: `7698ac2d541242de35383d488cfa3cc1ab5a31c2`. Refreshed and rechecked against `21cc4a4aed1ac11b9de4b60fa464f0596b0bd21a` after 16 newer commits appeared on main. All 150 upstream changed blobs were reconstructed locally and matched their Git blob hashes before applying this documentation work. The final comparison, replenishment and export guidance incorporates that newer behavior. No production writes, permissions, deployment, migrations or engine behavior were changed.
+Initial source: `7698ac2d541242de35383d488cfa3cc1ab5a31c2`. Refreshed through `21cc4a4aed1ac11b9de4b60fa464f0596b0bd21a`, then `32aa35b8f4f525ce9c75c49685d0866803840af3` as main advanced. Both upstream updates (150 and 103 changed blobs) matched their Git blob hashes locally before integration. The final refresh adds Supplier-stage per-lane lead-time overrides, whole-week rounding and the lane/default fallback. The final comparison, replenishment and export guidance incorporates that newer behavior. No production writes, permissions, deployment, migrations or engine behavior were changed.
 
 ## What changed
 
@@ -20,7 +20,7 @@ Existing slugs, registry/search organization and documentation access filtering 
 
 | Check | Result |
 | --- | --- |
-| Full Vitest suite after upstream refresh | PASS: 157 files, 1,655 tests |
+| Full Vitest suite after upstream refresh | PASS: 158 files, 1,661 tests |
 | Final documentation suite after tutorial refinements | PASS: 10 files, 296 tests |
 | Production Vite build | PASS; existing large-chunk/Tailwind warnings |
 | Typecheck ratchet | PASS: no new errors; 15 baseline errors in 8 files |

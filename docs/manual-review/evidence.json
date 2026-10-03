@@ -1,5 +1,5 @@
 {
-  "inspected_commit": "21cc4a4aed1ac11b9de4b60fa464f0596b0bd21a",
+  "inspected_commit": "32aa35b8f4f525ce9c75c49685d0866803840af3",
   "scope": "Source review and isolated local execution; not a deployment audit.",
   "sources": [
     {
@@ -24,7 +24,7 @@
       "path": "src/lib/policies/resolveEffective.ts",
       "symbols": "getEffectiveValue, resolveCell",
       "manual_page": "how-policies-work",
-      "sha256": "4757e73766d9de2f25c1ff44f67f38f9f9dbc2a69bcdd8f8cf81d402823f6c9b"
+      "sha256": "237d08717e82532b15fe911edbf42662ae8429530666ec4dea102a342a79e793"
     },
     {
       "path": "src/lib/policies/projectRules.ts",
@@ -36,7 +36,7 @@
       "path": "scsim/scsim/io/project_map.py",
       "symbols": "_build_settings, _map_policies, from_project_data",
       "manual_page": "how-policies-work",
-      "sha256": "9a1493f57270b8c9a6196a34db9f038f53116f9fb0d6600addccc31ea409c976"
+      "sha256": "776a086887d7202f68cccd6e51b58c278beb381b874e583fc0f27e98a46b207b"
     },
     {
       "path": "sim-worker/sim_worker/local.py",

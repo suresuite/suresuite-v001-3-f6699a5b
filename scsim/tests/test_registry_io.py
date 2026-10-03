@@ -473,6 +473,9 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         "capacity_per_week": ("suppliers.capacity_per_week", "supplier"),
         "reliability_score": ("suppliers.reliability_score", "supplier"),
         "initial_on_hand": ("materials.initial_on_hand", "supplier"),
+        # The first override of a LANE column: one supplier × material link's
+        # lead time over the uploaded `inbound_logistics.lead_time`.
+        "lead_time_weeks": ("inbound_logistics.lead_time", "supplier"),
         "sell_price": ("products.sell_price", "plant"),
         "production_capacity": ("products.production_capacity", "plant"),
         # PLAN.md §24 WP 14.2 — the Customer row's demand spec over
@@ -569,6 +572,7 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "coverage_weeks": 3, "reorder_point": 40, "order_up_to": 400, "review_period_days": 14,
         "material_cost": 3.3,
         "material_moq": 9, "capacity_per_week": 77, "reliability_score": 0.5, "initial_on_hand": 5,
+        "lead_time_weeks": 5,
         "sell_price": 7, "production_capacity": 66,
         "row_demand_mode": "model", "row_demand_distribution": "poisson", "row_demand_mean": 25,
         "row_demand_variation": 0.5, "row_demand_min": 5, "row_demand_max": 500,

@@ -3673,6 +3673,20 @@
     },
     {
       "catalog_ref": null,
+      "domain": "positive",
+      "empty_default": 2.0,
+      "family": "sourcing",
+      "key": "lead_time_weeks",
+      "master": "inbound_logistics.lead_time",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_weeks",
+      "transform": "weeks, > 0, on THIS supplier x material link only; rounded half to even and clamped 1-51 like the uploaded value. Order: the Supplier-stage row (`node:<supplier>::<material>`) -> inbound_logistics.lead_time x lead_time_unit -> 2 weeks"
+    },
+    {
+      "catalog_ref": null,
       "domain": "nonnegative",
       "empty_default": null,
       "empty_note": "the engine's own opening stock (its starting cover)",

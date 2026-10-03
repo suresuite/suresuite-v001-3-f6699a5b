@@ -38,6 +38,7 @@ import {
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { customerRowMasters, demandCellNote, fulfillmentCellNote } from "@/lib/policies/customerRows";
+import { supplierLaneMasters } from "@/lib/policies/supplierLanes";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
 import type { StageRowsQuery } from "@/hooks/useStageGuards";
 import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/policies/schemas";
@@ -124,8 +125,11 @@ export function MobileStagePolicyList({
       outbound_logistics: customerRowMasters(lanes.outbound, lanes.forecasts),
       // WP 14.3 — the base under a Customer row's priority and service target.
       customers: new Map((lanes.customers ?? []).map((c) => [String(c.customer_id), c])),
+      // The base under a Supplier row's lead time: each lane as the engine
+      // builds its link, keyed `<supplier>::<material>`.
+      inbound_logistics: supplierLaneMasters(lanes.inbound),
     }),
-    [materials, products, suppliers, lanes.outbound, lanes.forecasts, lanes.customers],
+    [materials, products, suppliers, lanes.outbound, lanes.forecasts, lanes.customers, lanes.inbound],
   );
 
   const masterColByField = useMemo(() => {
