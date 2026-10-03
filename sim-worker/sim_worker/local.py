@@ -48,7 +48,7 @@ from .series_store import long_columns
 # The tables a simulation reads — the snapshot's `inputs` domain (WP 11.2 pins
 # it to the worker's read set, `simulationScopeParity.test.ts`).
 INPUT_TABLES = ("suppliers", "materials", "products", "customers", "inbound", "outbound",
-                "bom", "bom_multi_level")
+                "bom", "bom_multi_level", "demand_forecasts")
 
 
 def dataset_inputs(dataset: dict[str, Any]) -> dict[str, list[dict]]:
@@ -91,6 +91,7 @@ def project_data_from_snapshots(
     return build_project_data(
         suppliers=t["suppliers"], materials=t["materials"], products=t["products"],
         inbound=t["inbound"], outbound=t["outbound"], customers=t["customers"],
+        demand_forecasts=t["demand_forecasts"],
         # The worker's rule: multi-level BOM rows win when there are any.
         bom=t["bom_multi_level"] or t["bom"],
         policies=apply_recovery(snapshot_to_policies(policy_snapshot or {}), recovery),

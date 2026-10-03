@@ -41,7 +41,24 @@ export default function OutboundLogistics() {
             ),
             time_unit: (
               <>
-                This governs <Term>volume</Term> and nothing else on the row.
+                This governs <Term>volume</Term> — and the row's <Term>demand_mean</Term>,{" "}
+                <Term>demand_min</Term> and <Term>demand_max</Term>, which are rates too and are
+                stored weekly once the file is promoted.
+              </>
+            ),
+            demand_distribution: (
+              <>
+                Optional. The row's <strong>own</strong> demand shape. Blank: the row runs on its
+                product's distribution, scaled by its share of the product's volume — how every
+                project ran before demand could be stated per row.
+              </>
+            ),
+            demand_variation: (
+              <>
+                <strong>Read by the distribution</strong>: for <Term>normal</Term> it is the
+                coefficient of variation (σ = variation × mean); for <Term>triangular_av</Term> it is
+                the ± fraction (0.3 → 70 to 130 around 100). Deterministic, Poisson and triangular
+                ignore it.
               </>
             ),
             unit_price: (
@@ -53,6 +70,17 @@ export default function OutboundLogistics() {
             ),
           }}
         />
+      </Section>
+
+      <Section id="demand-per-row" title="Demand per customer and product">
+        <P>
+          Each row may state its own demand: a distribution with its mean and variation, or a
+          forecast series uploaded as a <DocLink to="demand-forecasts">Demand Forecast</DocLink>.
+          A product's demand is then the sum of its rows. A row that states nothing keeps the
+          product-level demand, split by volume — so a file without these columns runs exactly as
+          it always has. Every value can be overridden per row on the Customer stage at{" "}
+          <AppLink to="/policies">/policies</AppLink>; the upload is never changed by that.
+        </P>
       </Section>
 
       <Callout tone="limit" title="expected_lead_time is stored, validated, and read by nothing">

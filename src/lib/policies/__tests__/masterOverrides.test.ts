@@ -45,7 +45,8 @@ const node = (target_key: string, family: OverrideRow["family"], patch: Record<s
 describe("the rule is the engine's declaration", () => {
   it("every master-backed grid column has exactly one engine override rule, on its own stage", () => {
     const seen: string[] = [];
-    for (const stage of ["supplier", "plant"] as const) {
+    // The Customer stage joined in PLAN.md §24 WP 14.2 (the row's demand spec).
+    for (const stage of ["supplier", "plant", "customer"] as const) {
       for (const c of STAGE_TABLE_SPEC[stage].cols) {
         if (!c.master) continue;
         const rule = masterOverrideRule(c.family, c.field);

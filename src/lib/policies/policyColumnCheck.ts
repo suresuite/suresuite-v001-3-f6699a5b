@@ -430,6 +430,52 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     verdict: "ignored",
     note: "10 stored. The pre-run gate requires it.",
   },
+  // PLAN.md §24 WP 14.2 — demand per customer × product row.
+  "customer:row_demand_mode": {
+    shows: "your override, else empty — the engine's rule: the row's forecast when one is uploaded, else its model",
+    savedTo: "override demand.row_demand_mode (Customer row)",
+    engine: "'model' sets an uploaded forecast aside; 'forecast' without one is warned and ignored",
+    verdict: "works",
+  },
+  "customer:row_forecast": {
+    shows: "the row's uploaded forecast buckets (demand_forecasts), summarized",
+    savedTo: "—",
+    engine: "the per-week centre of the row's demand, spread evenly over each bucket at promotion",
+    verdict: "info",
+  },
+  "customer:row_demand_distribution": {
+    shows: "your override → outbound_logistics.demand_distribution → empty (the product's distribution × share)",
+    savedTo: "override demand.row_demand_distribution (per row — /policies never writes the data)",
+    engine: "override → the row's uploaded distribution → the product's distribution scaled by the row's volume share",
+    verdict: "works",
+  },
+  "customer:row_demand_mean": {
+    shows: "your override → outbound_logistics.demand_mean (weekly) → empty (the product's mean × share)",
+    savedTo: "override demand.row_demand_mean (per row)",
+    engine: "override → the row's uploaded mean → the product's mean × share",
+    verdict: "works",
+  },
+  "customer:row_demand_variation": {
+    shows: "your override → outbound_logistics.demand_variation",
+    savedTo: "override demand.row_demand_variation (per row)",
+    engine: "read by the distribution: CV for normal, ± fraction for triangularAV",
+    verdict: "conditional",
+    note: "Read only when the row's distribution is normal or triangularAV.",
+  },
+  "customer:row_demand_min": {
+    shows: "your override → outbound_logistics.demand_min (weekly)",
+    savedTo: "override demand.row_demand_min (per row)",
+    engine: "the triangular row's lower bound",
+    verdict: "conditional",
+    note: "Read only when the row's distribution is triangular.",
+  },
+  "customer:row_demand_max": {
+    shows: "your override → outbound_logistics.demand_max (weekly)",
+    savedTo: "override demand.row_demand_max (per row)",
+    engine: "the triangular row's upper bound",
+    verdict: "conditional",
+    note: "Read only when the row's distribution is triangular.",
+  },
 };
 
 /** Header label + sub-label exactly as the grid renders them. */

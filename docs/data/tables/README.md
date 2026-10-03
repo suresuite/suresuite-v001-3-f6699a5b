@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-75 of 92 tables are covered,
-972 columns in all. A table that is not here is listed
+76 of 93 tables are covered,
+990 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -23,6 +23,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`customers`](customers.md) | 2 | `data-ingestion` | 10 | One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows. |
 | [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 18 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
 | [`delegation_grants`](delegation_grants.md) | G | `platform` | 9 | One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends. |
+| [`demand_forecasts`](demand_forecasts.md) | 2 | `data-ingestion` | 13 | One forecast BUCKET of one customer × product row: from `period_start`, for one week or one calendar month, this customer is expected to take `quantity` of this product (PLAN.md §24 WP 14.2, ADR 0002 decisions 2 and 7). A series is the row's buckets in date order. The plan reads it as the centre of the row's weekly demand; the simulated world draws actual demand around it. |
 | [`disruption_scenario_effects`](disruption_scenario_effects.md) | 4 | `policy-ui` | 9 | One effect for one profile: WHAT the disruption does to whatever it hits. A capacity reduction or a time delay, with a magnitude and the unit that magnitude is in. |
 | [`disruption_scenario_profiles`](disruption_scenario_profiles.md) | 4 | `policy-ui` | 13 | One disruption profile for one project — the HEADER of the normalised disruption model. What it hits lives in `_targets`, what it does in `_effects`, and how it is simulated in `_settings`; all three cascade from this row. |
 | [`disruption_scenario_settings`](disruption_scenario_settings.md) | 4 | `policy-ui` | 8 | One simulation setting for one profile, as a key and a JSONB value. HOW the disruption is simulated, as against what it hits (`_targets`) and what it does (`_effects`). |
@@ -51,7 +52,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`org_capabilities`](org_capabilities.md) | G | `platform` | 5 | One grant or denial, for one org_id and one capability. The org layer: a tenant-wide override of the role default. |
 | [`organization_members`](organization_members.md) | G | `platform` | 6 | One user's membership of one organization, and the role they hold IN that organization. An account may hold several — one per organization it belongs to (§4 D210). Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for. |
 | [`organizations`](organizations.md) | G | `platform` | 18 | One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold. |
-| [`outbound_logistics`](outbound_logistics.md) | 2 | `data-ingestion` | 13 | One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed). |
+| [`outbound_logistics`](outbound_logistics.md) | 2 | `data-ingestion` | 18 | One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed). |
 | [`password_reset_requests`](password_reset_requests.md) | G | `platform` | 6 | One "Forgot password?" request for one account, from the moment the person asks until a super admin resets the password or dismisses the request (PLAN.md §4 D251). |
 | [`plan_role_allowances`](plan_role_allowances.md) | 4 | `platform` | 8 | One project role's share of an organization's capacity pool: the percentage of the month's compute and of the series storage a member holding that role may use, and how many runs that member may have in flight. A row with no organization is the platform default; a row naming one overrides it for that organization alone. |
 | [`policy_defaults`](policy_defaults.md) | 4 | `policy-ui` | 15 | One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against. |
@@ -90,4 +91,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `48d3cc002eef`, engine `0.3.0`.*
+*Generated from data contract `14629b47bab9`, engine `0.3.0`.*

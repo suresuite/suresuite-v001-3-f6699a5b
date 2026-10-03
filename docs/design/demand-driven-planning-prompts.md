@@ -310,6 +310,14 @@ DO:
    Inherited from WP 14.1: use the demand rows (model.row_*, row_ptr, ctx.demand_rows).
    P-C.2's cust_share spreads a product no link names over ALL customers; the demand
    rows give it one implicit row — make the two agree.
+   Inherited from WP 14.2: the Customer stage already carries per-row cells and the
+   override entity "row" (<customer>::<product>, entityOverrides.ts), the composite master
+   pointer idFrom "customer_id::product_id" onto outbound_logistics, and the mapper's
+   per-row reader _apply_row_demand_overrides (literal patch.get("row_...") reads, for the
+   D90 gate). Seven production keys, sell_price among them, declare "customer" scope
+   because _composite_patches resolves any node:<x>::<product> key to the PRODUCT: a
+   sell_price patch on a Customer row sets the product's price, not the row's. A per-row
+   price for revenue_max needs its own row key; decide whether to close that latent scope.
 2. Engine, P-C.2:
    - Publish the rule and per-row priority / price / floor at setup (the P-C.6
      publish-at-setup pattern).
@@ -396,6 +404,11 @@ DO:
    ingestion template, snapshot simulation scope, and Plant-table cells on /policies as
    overrides (scope declared in POLICY_BUNDLE_KEYS). Close RFC 4 in PLAN.md §14.
 6. Inspection series per product: projected demand, requirement, planned, built.
+   Inherited from WP 14.2: uploaded per-row specs and dated forecasts reach the engine
+   (design doc §9 point 5 is the calendar). A new products column copies the outbound
+   demand columns' route: rate conversion at promotion, jsonb_strip_nulls in
+   _build_dataset_snapshot_v2 (a project that sets none hashes as before), and datamap's
+   projection names it.
 
 TESTS:
 - The design doc's §2 example, built as a test: two rows, capacity 180, fair_share. Week

@@ -476,10 +476,20 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         "production_capacity": ("products.production_capacity", "plant"),
         "demand_mean": ("products.demand_mean", "plant"),
         "demand_cv": ("products.demand_cv", "plant"),
+        # PLAN.md §24 WP 14.2 — the Customer row's demand spec over
+        # `outbound_logistics` (one row per customer × product).
+        "row_demand_distribution": ("outbound_logistics.demand_distribution", "customer"),
+        "row_demand_mean": ("outbound_logistics.demand_mean", "customer"),
+        "row_demand_variation": ("outbound_logistics.demand_variation", "customer"),
+        "row_demand_min": ("outbound_logistics.demand_min", "customer"),
+        "row_demand_max": ("outbound_logistics.demand_max", "customer"),
     }
     for k in POLICY_BUNDLE_KEYS:
         assert bool(k.get("master")) == bool(k.get("rows")) == bool(k.get("domain")), k
-        assert k.get("domain") in (None, "positive", "nonnegative", "fraction"), k
+        # One ENUM domain joined in WP 14.2 for the Customer row's
+        # distribution; the numeric three are the mapper's `_override_num`.
+        assert k.get("domain") in (None, "positive", "nonnegative", "fraction",
+                                   "distribution"), k
         assert k["catalog_ref"] is None or not k.get("master"), k
 
 
@@ -510,7 +520,11 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
                 SupplyArc("S3", "M1", unit_price=11, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
             ],
             bom=[BomArc("P1", "M1", 1.0)],
-            outbound=[OutboundArc("P1", "C1", unit_price=100, volume=50, time_unit="week"),
+            # C1 states its own demand (WP 14.2), so every Customer-row key has
+            # something to override: a normal around a forecast.
+            outbound=[OutboundArc("P1", "C1", unit_price=100, volume=50, time_unit="week",
+                                  demand_distribution="normal", demand_mean=40.0,
+                                  demand_variation=0.2, forecast=[40.0] * 10),
                       OutboundArc("P1", "C2", unit_price=100, volume=10, time_unit="week")],
             scenario=ScenarioSettings(horizon_days=364),
         )
@@ -534,8 +548,11 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "coverage_weeks": 3, "reorder_point": 40, "order_up_to": 400, "material_cost": 3.3,
         "material_moq": 9, "capacity_per_week": 77, "reliability_score": 0.5, "initial_on_hand": 5,
         "sell_price": 7, "production_capacity": 66, "demand_mean": 20, "demand_cv": 0.9,
+        "row_demand_mode": "model", "row_demand_distribution": "poisson", "row_demand_mean": 25,
+        "row_demand_variation": 0.5, "row_demand_min": 5, "row_demand_max": 500,
     }
-    keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1"}
+    keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1",
+            "customer": "node:C1::P1"}
 
     def mapped(policies):
         d = project()

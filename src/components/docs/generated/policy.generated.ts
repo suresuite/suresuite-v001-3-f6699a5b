@@ -1147,11 +1147,11 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/datamap.py:112."
+      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/datamap.py:172."
     ],
     "breakClass": "legacy-only",
     "breakEvidence": [
-      "sim-worker/sim_worker/datamap.py:112"
+      "sim-worker/sim_worker/datamap.py:172"
     ]
   },
   {
@@ -1443,13 +1443,243 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:756, src/hooks/useStageRows.tsx:771."
+      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:770, src/hooks/useStageRows.tsx:785."
     ],
     "breakClass": "app-routing",
     "breakEvidence": [
-      "src/hooks/useStageRows.tsx:756",
-      "src/hooks/useStageRows.tsx:771"
+      "src/hooks/useStageRows.tsx:770",
+      "src/hooks/useStageRows.tsx:785"
     ]
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_mode",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_mode` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → CustomerLink.forecast (P-C.4). Transform: empty = the engine's rule (forecast when the row has an uploaded series, else model). Enum — 'model' plans and draws on the row's mean even when a forecast series is uploaded (the series is set aside); 'forecast' uses the series and is warned and ignored when the row has none",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_forecast",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_forecast` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_distribution",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_distribution` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_distribution` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_model",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_mean",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_mean` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_mean` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units per time_unit`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_mean",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_variation",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_variation` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_variation` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`dimensionless — read by the distribution`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_variation",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_min",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_min` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_min` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units per time_unit`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_min",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_max",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_max` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`outbound_logistics.demand_max` (item master, keyed from `customer_id::product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units per time_unit`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_row_demand_spec -> CustomerLink.demand_max",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   }
 ];
 
@@ -1984,6 +2214,13 @@ export const UPLOAD_ASSETS: UploadAsset[] = [
     "name": "Outbound Logistics",
     "description": "Outbound distribution data to customers",
     "templateFile": "/template/outbound_logistic.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "demand_forecasts",
+    "name": "Demand Forecast",
+    "description": "Forecast quantity per customer × product, per week or per month — the centre the run draws demand around",
+    "templateFile": "/template/demand_forecasts.csv",
     "guideFile": "/docs/csv-upload-guide.md"
   },
   {
@@ -3676,8 +3913,8 @@ export type ProjectDeletion = {
 };
 
 export const PROJECT_DELETION: ProjectDeletion = {
-  "projectScoped": 54,
-  "cascade": 43,
+  "projectScoped": 55,
+  "cascade": 44,
   "detached": [
     "chat_threads",
     "user_files"
@@ -3784,7 +4021,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 75,
+  "described": 76,
   "open": [
     {
       "table": "analysis_kinds",
@@ -4022,5 +4259,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 42;
+export const CHAIN_COUNT = 49;
 export const BROKEN_COUNT = 5;

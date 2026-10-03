@@ -19,10 +19,12 @@ import {
   datasetDeletedMessage,
   deletableCount as countDeletable,
 } from '@/lib/projects/datasetDeletion';
+import { fetchProjectForecasts } from '@/lib/policies/projectLanes';
+import type { ForecastBucket } from '@/lib/policies/customerRows';
 import { AlertCircle, RefreshCw, Download, Trash2, X } from 'lucide-react';
 
 // Define the type that includes all possible tab keys  
-type TabKey = 'bom' | 'inbound' | 'outbound' | 'nodeList' | 'deepNodes' | 'deepEdges' | 'deepSummary';
+type TabKey = 'bom' | 'inbound' | 'outbound' | 'forecast' | 'nodeList' | 'deepNodes' | 'deepEdges' | 'deepSummary';
 
 interface ProjectDatasets {
   bom_level: string;
@@ -71,6 +73,8 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
   const [bomData, setBomData] = useState<any[]>([]);
   const [inboundData, setInboundData] = useState<any[]>([]);
   const [outboundData, setOutboundData] = useState<any[]>([]);
+  // PLAN.md §24 WP 14.2 — the per-row forecast buckets.
+  const [forecastData, setForecastData] = useState<ForecastBucket[]>([]);
   const [nodeListData, setNodeListData] = useState<NodeListItem[]>([]);
   const [deepNodesData, setDeepNodesData] = useState<any[]>([]);
   const [deepEdgesData, setDeepEdgesData] = useState<any[]>([]);
@@ -110,6 +114,11 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
       setBomData(ds.bom || []);
       setInboundData(ds.inbound || []);
       setOutboundData(ds.outbound || []);
+
+      // The forecast buckets (WP 14.2) — through the RPC that names its caller.
+      const fq = await fetchProjectForecasts(project.id, user);
+      if (fq.error) throw new Error(`demand forecast: ${fq.error}`);
+      setForecastData(fq.rows as unknown as ForecastBucket[]);
 
       // Load node list data
       const { data: nodeListData, error: nodeListError } = await supabase.rpc('get_node_list', {
@@ -164,6 +173,7 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
         { key: 'bom' as const, label: 'BOM', data: bomData },
         { key: 'inbound' as const, label: 'Inbound', data: inboundData },
         { key: 'outbound' as const, label: 'Outbound', data: outboundData },
+        { key: 'forecast' as const, label: 'Forecast', data: forecastData },
         { key: 'nodeList' as const, label: 'Node List', data: nodeListData },
       ];
 
@@ -175,7 +185,7 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
 
       return [...baseTabs, ...deepTierTabs];
     },
-    [bomData, inboundData, outboundData, nodeListData, deepNodesData, deepEdgesData, deepSummaryData, project.deep_tier_enabled]
+    [bomData, inboundData, outboundData, forecastData, nodeListData, deepNodesData, deepEdgesData, deepSummaryData, project.deep_tier_enabled]
   );
 
   // Only render tabs that actually have rows
@@ -241,6 +251,8 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
       columns = ['supplier_id', 'material_id', 'volume', 'unit_price', 'lead_time', 'time_unit', 'plant_name'];
     } else if (activeTab === 'outbound') {
       columns = ['customer_id', 'product_id', 'volume', 'unit_price', 'expected_lead_time', 'time_unit', 'plant_name'];
+    } else if (activeTab === 'forecast') {
+      columns = ['customer_id', 'product_id', 'period_start', 'time_unit', 'quantity', 'period_end', 'weekly_quantity'];
     } else if (activeTab === 'nodeList') {
       columns = ['node_id', 'node_type', 'node_group', 'description_text', 'location_text', 'longitude', 'latitude', 'plant_name'];
     } else if (activeTab === 'deepNodes') {
@@ -337,6 +349,8 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
         ? ['Supplier ID', 'Material ID', 'Volume', 'Unit Price', 'Lead Time', 'Time Unit', 'Plant Name']
         : activeTab === 'outbound'
         ? ['Customer ID', 'Product ID', 'Volume', 'Unit Price', 'Expected Lead Time', 'Time Unit', 'Plant Name']
+        : activeTab === 'forecast'
+        ? ['Customer ID', 'Product ID', 'Period Start', 'Bucket', 'Quantity', 'Period End', 'Per Week (spread)']
         : activeTab === 'nodeList'
         ? ['Node ID', 'Type', 'Group', 'Description', 'Location', 'Longitude', 'Latitude', 'Plant Name']
         : activeTab === 'deepNodes'
@@ -395,6 +409,16 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
                     <TableCell className={CELL_PAD}>{row.expected_lead_time}</TableCell>
                     <TableCell className={CELL_PAD}>{row.time_unit}</TableCell>
                     <TableCell className={CELL_PAD}>{row.plant_name}</TableCell>
+                  </>
+                ) : activeTab === 'forecast' ? (
+                  <>
+                    <TableCell className={CELL_PAD}>{row.customer_id}</TableCell>
+                    <TableCell className={CELL_PAD}>{row.product_id}</TableCell>
+                    <TableCell className={CELL_PAD}>{row.period_start}</TableCell>
+                    <TableCell className={CELL_PAD}>{row.time_unit || 'week'}</TableCell>
+                    <TableCell className={CELL_PAD}>{row.quantity}</TableCell>
+                    <TableCell className={CELL_PAD}>{row.period_end}</TableCell>
+                    <TableCell className={CELL_PAD}>{row.weekly_quantity}</TableCell>
                   </>
                 ) : activeTab === 'nodeList' ? (
                   <>

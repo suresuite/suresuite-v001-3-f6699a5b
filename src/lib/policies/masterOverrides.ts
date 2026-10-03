@@ -123,7 +123,8 @@ export function planEntityOverride(args: {
   rule: MasterOverrideRule;
   editedKey: string;
   rowKeysOfEntity: readonly string[];
-  value: number | null;
+  /** A number, or an enum token for an enum domain (WP 14.2's distribution). */
+  value: number | string | null;
 }): void {
   const { plan, overrides, rule, editedKey, rowKeysOfEntity, value } = args;
   for (const key of new Set([editedKey, ...rowKeysOfEntity])) {

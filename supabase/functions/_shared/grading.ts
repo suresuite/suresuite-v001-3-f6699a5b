@@ -53,6 +53,10 @@ export interface GradingDataset {
    * reporting it as defaulted is the grader telling the user the opposite of
    * what will happen. */
   overrides?: Row[];
+  /** `demand_forecasts` rows (PLAN.md §24 WP 14.2) — the per-row forecast
+   * buckets, each with `period_start`, `period_end` and `weekly_quantity`.
+   * Optional; absent grades exactly as before. */
+  demandForecasts?: Row[];
 }
 
 export interface FallbackStep {
@@ -1065,4 +1069,158 @@ export function flattenFindings(graded: GradedField[]): GradedFinding[] {
   // Blocks first, then warns, then infos — stable for UI + gate truncation.
   const rank: Record<Severity, number> = { block: 0, warn: 1, info: 2 };
   return out.sort((a, b) => rank[a.severity] - rank[b.severity]);
+}
+
+
+// ── Demand per customer × product row (PLAN.md §24 WP 14.2) ─────────────────
+//
+// The engine's `CustomerLink._check_demand` refuses a row spec that is missing a
+// parameter its distribution needs, and the mapper then DROPS the spec with a
+// warning — the row runs on its product's distribution instead. A run that
+// silently ignores what the user typed is exactly what the pre-run gate exists to
+// stop, so the same rules are a BLOCK here. A forecast shorter than the run, or
+// with a gap, is a WARN: the engine runs it, and says what it substitutes.
+
+const ROW_DISTRIBUTIONS = ["deterministic", "normal", "triangular", "triangular_av", "poisson"];
+
+function rowKind(v: unknown): string | null {
+  if (v === null || v === undefined || String(v).trim() === "") return null;
+  const t = String(v).trim().toLowerCase().replace(/[- ]/g, "_");
+  return t === "triangularav" ? "triangular_av" : t;
+}
+
+const numOrNull = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** The days since `anchor` of an ISO date. */
+function dayOf(iso: unknown, anchor: number): number | null {
+  const t = Date.parse(`${String(iso).slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(t) ? Math.round((t - anchor) / 86_400_000) : null;
+}
+
+/**
+ * Findings for the rows' own demand specs and forecast series.
+ *
+ * `overrides` are the policy version's rows: a Customer-row override
+ * (`node`-scope, target `<customer>::<product>`, family `demand`) beats the
+ * uploaded value field by field, as `_apply_row_demand_overrides` applies it.
+ * `horizonWeeks`, when known, is the run's length for the "forecast shorter than
+ * the run" warning.
+ */
+export function demandRowFindings(
+  outbound: Row[],
+  forecasts: Row[] = [],
+  overrides: Row[] = [],
+  horizonWeeks?: number,
+): GradedFinding[] {
+  const out: GradedFinding[] = [];
+  const policy = "P-C.4";
+  const patchOf = new Map<string, Row>();
+  for (const o of overrides) {
+    if (String(o.scope ?? "node") !== "node" || o.family !== "demand") continue;
+    if (!o.patch || typeof o.patch !== "object") continue;
+    patchOf.set(String(o.target_key), { ...(patchOf.get(String(o.target_key)) ?? {}), ...(o.patch as Row) });
+  }
+  const seriesRows = new Set(forecasts.map((f) => `${f.customer_id}::${f.product_id}`));
+
+  const bad: Record<string, string[]> = {};
+  const note = (msg: string, row: string) => (bad[msg] = [...(bad[msg] ?? []), row]);
+  for (const o of outbound) {
+    if (o.customer_id == null || o.product_id == null) continue;
+    const key = `${o.customer_id}::${o.product_id}`;
+    const p = patchOf.get(key) ?? {};
+    const pick = (field: string, override: string) =>
+      p[override] !== undefined && p[override] !== null && p[override] !== "" ? p[override] : o[field];
+    const kind = rowKind(pick("demand_distribution", "row_demand_distribution"));
+    const mean = numOrNull(pick("demand_mean", "row_demand_mean"));
+    const variation = numOrNull(pick("demand_variation", "row_demand_variation"));
+    const min = numOrNull(pick("demand_min", "row_demand_min"));
+    const max = numOrNull(pick("demand_max", "row_demand_max"));
+    const hasSeries = seriesRows.has(key) && p.row_demand_mode !== "model";
+    const anyParam = [mean, variation, min, max].some((x) => x !== null);
+    if (kind === null) {
+      if (anyParam && !hasSeries) note("states demand parameters but no distribution", key);
+      continue;
+    }
+    if (!ROW_DISTRIBUTIONS.includes(kind)) {
+      note(`names the distribution "${kind}", which the engine does not have`, key);
+      continue;
+    }
+    const centre = mean !== null || hasSeries;
+    if (kind !== "triangular" && !centre) note(`is ${kind} with no mean and no forecast`, key);
+    if (kind === "normal" && variation === null) note("is normal with no variation (its CV)", key);
+    if (kind === "triangular_av" && variation === null) note("is triangularAV with no variation (its ± fraction)", key);
+    if (kind === "triangular_av" && variation !== null && variation > 1) note("is triangularAV with a ± fraction above 1", key);
+    if (kind === "triangular") {
+      if (min === null || max === null || mean === null) note("is triangular without its min, mean (mode) and max", key);
+      else if (!(min <= mean && mean <= max)) note("is triangular with min ≤ mean ≤ max broken", key);
+    }
+    if (kind !== "triangular" && (min !== null || max !== null)) note(`is ${kind} and states a min or max, which only triangular reads`, key);
+  }
+  for (const [msg, rows] of Object.entries(bad)) {
+    out.push({
+      severity: "block",
+      field: "outbound_logistics.demand_distribution",
+      policy,
+      rows: rows.slice(0, 25),
+      message:
+        `${rows.length} customer × product row(s) ${msg}. The engine would drop the row's spec and ` +
+        "run it on its product's distribution instead — fix the row on the Customer stage or in the upload.",
+      reason: "A row's demand spec must carry every parameter its distribution needs (ADR 0002 decision 2).",
+    });
+  }
+
+  // Forecast series: one calendar for every row (week 0 = the earliest bucket).
+  if (forecasts.length) {
+    const starts = forecasts.map((f) => Date.parse(`${String(f.period_start).slice(0, 10)}T00:00:00Z`)).filter(Number.isFinite);
+    const anchor = Math.min(...starts);
+    const byRow = new Map<string, Array<[number, number]>>();
+    for (const f of forecasts) {
+      const a = dayOf(f.period_start, anchor);
+      const b = dayOf(f.period_end, anchor);
+      if (a === null || b === null) continue;
+      const k = `${f.customer_id}::${f.product_id}`;
+      byRow.set(k, [...(byRow.get(k) ?? []), [a, b]]);
+    }
+    const short: string[] = [];
+    const gaps: string[] = [];
+    for (const [k, spans] of byRow) {
+      const sorted = spans.sort((x, y) => x[0] - y[0]);
+      const weeks = Math.floor(Math.max(...sorted.map((s) => s[1])) / 7);
+      if (horizonWeeks !== undefined && weeks < horizonWeeks) short.push(`${k} (${weeks} of ${horizonWeeks} wk)`);
+      let reach = 0;
+      for (const [a, b] of sorted) {
+        if (a > reach) { gaps.push(k); break; }
+        reach = Math.max(reach, b);
+      }
+    }
+    if (short.length) {
+      out.push({
+        severity: "warn",
+        field: "demand_forecasts.period_start",
+        policy,
+        rows: short.slice(0, 25),
+        message:
+          `${short.length} row(s) have a forecast shorter than the run. Past its end the engine uses ` +
+          "the row's mean if it has one, else the forecast's last value, and says so on the run.",
+        reason: "A forecast is the per-week centre of the row's demand (ADR 0002 decision 2).",
+      });
+    }
+    if (gaps.length) {
+      out.push({
+        severity: "warn",
+        field: "demand_forecasts.period_start",
+        policy,
+        rows: gaps.slice(0, 25),
+        message:
+          `${gaps.length} row(s) have days no forecast bucket covers (week 0 is the project's earliest ` +
+          "bucket). A day no bucket covers is forecast as zero demand.",
+        reason: "Simulated weeks sum the days each bucket covers (PLAN.md §24 WP 14.2).",
+      });
+    }
+  }
+  return out;
 }

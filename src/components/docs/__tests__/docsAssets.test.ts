@@ -32,7 +32,7 @@ const PUBLIC = join(__dirname, "..", "..", "..", "..", "public");
 const resolve = (href: string) => join(PUBLIC, href.replace(/^\//, ""));
 
 describe("every asset the manual links exists", () => {
-  it("derived the FOURTEEN datasets the wizard declares", () => {
+  it("derived the FIFTEEN datasets the wizard declares", () => {
     // The vacuity rule (§4 D57): a scan that matched nothing would make every
     // assertion below pass over an empty list.
     //
@@ -52,8 +52,11 @@ describe("every asset the manual links exists", () => {
     // templates" counts files in `public/template/`, and the two numbers are still
     // different because `node_list` deliberately offers no template while
     // `customers.csv` added one. They were equal by coincidence before.
-    expect(UPLOAD_ASSETS.length).toBe(14);
-    expect(UPLOAD_ASSETS.filter((a) => a.templateFile).length).toBe(13);
+    //
+    // FIFTEEN SINCE PLAN.md §24 WP 14.2, which added `demand_forecasts` (and its
+    // template) so the per-row forecast the engine reads has a way in.
+    expect(UPLOAD_ASSETS.length).toBe(15);
+    expect(UPLOAD_ASSETS.filter((a) => a.templateFile).length).toBe(14);
   });
 
   it.each(UPLOAD_ASSETS.filter((a) => a.templateFile).map((a) => [a.id, a.templateFile!]))(

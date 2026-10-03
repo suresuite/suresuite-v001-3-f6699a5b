@@ -3461,7 +3461,8 @@
       "master": "products.sell_price",
       "rows": "plant",
       "scopes": [
-        "plant"
+        "plant",
+        "customer"
       ],
       "target": "Product.unit_price",
       "transform": "currency per unit, must be > 0. Order: the Plant-stage row (`node:<plant>::<product>`) -> products.sell_price (master) -> the demand-weighted outbound price -> 1.0"
@@ -3476,7 +3477,8 @@
       "master": "products.production_capacity",
       "rows": "plant",
       "scopes": [
-        "plant"
+        "plant",
+        "customer"
       ],
       "target": "Product.production_capacity",
       "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.production_capacity (master) -> the line capacity (capacity_units_per_day x 7 x utilization) -> max(2 x demand, 1000)"
@@ -3490,7 +3492,8 @@
       "master": "products.demand_mean",
       "rows": "plant",
       "scopes": [
-        "plant"
+        "plant",
+        "customer"
       ],
       "target": "Product.demand_mode",
       "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.demand_mean (master) -> the weekly outbound volume -> 0"
@@ -3505,7 +3508,8 @@
       "master": "products.demand_cv",
       "rows": "plant",
       "scopes": [
-        "plant"
+        "plant",
+        "customer"
       ],
       "target": "Product.demand_cv",
       "transform": "sigma / mean, >= 0. Order: the Plant-stage row -> products.demand_cv (master) -> the scenario demand model's cv -> 0.30. Read by the triangular and negative-binomial draws; not under Poisson"
@@ -3526,7 +3530,8 @@
       "key": "capacity_units_per_day",
       "scopes": [
         "default",
-        "plant"
+        "plant",
+        "customer"
       ],
       "shadowed_by": "products.production_capacity",
       "target": "Product.production_capacity",
@@ -3538,7 +3543,8 @@
       "key": "utilization_cap_pct",
       "scopes": [
         "default",
-        "plant"
+        "plant",
+        "customer"
       ],
       "shadowed_by": "products.production_capacity",
       "target": "Product.production_capacity",
@@ -3579,7 +3585,8 @@
       "family": "production",
       "key": "allocation_priority_weight",
       "scopes": [
-        "plant"
+        "plant",
+        "customer"
       ],
       "target": "material_allocation.priority_weights",
       "transform": "per-product weight, collected from composite `node:<node>::<product>` override keys. Read only when the scenario asks for `allocate_materials`, and its presence switches the objective to priority_weighted"
@@ -3625,6 +3632,91 @@
       ],
       "target": "inventory_control.material_overrides[*].order_up_to",
       "transform": "absolute units replacing S = E[D]\u00b7(T_s+\u03ba) for that material only; dropped with a warning when it does not exceed the row's reorder point. Not read at default scope"
+    },
+    {
+      "catalog_ref": "P-C.4",
+      "family": "demand",
+      "key": "row_demand_mode",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.forecast",
+      "transform": "empty = the engine's rule (forecast when the row has an uploaded series, else model). Enum \u2014 'model' plans and draws on the row's mean even when a forecast series is uploaded (the series is set aside); 'forecast' uses the series and is warned and ignored when the row has none"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "distribution",
+      "empty_default": null,
+      "empty_note": "the product's distribution, scaled by the row's volume share",
+      "family": "demand",
+      "key": "row_demand_distribution",
+      "master": "outbound_logistics.demand_distribution",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_model",
+      "transform": "enum deterministic | normal | triangular | triangular_av | poisson. Order: the Customer-stage row -> outbound_logistics.demand_distribution -> the product's distribution \u00d7 share"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "the product's mean \u00d7 the row's volume share",
+      "family": "demand",
+      "key": "row_demand_mean",
+      "master": "outbound_logistics.demand_mean",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_mean",
+      "transform": "units per week, >= 0 (the mode for triangular). Order: the Customer-stage row -> outbound_logistics.demand_mean (weekly after promotion)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 the distribution needs no variation, or the row is not specified",
+      "family": "demand",
+      "key": "row_demand_variation",
+      "master": "outbound_logistics.demand_variation",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_variation",
+      "transform": "read by the distribution: CV for normal, \u00b1 fraction for triangular_av. Order: the Customer-stage row -> outbound_logistics.demand_variation"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular rows need it",
+      "family": "demand",
+      "key": "row_demand_min",
+      "master": "outbound_logistics.demand_min",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_min",
+      "transform": "units per week, triangular only. Order: the Customer-stage row -> outbound_logistics.demand_min"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular rows need it",
+      "family": "demand",
+      "key": "row_demand_max",
+      "master": "outbound_logistics.demand_max",
+      "rows": "customer",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.demand_max",
+      "transform": "units per week, triangular only. Order: the Customer-stage row -> outbound_logistics.demand_max"
     }
   ],
   "run_window": {

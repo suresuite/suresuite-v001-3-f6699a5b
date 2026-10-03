@@ -323,6 +323,24 @@ const UploadWizard = ({
         'expected_lead_time',
         'unit_price',
       ],
+      // PLAN.md §24 WP 14.2 — the row's own demand spec. OPTIONAL, like
+      // `lead_time_unit` inbound: a file without them is today's file, and the
+      // row keeps its product's distribution scaled by its share. The rates are
+      // in the row's `time_unit` and land weekly (normalized at promotion).
+      optionalHeaders: ['demand_distribution', 'demand_mean', 'demand_variation', 'demand_min', 'demand_max'],
+      category: 'outbound',
+    },
+    {
+      // PLAN.md §24 WP 14.2 — the forecast series per customer × product. One
+      // row per week or calendar month; a month is spread evenly over its own
+      // days at promotion (ADR 0002 decision 7) and the review screen says so.
+      id: 'demand_forecasts',
+      name: 'Demand Forecast',
+      description: 'Forecast quantity per customer × product, per week or per month — the centre the run draws demand around',
+      templateFile: '/template/demand_forecasts.csv',
+      guideFile: '/docs/csv-upload-guide.md',
+      expectedHeaders: ['customer_id', 'product_id', 'period_start', 'quantity'],
+      optionalHeaders: ['time_unit'],
       category: 'outbound',
     },
     {

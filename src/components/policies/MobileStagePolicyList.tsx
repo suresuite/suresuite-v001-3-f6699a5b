@@ -33,6 +33,7 @@ import {
   type MasterRowMaps,
 } from "@/lib/policies/resolveEffective";
 import { useItemMasters } from "@/hooks/useItemMasters";
+import { customerRowMasters, demandCellNote } from "@/lib/policies/customerRows";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
 import type { StageRowsQuery } from "@/hooks/useStageGuards";
 import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/policies/schemas";
@@ -113,8 +114,11 @@ export function MobileStagePolicyList({
       materials: new Map(materials.map((m) => [m.material_id, m as unknown as Record<string, unknown>])),
       products: new Map(products.map((p) => [p.product_id, p as unknown as Record<string, unknown>])),
       suppliers: new Map(suppliers.map((s) => [s.supplier_id, s as unknown as Record<string, unknown>])),
+      // PLAN.md §24 WP 14.2 — the Customer stage's base: each row's own demand
+      // spec and its forecast series, keyed `<customer>::<product>`.
+      outbound_logistics: customerRowMasters(lanes.outbound, lanes.forecasts),
     }),
-    [materials, products, suppliers],
+    [materials, products, suppliers, lanes.outbound, lanes.forecasts],
   );
 
   const masterColByField = useMemo(() => {
@@ -325,7 +329,18 @@ export function MobileStagePolicyList({
                     // same assembler: `substitutionNote` over the same
                     // `ResolvedCell`, so the two surfaces cannot disagree about
                     // what stood in for a number.
-                    const note = substitutionNote(cell);
+                    const note =
+                      [
+                        substitutionNote(cell),
+                        demandCellNote(
+                          col.field,
+                          col.field === "row_demand_variation"
+                            ? resolveCol(openRow, cols.find((c) => c.field === "row_demand_distribution") ?? col).value
+                            : undefined,
+                        ),
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || undefined;
                     return (
                       <MobileRow
                         key={col.field}

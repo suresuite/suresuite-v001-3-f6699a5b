@@ -72,3 +72,11 @@ demand**, and **the plan never reads the realized future demand draws** (gate
   `SimContext.projected_demand_rows` / `projected_demand` — centres only, never
   draws. KPIs `demand_forecast_bias` / `demand_forecast_mape` (pooled and per
   product) appear only when rows carry specs.
+* **WP 14.2** (engine 0.3.0, no version change; data contract) — no engine
+  behaviour change. The per-row spec and dated forecasts reach `OutboundArc`
+  from the data: `outbound_logistics` demand columns and a `demand_forecasts`
+  table (monthly buckets spread evenly at promotion, decision 7), both in the
+  snapshot's simulation scope, laid on one calendar by
+  `sim_worker/datamap.py::forecast_series` (week 0 = the project's earliest
+  `period_start`; design doc §9, point 5). The mapper reads the Customer
+  table's row overrides (`row_demand_*`, `_apply_row_demand_overrides`).

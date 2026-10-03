@@ -21,7 +21,8 @@ export type DataMapDataset =
   | "materials"
   | "products"
   | "suppliers"
-  | "customers";
+  | "customers"
+  | "demand_forecasts";
 
 export const DATASET_LABEL: Record<DataMapDataset, string> = {
   inbound_logistics: "Inbound logistics (supplier → plant)",
@@ -32,6 +33,7 @@ export const DATASET_LABEL: Record<DataMapDataset, string> = {
   products: "Item master — products",
   suppliers: "Item master — suppliers",
   customers: "Item master — customers",
+  demand_forecasts: "Demand forecast (customer × product, per week or month)",
 };
 
 /** Identifies which live status computation applies to a contract row. */
@@ -44,6 +46,8 @@ export type StatusKey =
   | "outbound_unit_price"
   | "outbound_volume"
   | "outbound_expected_lead_time" // unused by engine
+  | "outbound_demand_spec" // WP 14.2 — the row's own demand distribution / mean / variation / bounds
+  | "forecast_series" // WP 14.2 — the per-row forecast buckets
   | "bom_consumption_rate"
   | "material_cost"
   | "material_holding"
@@ -135,6 +139,11 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "outbound_logistics", field: "volume", engineField: "Product demand fallback + CustomerLink.share", chain: "two uses: (1) Σ weekly volume per product when products.demand_mean is blank; (2) ALWAYS splits each product's demand across its customers in proportion to weekly volume (a lane with 0 volume gets no share). The network pages and the Supplier tree always use the sum, even when demand_mean is set (§4 D195)", statusKey: "outbound_volume" },
   { dataset: "outbound_logistics", field: "time_unit", engineField: "volume unit", chain: "the period of volume only (day / week / month / year …); unknown → week", statusKey: "identity" },
   { dataset: "outbound_logistics", field: "plant_name", engineField: null, chain: "not read — the engine merges every plant name into one plant. The network pages and the Supplier tree do NOT — they join on plant, so a row on a different plant name is a separate island there (§4 D202)", statusKey: "plant_ignored" },
+  { dataset: "outbound_logistics", field: "demand_distribution", engineField: "CustomerLink.demand_model", chain: "the row's own distribution (deterministic, normal, triangular, triangular_av, poisson); blank → the product's distribution scaled by the row's volume share (PLAN.md §24 WP 14.2)", statusKey: "outbound_demand_spec" },
+  { dataset: "outbound_logistics", field: "demand_mean", engineField: "CustomerLink.demand_mean", chain: "the row's mean per time_unit, weekly after promotion (the mode for triangular); a /policies Customer-row override wins", statusKey: "outbound_demand_spec" },
+  { dataset: "outbound_logistics", field: "demand_variation", engineField: "CustomerLink.demand_variation", chain: "read by the distribution: CV for normal, ± fraction for triangular_av; a /policies Customer-row override wins", statusKey: "outbound_demand_spec" },
+  { dataset: "outbound_logistics", field: "demand_min", engineField: "CustomerLink.demand_min", chain: "triangular only: the lower bound, weekly after promotion", statusKey: "outbound_demand_spec" },
+  { dataset: "outbound_logistics", field: "demand_max", engineField: "CustomerLink.demand_max", chain: "triangular only: the upper bound, weekly after promotion", statusKey: "outbound_demand_spec" },
   { dataset: "outbound_logistics", field: "expected_lead_time", engineField: null, chain: "uploaded but not read — the engine does not model a customer delivery lead time", statusKey: "outbound_expected_lead_time" },
   // ── bom_multi_level (preferred when it has rows) ─────────────────────────
   { dataset: "bom_multi_level", field: "material_id", engineField: "BomLine.material_id (after flattening)", chain: "child of the edge; the tree is flattened to finished product → purchased material, rates multiplied along each path", statusKey: "identity" },
@@ -172,6 +181,12 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "suppliers", field: "capacity_per_week", engineField: "Supplier.capacity_per_week", chain: "master → unlimited (empty is a valid choice; a finite value enables partial capacity-cut disruptions). Must be > 0: the upload refuses 0 and the engine rejects it, failing the run", statusKey: "supplier_capacity" },
   { dataset: "suppliers", field: "reliability_score", engineField: "Supplier.reliability_score", chain: "master → 1.0 — passed to the engine but read only by the backup-supplier 'reliability' rule, which the mapper never selects: no effect today", statusKey: "supplier_reliability" },
   // ── customers master ───────────────────────────────────────────────────
+  // ── demand_forecasts (PLAN.md §24 WP 14.2) ─────────────────────────────
+  { dataset: "demand_forecasts", field: "customer_id", engineField: "CustomerLink (the row)", chain: "identity — the bucket belongs to this customer × product row; a forecast for a row no outbound lane names still becomes that row's demand", statusKey: "forecast_series" },
+  { dataset: "demand_forecasts", field: "product_id", engineField: "CustomerLink (the row)", chain: "identity — with customer_id, the row the series belongs to", statusKey: "forecast_series" },
+  { dataset: "demand_forecasts", field: "period_start", engineField: "the simulated week", chain: "the project's earliest period_start is week 0; week w is the seven days 7·w days later", statusKey: "forecast_series" },
+  { dataset: "demand_forecasts", field: "period_end", engineField: "the simulated week", chain: "computed at promotion: start + 1 week or + 1 calendar month (exclusive)", statusKey: "forecast_series" },
+  { dataset: "demand_forecasts", field: "weekly_quantity", engineField: "CustomerLink.forecast", chain: "computed at promotion: the bucket's quantity spread evenly over its own days (decision 7); each simulated week sums the days it shares with a bucket", statusKey: "forecast_series" },
   { dataset: "customers", field: "customer_id", engineField: "Customer.id", chain: "identity — matched to outbound_logistics.customer_id. A customers row for an id on no outbound lane has no demand and is ignored (info); an outbound customer with no row keeps the defaults", statusKey: "identity" },
   { dataset: "customers", field: "name", engineField: "Customer.name", chain: "display only → id", statusKey: "name" },
   { dataset: "customers", field: "segment", engineField: "Customer.segment", chain: "master → 'default'. Read only by the sla_tier customer-allocation rule (Fulfillment card)", statusKey: "customer_segment" },

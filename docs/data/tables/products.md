@@ -77,9 +77,9 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `sell_price` | `sell_price` | `numeric` | `currency per unit of product` | no | What one unit of this product sells for. Where it is unset the engine uses the demand-weighted mean of the outbound arcs' prices, which is usually what the user means and is why leaving it blank is not an error. |
 | `production_capacity` | `production_capacity` | `numeric` | `units per week` | no | How much of this product the plant can make per week. The canonical G4 example: when it is unset the engine invents a capacity generous enough that capacity never binds, so an unset value silently turns off the constraint the user thinks they are simulating. |
 | `fulfillment_mode` | `fulfillment_mode` | `text` | — | no | Whether this product is made to order or made to stock. Decides whether the simulation holds finished goods for it. |
-| `demand_distribution` | `demand_distribution` | `text` | — | no | The SHAPE of weekly demand for this product — constant, normal, triangular and so on. What the user types here is `demand_distribution`; the engine calls the resolved value `demand_model`. |
+| `demand_distribution` | `demand_distribution` | `text` | — | no | The SHAPE of weekly demand for this product — constant, normal, triangular and so on. What the user types here is `demand_distribution`; the engine calls the resolved value `demand_model`. `normal` IS A REAL NORMAL since engine 0.3.0 (PLAN.md §24 WP 14.1, ADR 0002 decision 8): N(mean, σ = demand_cv × mean), negative draws set to 0 and counted on the run — before it, `normal` ran as triangularAV with a mapping warning. A customer × product row may state its own distribution on `outbound_logistics` (WP 14.2); this product-level one is what a row that states none runs on, scaled by its volume share. |
 | `demand_mean` | `demand_mean` | `numeric` | `units per week` | no | Typical weekly demand for this product. The engine treats it as the MODE of the demand distribution, not its arithmetic mean — a distinction that matters the moment the distribution is skewed. |
-| `demand_cv` | `demand_cv` | `numeric` | `coefficient of variation (dimensionless)` | no | How much weekly demand varies, as a coefficient of variation. |
+| `demand_cv` | `demand_cv` | `numeric` | `coefficient of variation (dimensionless)` | no | How much weekly demand varies — READ BY THE DISTRIBUTION (PLAN.md §24 WP 14.1): for `normal` it is the coefficient of variation (σ = cv × mean); for `triangular` / `triangularAV` it is the ± fraction of the triangularAV form, triangular(mean·(1−cv), mean, mean·(1+cv)), unless explicit `demand_min` / `demand_max` are given; Poisson and deterministic ignore it. The two readings are not interchangeable: 0.3 is σ = 30 % of the mean under normal and a ±30 % range under triangular. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row last changed. Server-set. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the row was inserted. Server-set. |
 | `demand_min` | `demand_min` | `numeric` | `units per week` | no | The lowest weekly demand the distribution allows. Used by the triangular demand shape; a value above the mode is clamped to the mode rather than rejected. |
@@ -275,7 +275,7 @@ Make-to-order or make-to-stock is a decision about how the business runs, not a 
 
 ### `demand_distribution`
 
-The SHAPE of weekly demand for this product — constant, normal, triangular and so on. What the user types here is `demand_distribution`; the engine calls the resolved value `demand_model`.
+The SHAPE of weekly demand for this product — constant, normal, triangular and so on. What the user types here is `demand_distribution`; the engine calls the resolved value `demand_model`. `normal` IS A REAL NORMAL since engine 0.3.0 (PLAN.md §24 WP 14.1, ADR 0002 decision 8): N(mean, σ = demand_cv × mean), negative draws set to 0 and counted on the run — before it, `normal` ran as triangularAV with a mapping warning. A customer × product row may state its own distribution on `outbound_logistics` (WP 14.2); this product-level one is what a row that states none runs on, scaled by its volume share.
 
 | | |
 |---|---|
@@ -353,7 +353,7 @@ default_mode is `hybrid` and this is the only field in the twelve where that is 
 
 ### `demand_cv`
 
-How much weekly demand varies, as a coefficient of variation.
+How much weekly demand varies — READ BY THE DISTRIBUTION (PLAN.md §24 WP 14.1): for `normal` it is the coefficient of variation (σ = cv × mean); for `triangular` / `triangularAV` it is the ± fraction of the triangularAV form, triangular(mean·(1−cv), mean, mean·(1+cv)), unless explicit `demand_min` / `demand_max` are given; Poisson and deterministic ignore it. The two readings are not interchangeable: 0.3 is σ = 30 % of the mean under normal and a ±30 % range under triangular.
 
 | | |
 |---|---|
@@ -565,6 +565,6 @@ The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_numb
 
 ---
 
-*Generated from data contract `48d3cc002eef`, engine `0.3.0`,
+*Generated from data contract `14629b47bab9`, engine `0.3.0`,
 sidecar `supabase/contract/products.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

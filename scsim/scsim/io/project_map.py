@@ -347,6 +347,14 @@ class MappingResult:
 # `products.production_capacity` (§4 D167) — which since WP 13.1 is present when
 # the master OR the Plant-stage override of it carries a value.
 #
+# `customer` (PLAN.md §24 WP 14.2) is a Customer-stage row, `node:<customer>::<product>`.
+# The seven production-family keys declare it TOO, and that is a measured fact, not
+# a feature: `_composite_patches` resolves ANY `node:<x>::<product>` key to the
+# product, so a production patch on a Customer row would reach the product. No
+# Customer cell renders a production field, so nothing can write one today; the
+# probe that found it is `test_declared_scopes_are_the_scopes_the_mapper_reads`
+# (§16 · WP 14.2).
+#
 # `scopes` is REQUIRED (§23 WP 13.4, §4 D204 b): WHERE the mapper reads the key —
 # `default` (the project-wide policy), `supplier` (a Supplier-stage row,
 # `node:<supplier>::<material>`), `plant` (a Plant-stage row,
@@ -500,7 +508,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "sell_price",
-        "scopes": ("plant",),
+        "scopes": ("plant", "customer"),
         "family": "production",
         "target": "Product.unit_price",
         "catalog_ref": None,
@@ -514,7 +522,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "production_capacity",
-        "scopes": ("plant",),
+        "scopes": ("plant", "customer"),
         "family": "production",
         "target": "Product.production_capacity",
         "catalog_ref": None,
@@ -529,7 +537,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "demand_mean",
-        "scopes": ("plant",),
+        "scopes": ("plant", "customer"),
         "family": "production",
         "target": "Product.demand_mode",
         "catalog_ref": None,
@@ -542,7 +550,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "demand_cv",
-        "scopes": ("plant",),
+        "scopes": ("plant", "customer"),
         "family": "production",
         "target": "Product.demand_cv",
         "catalog_ref": None,
@@ -566,7 +574,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "capacity_units_per_day",
-        "scopes": ("default", "plant"),
+        "scopes": ("default", "plant", "customer"),
         "family": "production",
         # NOT a policy parameter. This one lands on an ENTITY field, which is why
         # door 2 could never have declared it and why the row needed this table
@@ -589,7 +597,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         # nothing on screen holding the 0.85. It is read by `_map_policies`'s
         # capacity branch exactly as `capacity_units_per_day` is.
         "key": "utilization_cap_pct",
-        "scopes": ("default", "plant"),
+        "scopes": ("default", "plant", "customer"),
         "family": "production",
         "target": "Product.production_capacity",
         "catalog_ref": None,
@@ -629,7 +637,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "allocation_priority_weight",
-        "scopes": ("plant",),
+        "scopes": ("plant", "customer"),
         "family": "production",
         "target": "material_allocation.priority_weights",
         "catalog_ref": "P-X.3",
@@ -684,6 +692,99 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "transform": "absolute units replacing S = E[D]·(T_s+κ) for that material "
                      "only; dropped with a warning when it does not exceed the row's "
                      "reorder point. Not read at default scope",
+    },
+    # ── Demand per customer × product row (PLAN.md §24 WP 14.2, D284 b) ─────
+    # The Customer stage's demand cells. Each is an OVERRIDE of the row's
+    # uploaded spec on `outbound_logistics` (`master`), read from the Customer
+    # row's key `node:<customer>::<product>` (`rows: customer`) — the same
+    # override → data → default order as every master-backed cell. Rates are
+    # weekly (the grid shows units/wk); the data's rates are weekly after
+    # promotion. A project that sets none of them maps exactly as before.
+    {
+        # NOT a master override: the mode is DERIVED from the data (a row with an
+        # uploaded series plans on it), so there is no column to override.
+        "key": "row_demand_mode",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.forecast",
+        "catalog_ref": "P-C.4",
+        "transform": "empty = the engine's rule (forecast when the row has an uploaded "
+                     "series, else model). Enum — 'model' plans and draws on the row's mean even when a forecast "
+                     "series is uploaded (the series is set aside); 'forecast' uses the "
+                     "series and is warned and ignored when the row has none",
+    },
+    {
+        "key": "row_demand_distribution",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_model",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_distribution",
+        "rows": "customer",
+        "domain": "distribution",
+        "empty_default": None,
+        "empty_note": "the product's distribution, scaled by the row's volume share",
+        "transform": "enum deterministic | normal | triangular | triangular_av | poisson. "
+                     "Order: the Customer-stage row -> outbound_logistics.demand_distribution "
+                     "-> the product's distribution × share",
+    },
+    {
+        "key": "row_demand_mean",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_mean",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_mean",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "the product's mean × the row's volume share",
+        "transform": "units per week, >= 0 (the mode for triangular). Order: the "
+                     "Customer-stage row -> outbound_logistics.demand_mean (weekly after "
+                     "promotion)",
+    },
+    {
+        "key": "row_demand_variation",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_variation",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_variation",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — the distribution needs no variation, or the row is not specified",
+        "transform": "read by the distribution: CV for normal, ± fraction for "
+                     "triangular_av. Order: the Customer-stage row -> "
+                     "outbound_logistics.demand_variation",
+    },
+    {
+        "key": "row_demand_min",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_min",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_min",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular rows need it",
+        "transform": "units per week, triangular only. Order: the Customer-stage row -> "
+                     "outbound_logistics.demand_min",
+    },
+    {
+        "key": "row_demand_max",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.demand_max",
+        "catalog_ref": None,
+        "master": "outbound_logistics.demand_max",
+        "rows": "customer",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular rows need it",
+        "transform": "units per week, triangular only. Order: the Customer-stage row -> "
+                     "outbound_logistics.demand_max",
     },
 )
 
@@ -1209,6 +1310,105 @@ def _customer_links(cust_share: dict[tuple[str, str], float],
     return out
 
 
+# The Customer-row override keys (POLICY_BUNDLE_KEYS, `rows: customer`) and the
+# CustomerLink field each one sets.
+_ROW_OVERRIDE_FIELD = {
+    "row_demand_distribution": "demand_model",
+    "row_demand_mean": "demand_mean",
+    "row_demand_variation": "demand_variation",
+    "row_demand_min": "demand_min",
+    "row_demand_max": "demand_max",
+}
+# `MappingResult.resolved` field name → the spec field it reports.
+_ROW_RESOLVED = {
+    "outbound_logistics.demand_distribution": "demand_model",
+    "outbound_logistics.demand_mean": "demand_mean",
+    "outbound_logistics.demand_variation": "demand_variation",
+    "outbound_logistics.demand_min": "demand_min",
+    "outbound_logistics.demand_max": "demand_max",
+}
+
+
+def _apply_row_demand_overrides(
+    row_spec: dict[tuple[str, str], dict[str, Any]], policies: dict,
+    tally: "_SourceTally", w: list[MappingWarning],
+    all_rows: set[tuple[str, str]] = frozenset(),
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """The Customer stage's demand cells (PLAN.md §24 WP 14.2): an override on
+    `node:<customer>::<product>` (family `demand`) beats the row's uploaded spec,
+    field by field — override → data → the product's distribution × share.
+
+    Records each row's resolved value and source on `tally` (page-equals-run)
+    ONLY when the project specifies demand on some row, by data or override: a
+    project that sets none maps, and logs, exactly as before Phase 14.
+    """
+    overrides: dict[tuple[str, str], dict[str, Any]] = {}
+    for key in sorted(k for k in policies if isinstance(k, str) and k.startswith("node:")):
+        patch = (policies.get(key) or {}).get("demand") or {}
+        if not isinstance(patch, dict) or not any(f in patch for f in (*_ROW_OVERRIDE_FIELD, "row_demand_mode")):
+            continue
+        cid, sep, pid = key[len("node:"):].partition("::")
+        if not sep or not cid or not pid:
+            continue
+        overrides[(pid, cid)] = patch
+    if not overrides and not row_spec:
+        return row_spec
+
+    out = {k: dict(v) for k, v in row_spec.items()}
+    # Only rows that EXIST: a `node:<a>::<b>` key from another stage (a Plant row
+    # `<plant>::<product>`) must not invent a customer called `<plant>`.
+    keys = set(out) | set(all_rows)
+    for pid, cid in sorted(keys):
+        ent = f"customer_row:{cid}::{pid}"
+        spec = out.get((pid, cid), {})
+        data_spec = dict(spec)
+        patch = overrides.get((pid, cid), {})
+        src: dict[str, str] = {}
+        # Each key read as a literal, so the D90 gate sees the reader.
+        reads = {
+            "row_demand_distribution": patch.get("row_demand_distribution"),
+            "row_demand_mean": patch.get("row_demand_mean"),
+            "row_demand_variation": patch.get("row_demand_variation"),
+            "row_demand_min": patch.get("row_demand_min"),
+            "row_demand_max": patch.get("row_demand_max"),
+        }
+        for bkey, v in reads.items():
+            field = _ROW_OVERRIDE_FIELD[bkey]
+            if v in (None, ""):
+                continue
+            if bkey == "row_demand_distribution":
+                kind = _ROW_KIND.get(str(v).strip().lower().replace("-", "_").replace(" ", "_"))
+                if kind is None:
+                    w.append(MappingWarning("warn", ent, bkey,
+                                            f"/policies override {v!r} is not a distribution — "
+                                            f"ignored, the row's data decides"))
+                    continue
+                spec[field] = kind
+            else:
+                n = _override_num(v, entity=ent, field=bkey, domain="nonnegative", w=w)
+                if n is None:
+                    continue
+                spec[field] = n
+            src[field] = "override"
+        mode = patch.get("row_demand_mode")
+        if mode == "model" and spec.get("forecast") is not None:
+            spec.pop("forecast")
+            if spec.get("demand_model") is None:
+                spec["demand_model"] = "deterministic"
+        elif mode == "forecast" and spec.get("forecast") is None:
+            w.append(MappingWarning("warn", ent, "row_demand_mode",
+                                    "/policies sets this row to its forecast, and it has none "
+                                    "uploaded — the row plans on its mean"))
+        if spec:
+            out[(pid, cid)] = spec
+        rid = f"{cid}::{pid}"
+        for rfield, field in _ROW_RESOLVED.items():
+            source = src.get(field) or ("master" if data_spec.get(field) is not None else "default")
+            tally.add(rfield, source, rid)
+            tally.value(rfield, rid, spec.get(field))
+    return out
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 def from_project_data(data: ProjectData) -> MappingResult:
@@ -1424,6 +1624,10 @@ def from_project_data(data: ProjectData) -> MappingResult:
             wgt = max(weekly, 1e-9)
             out_price_num[o.product_id] = out_price_num.get(o.product_id, 0.0) + float(o.unit_price) * wgt
             out_price_den[o.product_id] = out_price_den.get(o.product_id, 0.0) + wgt
+
+    # WP 14.2 — /policies Customer-row overrides of the row's demand spec.
+    row_spec = _apply_row_demand_overrides(row_spec, data.policies, tally, w,
+                                           all_rows=set(cust_share) | set(row_spec))
 
     # ── Suppliers ──
     sup_master = {s.id: s for s in data.suppliers}

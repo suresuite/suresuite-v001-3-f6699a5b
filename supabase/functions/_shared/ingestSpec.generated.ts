@@ -11,7 +11,7 @@
 // assumed.
 
 export type IngestRule = {
-  kind: 'text' | 'numeric' | 'integer' | 'unit' | 'enum' | 'boolean';
+  kind: 'text' | 'numeric' | 'integer' | 'unit' | 'enum' | 'boolean' | 'date';
   min?: number;
   exclusive_min?: number;
   max?: number;
@@ -229,6 +229,83 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
           "blank": "null"
         },
         "validate": "optional; >= 0. ZERO IS ALLOWED AND MEANS SOMETHING: only the ratio between two customers matters, so 0 is the lowest priority there is — served last, and only out of what is left. `exclusive_min` would reject a value the engine reads correctly. Blank lands nothing and the DEFAULT 1.0 stands in, which makes the `priority` rule inert for that customer."
+      }
+    ],
+    "normalize": []
+  },
+  "demand_forecasts": {
+    "dataset": "demand_forecasts",
+    "target": "demand_forecasts",
+    "tier": "2",
+    "factClass": "transactional",
+    "serverSet": [
+      "project_id"
+    ],
+    "columns": [
+      {
+        "column": "customer_id",
+        "csvHeader": "customer_id",
+        "required": true,
+        "type": "text",
+        "nullable": false,
+        "rule": {
+          "kind": "text",
+          "blank": "reject"
+        },
+        "validate": "non-empty"
+      },
+      {
+        "column": "product_id",
+        "csvHeader": "product_id",
+        "required": true,
+        "type": "text",
+        "nullable": false,
+        "rule": {
+          "kind": "text",
+          "blank": "reject"
+        },
+        "validate": "non-empty"
+      },
+      {
+        "column": "period_start",
+        "csvHeader": "period_start",
+        "required": true,
+        "type": "date",
+        "nullable": false,
+        "rule": {
+          "kind": "date",
+          "blank": "reject"
+        },
+        "validate": "a calendar date written YYYY-MM-DD"
+      },
+      {
+        "column": "time_unit",
+        "csvHeader": "time_unit",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "enum",
+          "values": [
+            "week",
+            "month"
+          ],
+          "blank": "null"
+        },
+        "validate": "week or month; blank means week"
+      },
+      {
+        "column": "quantity",
+        "csvHeader": "quantity",
+        "required": true,
+        "type": "numeric",
+        "nullable": false,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "reject"
+        },
+        "validate": "numeric >= 0"
       }
     ],
     "normalize": []
@@ -549,9 +626,98 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
           "blank": "reject"
         },
         "validate": "numeric > 0"
+      },
+      {
+        "column": "demand_distribution",
+        "csvHeader": "demand_distribution",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "enum",
+          "values": [
+            "deterministic",
+            "normal",
+            "triangular",
+            "triangular_av",
+            "poisson"
+          ],
+          "blank": "null"
+        },
+        "validate": "one of deterministic, normal, triangular, triangular_av, poisson; blank lands nothing"
+      },
+      {
+        "column": "demand_mean",
+        "csvHeader": "demand_mean",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; blank lands nothing"
+      },
+      {
+        "column": "demand_variation",
+        "csvHeader": "demand_variation",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; triangular_av needs <= 1; blank lands nothing"
+      },
+      {
+        "column": "demand_min",
+        "csvHeader": "demand_min",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; triangular only; blank lands nothing"
+      },
+      {
+        "column": "demand_max",
+        "csvHeader": "demand_max",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; triangular only; blank lands nothing"
       }
     ],
     "normalize": [
+      {
+        "column": "demand_max",
+        "unitColumn": "time_unit",
+        "conversion": "rate",
+        "canonical": "week"
+      },
+      {
+        "column": "demand_mean",
+        "unitColumn": "time_unit",
+        "conversion": "rate",
+        "canonical": "week"
+      },
+      {
+        "column": "demand_min",
+        "unitColumn": "time_unit",
+        "conversion": "rate",
+        "canonical": "week"
+      },
       {
         "column": "volume",
         "unitColumn": "time_unit",
@@ -1015,6 +1181,7 @@ export const PROMOTABLE_TARGETS: string[] = [
   "bom_multi_level",
   "bom_single_level",
   "customers",
+  "demand_forecasts",
   "inbound_logistics",
   "materials",
   "outbound_logistics",

@@ -18,8 +18,20 @@
 // and imported by relative path from the browser.
 
 export type Row = Record<string, unknown>;
-export type OverrideDomain = "positive" | "nonnegative" | "fraction";
-export type OverrideEntity = "material" | "supplier" | "product";
+export type OverrideDomain = "positive" | "nonnegative" | "fraction" | "distribution" | "demand_mode";
+/** `row` (PLAN.md §24 WP 14.2) is a customer × product row of
+ *  `outbound_logistics`, keyed exactly as the Customer stage keys it,
+ *  `<customer>::<product>`. */
+export type OverrideEntity = "material" | "supplier" | "product" | "row";
+
+/** The values an ENUM domain accepts — the mapper's `_ROW_KIND` targets and the
+ *  row's two modes. */
+export const ENUM_DOMAIN_VALUES: Record<"distribution" | "demand_mode", readonly string[]> = {
+  distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
+  demand_mode: ["forecast", "model"],
+};
+export const isEnumDomain = (d: OverrideDomain): d is "distribution" | "demand_mode" =>
+  d === "distribution" || d === "demand_mode";
 
 export interface OverrideDecl {
   /** The bundle key — the grid column's `field`. */
@@ -28,7 +40,7 @@ export interface OverrideDecl {
   /** `table.column` of the item master this key overrides. */
   master: string;
   /** The /policies stage whose rows carry it. */
-  rows: "supplier" | "plant";
+  rows: "supplier" | "plant" | "customer";
   domain: OverrideDomain;
   entity: OverrideEntity;
   /** What the engine uses when override, master and derivations are all empty:
@@ -41,6 +53,7 @@ const ENTITY_OF_TABLE: Record<string, OverrideEntity> = {
   materials: "material",
   suppliers: "supplier",
   products: "product",
+  outbound_logistics: "row",
 };
 
 /** The override declarations among the registry's `policy_bundle_keys`. */
@@ -54,7 +67,7 @@ export function overrideDecls(bundleKeys: readonly Row[] | undefined): OverrideD
       key: String(k.key),
       family: String(k.family),
       master,
-      rows: k.rows === "plant" ? "plant" : "supplier",
+      rows: k.rows === "plant" ? "plant" : k.rows === "customer" ? "customer" : "supplier",
       domain: (k.domain as OverrideDomain) ?? "nonnegative",
       entity,
       emptyDefault: typeof k.empty_default === "number" ? k.empty_default : null,
@@ -68,6 +81,11 @@ export function overrideDecls(bundleKeys: readonly Row[] | undefined): OverrideD
  *  with a warning, and the master decides. */
 export function isUsableOverride(v: unknown, domain: OverrideDomain): boolean {
   if (v === null || v === undefined || v === "" || typeof v === "boolean") return false;
+  if (isEnumDomain(domain)) {
+    const t = String(v).trim().toLowerCase().replace(/[- ]/g, "_");
+    const norm = t === "triangularav" ? "triangular_av" : t;
+    return ENUM_DOMAIN_VALUES[domain].includes(norm);
+  }
   const n = Number(v);
   if (!Number.isFinite(n) || n < 0) return false;
   if (domain === "positive") return n > 0;
@@ -153,6 +171,18 @@ export function entityOverride(
     return { ...found, usable: isUsableOverride(found.value, decl.domain) };
   }
 
+  // A customer × product row (WP 14.2): the Customer row's own key, exactly
+  // (`_apply_row_demand_overrides` reads `node:<customer>::<product>`).
+  if (decl.entity === "row") {
+    for (const o of rows) {
+      if (String(o.target_key) !== entityId) continue;
+      const v = patchOf(o)[decl.key];
+      if (v === undefined || v === null || v === "") continue;
+      return { value: v, targetKey: entityId, usable: isUsableOverride(v, decl.domain) };
+    }
+    return undefined;
+  }
+
   for (const o of rows) {
     const parts = partition(String(o.target_key));
     if (!parts) continue;
@@ -173,12 +203,15 @@ export function entityOverride(
 export function overriddenEntities(
   overrides: readonly Row[] | undefined,
   bundleKeys: readonly Row[] | undefined,
-  idsByEntity: Record<OverrideEntity, ReadonlySet<string>>,
+  idsByEntity: Partial<Record<OverrideEntity, ReadonlySet<string>>>,
 ): Map<string, Map<string, number>> {
   const out = new Map<string, Map<string, number>>();
   if (!overrides?.length) return out;
   for (const decl of overrideDecls(bundleKeys)) {
     const ids = idsByEntity[decl.entity];
+    // The grader grades the item masters; a customer-row override (WP 14.2) is
+    // not one of them and has no ids here.
+    if (!ids) continue;
     const hit = new Map<string, number>();
     for (const id of ids) {
       const ov = entityOverride(overrides, decl, id, decl.entity === "product" ? ids : undefined);

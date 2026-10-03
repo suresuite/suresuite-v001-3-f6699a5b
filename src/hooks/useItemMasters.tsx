@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import { ProjectRightRefused } from "@/lib/auth/projectRights";
 import { toast } from "sonner";
-import { fetchProjectLanes } from "@/lib/policies/projectLanes";
+import { fetchProjectForecasts, fetchProjectLanes } from "@/lib/policies/projectLanes";
+import type { ForecastBucket } from "@/lib/policies/customerRows";
 import {
   demandWeightedSellPrice,
   derivedMaterialCost,
@@ -110,6 +111,8 @@ interface UseItemMastersResult {
   lanes: {
     inbound: Record<string, unknown>[];
     outbound: Record<string, unknown>[];
+    /** PLAN.md §24 WP 14.2 — the per-row forecast buckets (weekly rate each). */
+    forecasts: ForecastBucket[];
     /** Single- OR multi-level rows — bomLevel tells consumers the shape. */
     bom: Record<string, unknown>[];
     /** projects.bom_level — 'single' or 'multi'/'multi_level'. */
@@ -146,6 +149,7 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [inboundArcs, setInboundArcs] = useState<Record<string, unknown>[]>([]);
   const [outboundArcs, setOutboundArcs] = useState<Record<string, unknown>[]>([]);
+  const [forecasts, setForecasts] = useState<ForecastBucket[]>([]);
   const [bomRows, setBomRows] = useState<Record<string, unknown>[]>([]);
   const [bomLevel, setBomLevel] = useState<string>("single");
   const [lanesLoaded, setLanesLoaded] = useState(false);
@@ -162,6 +166,12 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
     const lanes = await fetchProjectLanes(projectId, user);
     setInboundArcs(lanes.inbound);
     setOutboundArcs(lanes.outbound);
+    // WP 14.2 — a failed read is logged and leaves the series empty; the
+    // Customer row then shows no forecast, which the Data map reports as a
+    // failed read rather than as "none uploaded" (useDataMap).
+    const fq = await fetchProjectForecasts(projectId, user);
+    if (fq.error) console.warn("[useItemMasters] demand forecast read failed", fq.error);
+    setForecasts(fq.rows as unknown as ForecastBucket[]);
     // BOTH BOM shapes pass through raw — the shared grader normalizes
     // multi-level rows itself. Dropping them here once made "Verify your
     // inputs" grade an empty BOM on multi-level projects and miss the
@@ -309,10 +319,10 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
 
   const lanes = useMemo(
     () => ({
-      inbound: inboundArcs, outbound: outboundArcs, bom: bomRows, bomLevel,
+      inbound: inboundArcs, outbound: outboundArcs, forecasts, bom: bomRows, bomLevel,
       truncated: laneTruncation, loaded: lanesLoaded,
     }),
-    [inboundArcs, outboundArcs, bomRows, bomLevel, laneTruncation, lanesLoaded],
+    [inboundArcs, outboundArcs, forecasts, bomRows, bomLevel, laneTruncation, lanesLoaded],
   );
 
   return {

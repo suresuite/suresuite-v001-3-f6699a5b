@@ -399,6 +399,9 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
   routing: RoutingPolicy.options,
   // fulfillment
   allocation: AllocationRule.options,
+  // customer · demand per row (WP 14.2) — the engine's own enum domains
+  row_demand_mode: ["forecast", "model"],
+  row_demand_distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
   // production
   lot_policy: LotPolicy.options,
   scheduling: SchedulingRule.options,
@@ -468,6 +471,10 @@ export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<stri
     "capacity_units_per_day", "utilization_cap_pct", "allocation_priority_weight",
   ]),
   recovery: new Set(["response", "detection_lag_days"]),
+  // PLAN.md §24 WP 14.2 — the Customer row's forecast-or-model choice. The
+  // row's other demand cells are master overrides (`outbound_logistics`), which
+  // the grid resolves through their own rule, not through this map.
+  demand: new Set(["row_demand_mode"]),
 };
 
 /** True when a default-level field is exposed in the GUI (consumed by scsim). */
@@ -615,6 +622,15 @@ export const FIELD_LABELS: Record<string, string> = {
   production_cost_per_unit: "Production cost / unit",
   production_lead_time_mean_days: "Production lead time mean (days)",
   production_lead_time_std_days: "Production lead time σ (days)",
+  // customer · demand per row (PLAN.md §24 WP 14.2) — overrides of the
+  // outbound row's own spec, read by the engine before the uploaded value.
+  row_demand_mode: "Demand mode (forecast / model)",
+  row_forecast: "Forecast series (uploaded)",
+  row_demand_distribution: "Demand distribution",
+  row_demand_mean: "Demand mean (units/wk)",
+  row_demand_variation: "Demand variation (CV for normal, ± fraction for triangularAV)",
+  row_demand_min: "Demand min (units/wk, triangular)",
+  row_demand_max: "Demand max (units/wk, triangular)",
   // fulfillment extensions
   sourcing_firm: "Sourcing firm",
   price: "Price",

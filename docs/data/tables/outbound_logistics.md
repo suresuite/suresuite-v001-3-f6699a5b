@@ -24,6 +24,13 @@ it rather than duplicating it.
 
 ## Constraints
 
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `outbound_logistics_demand_spec_check` | `CHECK ( (demand_distribution IS NULL OR demand_distribution IN ('deterministic', 'normal', 'triangular', 'triangular_av', 'poisson')) AND (demand_mean IS NULL OR demand_mean >= 0) AND (demand_variation IS NULL OR demand_variation >= 0) AND (demand_min IS NULL OR demand_min >= 0) AND (demand_max IS NULL OR demand_max >= 0) )` | `20261003000001_demand_per_row.sql` |
+
 | Constraint | Kind | Definition |
 |---|---|---|
 | `outbound_logistics_source_row_fk` | FOREIGN KEY | `FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED` |
@@ -69,8 +76,8 @@ it rather than duplicating it.
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:421` | yes |
-| `ProjectPolicies.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:205` | yes |
-| `SimulationLab.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:205` | yes |
+| `ProjectPolicies.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:216` | yes |
+| `SimulationLab.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:216` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -91,13 +98,18 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `customer_id` | `customer_id` | `text` | — | **yes** | The customer's code as the user's own systems spell it. |
 | `product_id` | `product_id` | `text` | — | **yes** | The finished product's code as the user's own systems spell it. Joins to products and the BOM. |
 | `volume` | `volume` | `numeric` | `units per time_unit` *(from `time_unit`)* | **yes** | How much of this product the customer takes over one `time_unit`. A RATE, not a quantity — two rows are only comparable after both are converted to the same period. |
-| `time_unit` | `time_unit` | `text` | — | no | The period `volume` is quoted over — day, week, month, quarter, year. It describes the VOLUME only. It says nothing about `expected_lead_time`. |
+| `time_unit` | `time_unit` | `text` | — | no | The period `volume` is quoted over — day, week, month, quarter, year — and, since WP 14.2, the period of the row's `demand_mean`, `demand_min` and `demand_max` too. It says nothing about `expected_lead_time`. |
 | `expected_lead_time` | `expected_lead_time` | `numeric` | `weeks` | **yes** | How long the customer expects to wait for this product. The contract fixes the unit at WEEKS; `time_unit` does not apply to it. |
 | `unit_price` | `unit_price` | `numeric` | `currency per unit of product` | **yes** | What the customer pays for one unit of this product. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the row was inserted. Server-set. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row last changed. Server-set. |
 | `ingest_run_id` | — | `uuid` | — | — | The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else. |
 | `source_row_id` | — | `uuid` | — | — | The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it. |
+| `demand_distribution` | `demand_distribution` | `text` | — | no | The SHAPE of this customer × product row's weekly demand — deterministic, normal, triangular, triangular_av or poisson (PLAN.md §24 WP 14.2, ADR 0002 decision 2). Blank: the row takes its product's distribution, scaled by its share of the product's volume, which is how every project ran before Phase 14. |
+| `demand_mean` | `demand_mean` | `numeric` | `units per time_unit` *(from `time_unit`)* | no | This row's mean demand — the MODE for a triangular row, as `products.demand_mean` is a product's. A RATE in the row's `time_unit`, weekly after promotion. With a forecast series it is the value the plan uses past the series' end. |
+| `demand_variation` | `demand_variation` | `numeric` | `dimensionless — read by the distribution` | no | How much the row's weekly demand varies, READ BY ITS DISTRIBUTION: for `normal` it is the coefficient of variation (σ = variation × centre); for `triangular_av` it is the ± fraction of the centre (0.3 → 70…130 around 100). Deterministic, poisson and triangular (whose bounds are explicit) ignore it. |
+| `demand_min` | `demand_min` | `numeric` | `units per time_unit` *(from `time_unit`)* | no | A triangular row's lower bound — a rate in the row's `time_unit`, weekly after promotion. Read by `triangular` only. |
+| `demand_max` | `demand_max` | `numeric` | `units per time_unit` *(from `time_unit`)* | no | A triangular row's upper bound — a rate in the row's `time_unit`, weekly after promotion. Read by `triangular` only. |
 
 ## Each column in full
 
@@ -212,7 +224,7 @@ Volume is what the user's own systems recorded. It is not estimated; it is the t
 
 ### `time_unit`
 
-The period `volume` is quoted over — day, week, month, quarter, year. It describes the VOLUME only. It says nothing about `expected_lead_time`.
+The period `volume` is quoted over — day, week, month, quarter, year — and, since WP 14.2, the period of the row's `demand_mean`, `demand_min` and `demand_max` too. It says nothing about `expected_lead_time`.
 
 | | |
 |---|---|
@@ -355,6 +367,88 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `demand_distribution`
+
+The SHAPE of this customer × product row's weekly demand — deterministic, normal, triangular, triangular_av or poisson (PLAN.md §24 WP 14.2, ADR 0002 decision 2). Blank: the row takes its product's distribution, scaled by its share of the product's volume, which is how every project ran before Phase 14.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261003000001_demand_per_row.sql` |
+| Read by the engine | `project_map.py::_row_demand_spec -> CustomerLink.demand_model` |
+| Transform | lower-cased; `triangularAV` spellings → triangular_av; an unknown value is warned and the row keeps its product's distribution |
+| When NULL, the engine uses | the product's distribution × the row's volume share |
+| Validated at ingest | one of deterministic, normal, triangular, triangular_av, poisson; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+**Substitutions** — every point where a value you did not supply can stand in
+for one you did.
+
+| When | The value used | Shown as | Visible where |
+|---|---|---|---|
+| blank | the product's own distribution, scaled by the row's share of the product's outbound volume | `derived` | the Customer table's distribution cell on /policies |
+
+### `demand_mean`
+
+This row's mean demand — the MODE for a triangular row, as `products.demand_mean` is a product's. A RATE in the row's `time_unit`, weekly after promotion. With a forecast series it is the value the plan uses past the series' end.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `rate` |
+| Unit | `units per time_unit` — column, named by `time_unit` |
+| Added by | `20261003000001_demand_per_row.sql` |
+| Read by the engine | `project_map.py::_row_demand_spec -> CustomerLink.demand_mean` |
+| Transform | rateToWeekly(demand_mean, time_unit) — normalized to weeks at promotion |
+| Validated at ingest | numeric >= 0; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `demand_variation`
+
+How much the row's weekly demand varies, READ BY ITS DISTRIBUTION: for `normal` it is the coefficient of variation (σ = variation × centre); for `triangular_av` it is the ± fraction of the centre (0.3 → 70…130 around 100). Deterministic, poisson and triangular (whose bounds are explicit) ignore it.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `dimensionless — read by the distribution` — fixed |
+| Added by | `20261003000001_demand_per_row.sql` |
+| Read by the engine | `project_map.py::_row_demand_spec -> CustomerLink.demand_variation` |
+| Validated at ingest | numeric >= 0; triangular_av needs <= 1; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `demand_min`
+
+A triangular row's lower bound — a rate in the row's `time_unit`, weekly after promotion. Read by `triangular` only.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `rate` |
+| Unit | `units per time_unit` — column, named by `time_unit` |
+| Added by | `20261003000001_demand_per_row.sql` |
+| Read by the engine | `project_map.py::_row_demand_spec -> CustomerLink.demand_min` |
+| Transform | rateToWeekly(demand_min, time_unit) |
+| Validated at ingest | numeric >= 0; triangular only; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `demand_max`
+
+A triangular row's upper bound — a rate in the row's `time_unit`, weekly after promotion. Read by `triangular` only.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `rate` |
+| Unit | `units per time_unit` — column, named by `time_unit` |
+| Added by | `20261003000001_demand_per_row.sql` |
+| Read by the engine | `project_map.py::_row_demand_spec -> CustomerLink.demand_max` |
+| Transform | rateToWeekly(demand_max, time_unit) |
+| Validated at ingest | numeric >= 0; triangular only; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -365,6 +459,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `48d3cc002eef`, engine `0.3.0`,
+*Generated from data contract `14629b47bab9`, engine `0.3.0`,
 sidecar `supabase/contract/outbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -266,7 +266,13 @@ fields:
     meaning: >-
       The SHAPE of weekly demand for this product — constant, normal, triangular
       and so on. What the user types here is `demand_distribution`; the engine
-      calls the resolved value `demand_model`.
+      calls the resolved value `demand_model`. `normal` IS A REAL NORMAL since
+      engine 0.3.0 (PLAN.md §24 WP 14.1, ADR 0002 decision 8): N(mean, σ =
+      demand_cv × mean), negative draws set to 0 and counted on the run — before
+      it, `normal` ran as triangularAV with a mapping warning. A customer × product
+      row may state its own distribution on `outbound_logistics` (WP 14.2); this
+      product-level one is what a row that states none runs on, scaled by its
+      volume share.
     grain: metadata
     engine:
       consumed_by: "project_map.py::_resolve_demand_kind -> demand kind"
@@ -347,7 +353,13 @@ fields:
     unit: "coefficient of variation (dimensionless)"
     unit_source: fixed
     meaning: >-
-      How much weekly demand varies, as a coefficient of variation.
+      How much weekly demand varies — READ BY THE DISTRIBUTION (PLAN.md §24
+      WP 14.1): for `normal` it is the coefficient of variation (σ = cv × mean);
+      for `triangular` / `triangularAV` it is the ± fraction of the triangularAV
+      form, triangular(mean·(1−cv), mean, mean·(1+cv)), unless explicit
+      `demand_min` / `demand_max` are given; Poisson and deterministic ignore it.
+      The two readings are not interchangeable: 0.3 is σ = 30 % of the mean under
+      normal and a ±30 % range under triangular.
     grain: level
     engine:
       consumed_by: "project_map.py::_map_products -> demand cv"

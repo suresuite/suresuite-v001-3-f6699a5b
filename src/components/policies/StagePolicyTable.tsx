@@ -69,7 +69,11 @@ import {
   rowHasSeedableField,
   substitutionNote,
   masterBaseFor,
+  masterIdOf,
   masterOverrideFor,
+  masterRawFor,
+  isEnumMaster,
+  normalizeEnumToken,
 } from "@/lib/policies/resolveEffective";
 import { cellEngineRead, notSimulatedNote as noteOf } from "@/lib/policies/cellEngineRead";
 import {
@@ -89,6 +93,7 @@ import { ValueChainPopover, type ValueChainTarget } from "@/components/policies/
 import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters } from "@/hooks/useItemMasters";
+import { customerRowMasters, demandCellNote } from "@/lib/policies/customerRows";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
@@ -327,8 +332,11 @@ export function StagePolicyTable({
       materials: new Map(materials.map((m) => [m.material_id, m as unknown as Record<string, unknown>])),
       products: new Map(products.map((p) => [p.product_id, p as unknown as Record<string, unknown>])),
       suppliers: new Map(suppliers.map((s) => [s.supplier_id, s as unknown as Record<string, unknown>])),
+      // PLAN.md §24 WP 14.2 — the Customer stage's base: each row's own demand
+      // spec and its forecast series, keyed `<customer>::<product>`.
+      outbound_logistics: customerRowMasters(lanes.outbound, lanes.forecasts),
     }),
-    [materials, products, suppliers],
+    [materials, products, suppliers, lanes.outbound, lanes.forecasts],
   );
   const masterColByField = useMemo(() => {
     const m = new Map<string, ColSpec>();
@@ -1112,16 +1120,26 @@ export function StagePolicyTable({
         if (!col || col.synthetic) continue;
         const rule = col.master ? masterOverrideRule(col.family, col.field) : undefined;
         if (col.master && rule && dataRow) {
-          const id = String(dataRow[col.master.idFrom] ?? "");
+          const id = masterIdOf(col, dataRow);
           if (!id) continue;
           const siblings = dataRows
-            .filter((row) => String((row as Record<string, unknown>)[col.master!.idFrom] ?? "") === id)
+            .filter((row) => masterIdOf(col, row as Record<string, unknown>) === id)
             .map((row) => String(row.key));
           // `null` (or a cleared cell) is *reset to master*: the key leaves every
           // row of the entity. A value equal to the base with no override saved
           // is not an override at all — nothing to store.
-          const n = v === null || v === undefined || v === "" ? null : Number(v);
-          const base = masterBaseFor(col, dataRow, masterRowById, derived);
+          // An ENUM master (the Customer row's distribution, WP 14.2) saves its
+          // token as the engine reads it; every other master saves a number.
+          const enumCell = isEnumMaster(col);
+          const n =
+            v === null || v === undefined || v === ""
+              ? null
+              : enumCell
+                ? normalizeEnumToken(v)
+                : Number(v);
+          const base = enumCell
+            ? masterRawFor(col, dataRow, masterRowById)
+            : masterBaseFor(col, dataRow, masterRowById, derived);
           const saved = masterOverrideFor(col, dataRow, overrides, masterRowById);
           if (n !== null && !saved && base !== undefined && isEqual(n, base)) continue;
           if (n === null && !saved) continue;
@@ -1811,7 +1829,14 @@ export function StagePolicyTable({
           // T1/T2 — one sentence, assembled from the registry's own chain, used
           // by the hover AND by the popover so the two cannot disagree about
           // what stood in for this number (§4 D167).
-          const substitution = substitutionNote(resolved);
+          const demandNote = demandCellNote(
+            col.field,
+            col.field === "row_demand_variation"
+              ? getEffective(rowKey, r, "row_demand_distribution", "demand")
+              : undefined,
+          );
+          const substitution =
+            [substitutionNote(resolved), demandNote].filter(Boolean).join(" ") || undefined;
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);
@@ -1909,7 +1934,7 @@ export function StagePolicyTable({
                 // cannot be named yet).
                 const src = sourceFor(col as { field: string; master?: { table: string; field: string } });
                 const masterRow = src && col.master
-                  ? masterRowById[col.master.table].get(String(r[col.master.idFrom] ?? ""))
+                  ? masterRowById[col.master.table]?.get(masterIdOf(col, r))
                   : undefined;
                 const target: ValueChainTarget = {
                   dataset: src?.dataset ?? null,

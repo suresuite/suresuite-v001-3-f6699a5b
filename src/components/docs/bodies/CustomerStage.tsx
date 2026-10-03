@@ -16,17 +16,12 @@ export default function CustomerStage() {
     <>
       <PageTitle lead={stage.role}>Customer stage</PageTitle>
 
-      <Callout tone="limit" title={`This stage has ${cols.length} columns, and that is the finding`}>
+      <Callout tone="note" title="Demand is set here, row by row">
         <p>
-          The supplier stage has {supplierCols} and the plant stage has {plantCols}. This one has{" "}
-          {cols.length}, and <strong>neither reaches the simulation</strong>. It is the smallest
-          screen in the policy grid by a long way, and a reader who came here expecting the
-          demand-side equivalent of the other two should stop and read the next section instead of
-          hunting for controls that are not there.
-        </p>
-        <p>
-          This page is short because the stage is small. It is not an unfinished page, and padding
-          it would hide the one thing worth knowing about the screen.
+          Since demand can be stated per customer and product, this stage carries the row's own
+          demand: its mode (forecast or model), distribution, mean, variation and — for a triangular
+          row — its bounds, with the uploaded forecast shown beside them. The supplier stage has{" "}
+          {supplierCols} columns and the plant stage {plantCols}; this one has {cols.length}.
         </p>
       </Callout>
 
@@ -37,9 +32,10 @@ export default function CustomerStage() {
           <DocLink to="outbound-logistics">Outbound Logistics</DocLink> upload.
         </P>
         <P>
-          Demand itself is not set here. It comes from the product master's{" "}
-          <Term>demand_mean</Term>, or — far more often — from the outbound volumes.{" "}
-          <DocLink to="products">Products</DocLink> covers the shape of it.
+          A row's demand comes from its own spec when it has one — uploaded on the outbound file
+          or as a <DocLink to="demand-forecasts">Demand Forecast</DocLink>, and overridable in the
+          cells here — and otherwise from its product's demand, split by volume.{" "}
+          <DocLink to="products">Products</DocLink> covers the product-level shape.
         </P>
         <StageSummary stage="customer" />
       </Section>
@@ -55,6 +51,26 @@ export default function CustomerStage() {
               </>
             ),
             sourcing_firm: <>The same kind of decision, recorded per row.</>,
+            row_demand_mode: (
+              <>
+                Empty follows the data: a row with an uploaded forecast plans on it, any other on
+                its mean. <Term>model</Term> sets an uploaded forecast aside.
+              </>
+            ),
+            row_forecast: <>The uploaded series, summarized — buckets, first date, first weekly values. Read-only here.</>,
+            row_demand_distribution: (
+              <>
+                Your override, else the outbound row's distribution, else the product's distribution
+                scaled by the row's share. The edit is saved as an override; the upload is never changed.
+              </>
+            ),
+            row_demand_mean: <>Units per week; the mode for a triangular row.</>,
+            row_demand_variation: (
+              <>
+                Read by the distribution: the CV for normal, the ± fraction for triangularAV. The
+                cell's note says which, for its row.
+              </>
+            ),
           }}
         />
       </Section>
@@ -75,9 +91,10 @@ export default function CustomerStage() {
           several rules competing to be the rule. The engine reads one.
         </P>
         <P>
-          The parts of a customer that <em>are</em> per row — what they buy, how much, at what price
-          and lead time — are your{" "}
-          <DocLink to="outbound-logistics">Outbound Logistics</DocLink> upload, not a policy. And
+          The parts of a customer that <em>are</em> per row — what they buy, how much and how it
+          varies, at what price and lead time — are your{" "}
+          <DocLink to="outbound-logistics">Outbound Logistics</DocLink> upload, with the demand
+          cells above as overrides on top. And
           the customer attributes the engine reads on top of that, priority weight and segment, live
           on a table with no upload and no screen at all; <DocLink to="known-limits">Known
           limits</DocLink> records that.

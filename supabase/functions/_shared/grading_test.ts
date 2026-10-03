@@ -13,6 +13,7 @@ import fixture from "./fixtures/validation_parity/dataset.json" with { type: "js
 import expected from "./fixtures/validation_parity/expected_findings.json" with { type: "json" };
 import {
   activeEnginePolicies,
+  demandRowFindings,
   flattenFindings,
   gradeManifest,
   normalizeBomRows,
@@ -404,4 +405,38 @@ Deno.test("WP 13.1: a usable /policies cost override makes materials.cost set", 
   assertEquals(set.resolved.some((r) => r.id === "M_DERIVED"), false, "not also derived");
   const ignored = gradeManifest(withOverride(0), DEFAULTS, REG, BRIDGE).find((g) => g.field === "materials.cost")!;
   assertEquals(ignored.set.includes("M_DERIVED"), false, "a cost of 0 is outside the domain; the engine ignores it");
+});
+
+
+// PLAN.md §24 WP 14.2 — a row's demand spec must carry what its distribution
+// needs (the engine would DROP it and run the product's distribution: a block),
+// and a forecast shorter than the run or with a gap is a warn. A Customer-row
+// override completes a spec the upload left incomplete.
+Deno.test("WP 14.2: an incomplete row demand spec blocks; an override can complete it", () => {
+  const outbound: Row[] = [
+    { customer_id: "C1", product_id: "P1", demand_distribution: "normal", demand_mean: 40 },
+    { customer_id: "C2", product_id: "P1", demand_distribution: "triangular", demand_mean: 10 },
+    { customer_id: "C3", product_id: "P1" },
+  ];
+  const blocks = demandRowFindings(outbound).filter((f) => f.severity === "block");
+  assertEquals(blocks.flatMap((f) => f.rows).sort(), ["C1::P1", "C2::P1"], "normal without a CV and triangular without bounds block");
+  const fixed = demandRowFindings(outbound, [], [
+    { scope: "node", target_key: "C1::P1", family: "demand", patch: { row_demand_variation: 0.2 } },
+    { scope: "node", target_key: "C2::P1", family: "demand", patch: { row_demand_min: 5, row_demand_max: 20 } },
+  ]);
+  assertEquals(fixed.filter((f) => f.severity === "block").length, 0, "the overrides complete both specs");
+});
+
+Deno.test("WP 14.2: a forecast shorter than the run, or with a gap, warns", () => {
+  const outbound: Row[] = [{ customer_id: "C1", product_id: "P1", demand_distribution: "deterministic" }];
+  const forecasts: Row[] = [
+    { customer_id: "C1", product_id: "P1", period_start: "2026-01-05", period_end: "2026-01-12", weekly_quantity: 50 },
+    { customer_id: "C1", product_id: "P1", period_start: "2026-01-19", period_end: "2026-01-26", weekly_quantity: 50 },
+  ];
+  const f = demandRowFindings(outbound, forecasts, [], 52);
+  assertEquals(f.every((x) => x.severity === "warn"), true, "a short or gapped series is a warn, not a block");
+  assertEquals(f.length, 2, "one for the short series, one for the gap");
+  assertEquals(f[0].rows[0], "C1::P1 (3 of 52 wk)", "the row and its coverage are named");
+  // A deterministic row with a series needs no mean: the series is its centre.
+  assertEquals(demandRowFindings(outbound, forecasts).filter((x) => x.severity === "block").length, 0, "no block");
 });

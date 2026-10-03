@@ -340,7 +340,26 @@ Found by WP 14.1 (defaults shipped; the owner may overrule):
    product's stationary mean becomes the sum of its rows' means, so P-P.1 sizes on the rows.
 3. **A product no customer row names** gets one implicit row (no customer, share 1).
 4. **Week 0 of a forecast series** is the first simulated week. Where a stored series carries
-   dates, WP 14.2 decides how a date maps to a simulated week.
+   dates, WP 14.2 decides how a date maps to a simulated week (below, point 5).
+
+Found by WP 14.2 (defaults shipped; the owner may overrule):
+
+5. **Which simulated week a dated bucket is.** Week 0 starts on the project's **earliest**
+   `period_start` — one calendar for every row, so two customers' weeks line up. Week *w* is
+   the seven days starting 7·*w* days later; its value is the sum over those days of each
+   covering bucket's daily rate (its weekly rate ÷ 7), so a week straddling two months takes
+   some of each and decision 7's even spread survives the boundary. A row's series ends at
+   its last week that lies wholly before its last bucket's end; a day no bucket covers adds
+   nothing (`sim_worker/datamap.py::forecast_series`).
+6. **Where a row's demand spec lives.** On `outbound_logistics`, whose natural key
+   (project, plant, customer, product) is the row the engine keys by (customer, product) once
+   a project has one plant. A forecast is its own table, `demand_forecasts`, keyed
+   (project, customer, product, `period_start`) — no plant, because demand belongs to the
+   customer row, not the lane that serves it. The monthly spread happens **at promotion**
+   (`weekly_quantity` = quantity × 7 ÷ the period's days; `period_end` exclusive).
+7. **`demand_mode` is derived, not uploaded.** A row with forecast buckets runs on them; an
+   override `row_demand_mode = model` on /policies sets the series aside and the row runs on
+   its mean + distribution. There is no stored mode column a second upload could contradict.
 
 
 ---

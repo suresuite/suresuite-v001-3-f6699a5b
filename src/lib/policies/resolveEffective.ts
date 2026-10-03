@@ -4,6 +4,7 @@ import type { ColSpec } from "./columnSpecs";
 import { reducerLabel, type DerivedValue } from "./effectiveEconomics";
 import { shadowedBy } from "./registryAccess";
 import { entityOverride, masterOverrideRule, type ResolvedOverride } from "./masterOverrides";
+import { isEnumDomain } from "../../../supabase/functions/_shared/entityOverrides.ts";
 import type { Provenance } from "@/components/policies/policyGridUi";
 
 /**
@@ -15,10 +16,56 @@ import type { Provenance } from "@/components/policies/policyGridUi";
  * correctness bug, not a style one.
  */
 
+/**
+ * The id a master-backed cell joins its master row on. `idFrom` names one row
+ * field, or — for a composite key (the Customer stage's `customer_id::product_id`,
+ * PLAN.md §24 WP 14.2) — several joined by `::`, which is how the row's own key
+ * and the engine's `node:<customer>::<product>` spell it.
+ */
+export function masterIdOf(col: Pick<ColSpec, "master">, row: Record<string, unknown>): string {
+  if (!col.master) return "";
+  return col.master.idFrom
+    .split("::")
+    .map((f) => String(row[f] ?? ""))
+    .join("::");
+}
+
+/** An enum override as the engine reads it: lower-case, `triangularAV` →
+ *  `triangular_av` (the mapper's `_ROW_KIND`). */
+export function normalizeEnumToken(v: unknown): string {
+  const t = String(v).trim().toLowerCase().replace(/[- ]/g, "_");
+  return t === "triangularav" ? "triangular_av" : t;
+}
+
 export interface MasterRowMaps {
   materials: Map<string, Record<string, unknown>>;
   products: Map<string, Record<string, unknown>>;
   suppliers: Map<string, Record<string, unknown>>;
+  /** PLAN.md §24 WP 14.2 — the customer × product rows, keyed `<customer>::<product>`
+   *  (`customerRowMasters` builds them, with each row's derived `demand_mode`).
+   *  Optional: a stage that renders no Customer cell does not need it. */
+  outbound_logistics?: Map<string, Record<string, unknown>>;
+}
+
+/** True for a master-backed cell whose values are ENUM tokens (the Customer
+ *  row's demand mode and distribution), not numbers. */
+export function isEnumMaster(col: ColSpec): boolean {
+  const rule = col.master ? masterOverrideRule(col.family, col.field) : undefined;
+  return !!rule && isEnumDomain(rule.domain);
+}
+
+/** The raw master value under a cell — a number, or an enum token for an enum
+ *  master — or undefined when the row carries none. */
+export function masterRawFor(
+  col: ColSpec,
+  row: Record<string, unknown>,
+  masterRowById: MasterRowMaps,
+): number | string | undefined {
+  if (!col.master) return undefined;
+  if (!isEnumMaster(col)) return masterValueFor(col, row, masterRowById);
+  const id = masterIdOf(col, row);
+  const v = masterRowById[col.master.table]?.get(id)?.[col.master.field];
+  return v == null || v === "" ? undefined : String(v);
 }
 
 export interface DerivedMaps {
@@ -51,10 +98,10 @@ export function masterValueFor(
   masterRowById: MasterRowMaps,
 ): number | undefined {
   if (!col.master) return undefined;
-  const id = String(row[col.master.idFrom] ?? "");
-  const v = masterRowById[col.master.table].get(id)?.[col.master.field];
+  const id = masterIdOf(col, row);
+  const v = masterRowById[col.master.table]?.get(id)?.[col.master.field];
   const n = Number(v);
-  return v == null || !Number.isFinite(n) ? undefined : n;
+  return v == null || v === "" || !Number.isFinite(n) ? undefined : n;
 }
 
 /**
@@ -73,7 +120,7 @@ export function masterOverrideFor(
   if (!col.master) return undefined;
   const rule = masterOverrideRule(col.family, col.field);
   if (!rule) return undefined;
-  const id = String(row[col.master.idFrom] ?? "");
+  const id = masterIdOf(col, row);
   const productIds =
     rule.entity === "product" ? new Set([...(masterRowById.products?.keys() ?? []), id]) : undefined;
   return entityOverride(overrides, rule, id, productIds);
@@ -91,13 +138,28 @@ export function masterBaseFor(
   return mv !== undefined ? mv : derivedValueFor(col, row, derived);
 }
 
+/** `masterBaseFor` for any master — an enum token for an enum master. */
+export function masterBaseRawFor(
+  col: ColSpec,
+  row: Record<string, unknown>,
+  masterRowById: MasterRowMaps,
+  derived: DerivedMaps,
+): number | string | undefined {
+  if (!isEnumMaster(col)) return masterBaseFor(col, row, masterRowById, derived);
+  return masterRawFor(col, row, masterRowById);
+}
+
 export function derivedValueFor(
   col: ColSpec,
   row: Record<string, unknown>,
   derived: DerivedMaps,
 ): number | undefined {
   if (!col.master) return undefined;
-  const id = String(row[col.master.idFrom] ?? "");
+  // A customer × product row's spec has no lane-derived fallback: an empty cell
+  // runs on the product's distribution × share, which the cell SAYS (the key's
+  // declared `empty_note`) rather than computing a number here (WP 14.2).
+  if (col.master.table === "outbound_logistics") return undefined;
+  const id = masterIdOf(col, row);
   if (col.master.table === "materials" && col.master.field === "cost") return derived.materialCost.get(id);
   if (col.master.field === "sell_price") return derived.sellPrice.get(id);
   if (col.master.field === "demand_mean") {
@@ -130,8 +192,8 @@ function derivedStepFor(
   row: Record<string, unknown>,
   derived: DerivedMaps,
 ): DerivedValue | undefined {
-  if (!col.master) return undefined;
-  const id = String(row[col.master.idFrom] ?? "");
+  if (!col.master || col.master.table === "outbound_logistics") return undefined;
+  const id = masterIdOf(col, row);
   if (col.master.field === "production_capacity") return derived.productionCapacity?.get(id);
   // §23 WP 13.4 — every lane-derived value is shown with its source. The cost
   // chain has two steps and the map says which answered; price and demand have
@@ -170,10 +232,12 @@ export function getEffectiveValue(args: {
     // §23 WP 13.1 — draft → override → item master → derived. A `null` draft
     // is *reset to master*: the cell shows the base again before the save.
     if (draft !== undefined && draft !== null) return draft;
+    const enumCell = isEnumMaster(mcol);
     if (draft === undefined) {
       const ov = masterOverrideFor(mcol, dataRow, overrides, masterRowById);
-      if (ov?.usable) return Number(ov.value);
+      if (ov?.usable) return enumCell ? normalizeEnumToken(ov.value) : Number(ov.value);
     }
+    if (enumCell) return masterRawFor(mcol, dataRow, masterRowById);
     return masterBaseFor(mcol, dataRow, masterRowById, derived);
   }
   if (draft !== undefined) return draft;
@@ -307,7 +371,7 @@ export interface ResolvedCell {
    * beside an override. Undefined when the column has no master or neither
    * source has a value.
    */
-  base?: number;
+  base?: number | string;
   baseSource?: "master" | "derived";
   /** A saved override the engine REFUSES (outside its declared domain): the run
    *  uses the base and warns, so the cell shows the base and says why. */
@@ -375,7 +439,7 @@ export function resolveCell(args: {
     masterColByField, masterRowById, derived, defaults, overrides, scope,
   });
 
-  const masterSet = col.master ? masterValueFor(col, row, masterRowById) !== undefined : false;
+  const masterSet = col.master ? masterRawFor(col, row, masterRowById) !== undefined : false;
   const derivedVal = col.master && !masterSet ? derivedValueFor(col, row, derived) : undefined;
   const derivedVia = derivedVal !== undefined ? derivedStepFor(col, row, derived) : undefined;
   // §23 WP 13.1 — the override the engine reads ahead of the master.
@@ -503,7 +567,7 @@ export function resolveCell(args: {
               ? "suggested"
               : "default";
 
-  const base = col.master ? (masterSet ? masterValueFor(col, row, masterRowById) : derivedVal) : undefined;
+  const base = col.master ? (masterSet ? masterRawFor(col, row, masterRowById) : derivedVal) : undefined;
   return {
     value: cellValue ?? liveDefault,
     provenance,

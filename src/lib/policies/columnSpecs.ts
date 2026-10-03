@@ -36,8 +36,14 @@ export interface ColSpec {
    * (docs/data-simulation-mapping.md §4).
    */
   master?: {
-    table: "materials" | "products" | "suppliers";
+    /**
+     * `outbound_logistics` (PLAN.md §24 WP 14.2) is the customer × product row's
+     * own demand spec — the base under the Customer stage's demand cells, joined
+     * on a COMPOSITE `idFrom` (`customer_id::product_id`), as the engine keys it.
+     */
+    table: "materials" | "products" | "suppliers" | "outbound_logistics";
     field: string;
+    /** The stage row's id field — or several joined by `::` for a composite key. */
     idFrom: string;
     /**
      * What an EMPTY master column MEANS, when empty means something (§4 D17).
@@ -359,15 +365,43 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       { id: "customer_id", label: "Customer" },
       { id: "product_id", label: "Product" },
     ],
-    // scsim alignment: demand-shape fields are not consumed by the engine
-    // (demand comes from product/graph data), and the fulfillment family
-    // (allocation, backorder, service level) is consumed at the PROJECT default
-    // scope only — never per customer×product — so those are edited in the
-    // fulfillment defaults card, not per-row here. What remains per-row is the
-    // firm-routing choice for a customer×product lane.
+    // DEMAND PER ROW (PLAN.md §24 WP 14.2, ADR 0002 decision 2). The row's own
+    // demand spec: its base is the uploaded `outbound_logistics` row (and the
+    // row's forecast series), an edit is a policy OVERRIDE on this row's key —
+    // the engine reads override → data → the product's distribution × share,
+    // exactly the order every master-backed cell follows (§23 WP 13.1). The
+    // forecast series itself is uploaded in Project manager and shown read-only.
+    //
+    // The fulfillment family (allocation, backorder, service level) is still
+    // consumed at the PROJECT default scope only — per-row fulfillment is WP
+    // 14.3's — so those are edited in the fulfillment defaults card. The
+    // firm-routing choice for a customer × product lane stays per row.
     cols: [
       col("primary_source", "fulfillment"),
       col("sourcing_firm", "fulfillment"),
+      // An OVERRIDE-ONLY choice, not a master column: the mode is derived from
+      // the data (a row with an uploaded series plans on it), so there is no
+      // column to point at. Empty = the engine's rule; `model` sets an uploaded
+      // series aside, and the Forecast cell beside it says whether there is one.
+      col("row_demand_mode", "demand"),
+      col("row_forecast", "demand", { readOnly: true }),
+      col("row_demand_distribution", "demand", {
+        master: { table: "outbound_logistics", field: "demand_distribution", idFrom: "customer_id::product_id" },
+      }),
+      col("row_demand_mean", "demand", {
+        master: { table: "outbound_logistics", field: "demand_mean", idFrom: "customer_id::product_id" },
+      }),
+      // Read BY THE DISTRIBUTION: a CV for normal, the ± fraction for
+      // triangularAV. The cell's title says which, for the row's distribution.
+      col("row_demand_variation", "demand", {
+        master: { table: "outbound_logistics", field: "demand_variation", idFrom: "customer_id::product_id" },
+      }),
+      col("row_demand_min", "demand", {
+        master: { table: "outbound_logistics", field: "demand_min", idFrom: "customer_id::product_id" },
+      }),
+      col("row_demand_max", "demand", {
+        master: { table: "outbound_logistics", field: "demand_max", idFrom: "customer_id::product_id" },
+      }),
     ],
     targetKey: (r) => `${r.customer_id}::${r.product_id ?? ""}`,
   },
@@ -500,6 +534,14 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   fg_safety_stock_days: { sub: "days · when sized", w: 78, kind: "int", unit: "d", prio: 1 },
   // ---- customer · fulfillment
   sourcing_firm: { sub: "serving node", w: 168, kind: "text", keep: true, align: "left" },
+  // ---- customer · demand per row (WP 14.2)
+  row_demand_mode: { sub: "forecast · model", w: 92, kind: "text", keep: true, align: "left" },
+  row_forecast: { sub: "uploaded series", w: 168, kind: "text", align: "left", prio: 6 },
+  row_demand_distribution: { sub: "per row", w: 112, kind: "text", keep: true, align: "left" },
+  row_demand_mean: { sub: "units / wk", w: 88, kind: "num", dec: 1, keep: true },
+  row_demand_variation: { sub: "CV (normal) · ± (triangularAV)", w: 96, kind: "num", dec: 2, prio: 5 },
+  row_demand_min: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
+  row_demand_max: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
 };
 
 /** Fallback so a new engine field renders sanely before it gets metadata. */
@@ -537,6 +579,13 @@ export const SHORT_LABEL: Record<string, string> = {
   fg_service_level_target: "FG service",
   fg_safety_stock_days: "FG days",
   sourcing_firm: "Sourcing firm",
+  row_demand_mode: "Demand mode",
+  row_forecast: "Forecast",
+  row_demand_distribution: "Distribution",
+  row_demand_mean: "Mean",
+  row_demand_variation: "Variation",
+  row_demand_min: "Min",
+  row_demand_max: "Max",
 };
 
 /** Per-stage label overrides — same field, different meaning by context. */

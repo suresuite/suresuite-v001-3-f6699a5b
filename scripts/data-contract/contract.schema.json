@@ -435,14 +435,15 @@
               "additionalProperties": false,
               "properties": {
                 "kind": {
-                  "description": "`unit` is a token public.unit_days() knows — the ONE unit table, never a list restated here (D10).",
+                  "description": "`unit` is a token public.unit_days() knows — the ONE unit table, never a list restated here (D10). `date` is an ISO calendar date, YYYY-MM-DD (WP 14.2).",
                   "enum": [
                     "text",
                     "numeric",
                     "integer",
                     "unit",
                     "enum",
-                    "boolean"
+                    "boolean",
+                    "date"
                   ]
                 },
                 "min": {
