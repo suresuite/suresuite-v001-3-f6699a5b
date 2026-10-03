@@ -102,7 +102,7 @@ export interface ColSpec {
    * `inventoryParamsForType` (registryPolicyTypes), which mirrors these `visibleWhen`
    * gates — kept here so prefill only persists type-relevant params.
    */
-  vectorGroup?: "invParams";
+  vectorGroup?: "invParams" | "fgParams";
   /** A render-only anchor column with no stored field (holds the vector cell). */
   synthetic?: boolean;
   /**
@@ -441,14 +441,30 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // P-P.4's buffer is never added on top of it. Over the `products` master,
       // edits are Plant-row overrides (§23 WP 13.1). Each level shows only under
       // the policies that read it.
+      //
+      // LAID OUT LIKE THE MATERIAL INVENTORY (Supplier stage): a policy-type
+      // dropdown, then ONE "FG replenishment" vector cell holding only the
+      // levels the chosen policy reads — S · s,S · D — each a symbol and an
+      // input with the engine's default greyed in place. The three level
+      // columns below feed that cell (`vectorGroup: "fgParams"`) and are
+      // hidden from the header; their master, gating and save wiring are
+      // unchanged.
       col("fg_policy", "production", {
+        label: "FG policy type",
         visibleWhen: holdsFgStock,
         master: { table: "products", field: "fg_policy", idFrom: "product_id" },
+        band: FG_BAND,
+      }),
+      col("__fg_params", "production", {
+        synthetic: true,
+        label: "FG replenishment",
+        visibleWhen: holdsFgStock,
         band: FG_BAND,
       }),
       col("fg_reorder_point", "production", {
         visibleWhen: fgPolicyIn("min_max"),
         master: { table: "products", field: "fg_reorder_point", idFrom: "product_id" },
+        vectorGroup: "fgParams",
         band: FG_BAND,
       }),
       col("fg_base_stock", "production", {
@@ -462,11 +478,13 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
             title: "Empty — S is derived: one week of the projected demand. Type a number to set the target yourself; a typed S is used as typed.",
           },
         },
+        vectorGroup: "fgParams",
         band: FG_BAND,
       }),
       col("fg_cover_days", "production", {
         visibleWhen: fgPolicyIn("days_of_cover"),
         master: { table: "products", field: "fg_cover_days", idFrom: "product_id" },
+        vectorGroup: "fgParams",
         band: FG_BAND,
       }),
       // FG OPENING STOCK IS A REAL CELL SINCE PLAN.md §24 WP 14.4 (§4 D89's
@@ -606,11 +624,15 @@ export function visibleColsForRow(
   );
 }
 
-/** The type-specific inventory params grouped into the "Replenishment parameters"
- * vector cell for a stage (in declared order). The cell renders the subset the
- * row's chosen type needs via `inventoryParamsForType`. */
-export function vectorParamCols(stage: StageKey): ColSpec[] {
-  return STAGE_TABLE_SPEC[stage].cols.filter((c) => c.vectorGroup === "invParams");
+/** The type-specific params grouped into a vector cell for a stage (in declared
+ * order): "invParams" — the material "Replenishment parameters" cell, which
+ * renders the subset the row's type needs via `inventoryParamsForType`;
+ * "fgParams" — the Plant stage's "FG replenishment" cell (FG_POLICY_PARAMS). */
+export function vectorParamCols(
+  stage: StageKey,
+  group: NonNullable<ColSpec["vectorGroup"]> = "invParams",
+): ColSpec[] {
+  return STAGE_TABLE_SPEC[stage].cols.filter((c) => c.vectorGroup === group);
 }
 
 /** Flatten a PolicyBundle into a single { field: value } map across families. */
@@ -691,7 +713,8 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   // ---- plant · FG stock (WP 14.4) — the switch, then only the levels the
   // row's FG policy reads, so each one that shows is one the run uses.
   fulfillment_mode: { sub: "mts holds stock · mto", w: 104, kind: "text", keep: true, filterable: false, align: "left" },
-  fg_policy: { sub: "base · min-max · cover", w: 120, kind: "text", keep: true, align: "left" },
+  fg_policy: { sub: "S · s,S · D", w: 152, kind: "type", keep: true, filterable: false, align: "left" },
+  __fg_params: { sub: "levels", w: 168, kind: "vector", keep: true, filterable: false, align: "left" },
   fg_reorder_point: { sub: "s · units · reorder", w: 84, kind: "int", keep: true },
   fg_base_stock: { sub: "S · units · target", w: 84, kind: "int", keep: true },
   fg_cover_days: { sub: "D · days of demand", w: 84, kind: "num", dec: 1, keep: true },
@@ -724,6 +747,7 @@ export const SHORT_LABEL: Record<string, string> = {
   reliability_score: "Reliability",
   type: "Policy type",
   __inv_params: "Replenishment",
+  __fg_params: "FG replenishment",
   initial_on_hand: "Initial stock",
   safety_stock_days: "Safety stock",
   holding_cost_pct: "Holding",
@@ -743,7 +767,7 @@ export const SHORT_LABEL: Record<string, string> = {
   row_demand_min: "Min",
   row_demand_max: "Max",
   fulfillment_mode: "FG stock",
-  fg_policy: "FG policy",
+  fg_policy: "FG policy type",
   fg_base_stock: "FG S",
   fg_reorder_point: "FG s",
   fg_cover_days: "FG cover",

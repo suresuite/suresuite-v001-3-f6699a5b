@@ -23254,6 +23254,22 @@ no longer mapped (`_TYPE_SHOWS`), and Q is REQUIRED: an (R,Q) Supplier row with 
 counts it) and its Q cell carries the reason. A run dispatched anyway keeps the engine's declared
 fallback, now warned per material in the run log rather than only at project scope.
 
+**Owner review — "make the FG inventory policy consistent with the material inventory".** The
+Plant grid's FG band drew the FG policy as three chips and its levels as three discrete columns
+(FG s, FG S, FG cover), while the Supplier grid draws a Policy-type dropdown and ONE
+Replenishment cell. WP 14.8 chose the discrete columns on purpose (a vector cell would drop the
+per-cell provenance dot and value-chain popover); the owner overrules that for consistency. Now:
+`fg_policy` is a dropdown labelled like the material one — Base stock (S) · Min-max (s, S) · Days
+of cover (D) — and the three levels feed one "FG replenishment" vector cell (`__fg_params`,
+`vectorGroup: "fgParams"`, `FG_POLICY_PARAMS` in `fgPolicyParams.ts`), rendered by the same
+`ReplenishmentCell` as the material levels: only the levels the policy reads, an empty
+base-stock S greyed as the derived target (≈ one week of the grid's demand), and a missing s, S
+or D marked with the reason (the run would fall back to base-stock). What the vector cell gives
+up is stated rather than lost: a level's source (your override vs the item master, and the
+master value a cleared cell returns to) moved from the dot into the input's hover. Storage, the
+master chain and the engine are unchanged; Opening FG stays its own column, as initial stock
+does for materials. `fgReplenishmentCell.test.tsx` pins the layout.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -25742,3 +25758,5 @@ frozen digests are unchanged.
 **Follow-up (§4 D288, engine 0.6.1).** The Supplier stage's Replenishment column: a typed s / S
 is the level the run uses (no safety stock on top), T reaches the engine, (R,Q) with a lot has
 S = R + Q, a row applies only what its type shows, and κ is shown only where the run reads it.
+And the FG band now matches the material layout — an FG policy-type dropdown and one "FG
+replenishment" levels cell — reversing this package's discrete-columns deviation (owner decision).

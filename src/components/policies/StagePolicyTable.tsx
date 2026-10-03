@@ -92,6 +92,7 @@ import {
 } from "@/lib/policies/masterOverrides";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
 import { engineClassificationFor } from "@/lib/policies/engineBridge";
+import { FG_POLICY_PARAMS, FG_POLICY_TYPE_LABELS } from "@/lib/policies/fgPolicyParams";
 import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
 import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
@@ -831,6 +832,13 @@ export function StagePolicyTable({
     return m;
   }, [stageKey]);
 
+  // The FG levels grouped into the Plant stage's "FG replenishment" cell.
+  const fgParamColByField = useMemo(() => {
+    const m = new Map<string, ColSpec>();
+    for (const c of vectorParamCols(stageKey, "fgParams")) m.set(c.field, c);
+    return m;
+  }, [stageKey]);
+
   /** Enum choices for a column, with the registry's own labels for Policy Type. */
   const enumOptionsFor = (
     col: ColSpec,
@@ -852,6 +860,10 @@ export function StagePolicyTable({
           ? "Forecast — the row plans week by week on its uploaded series; the distribution adds spread around it"
           : "Model — a constant mean per week, drawn from the distribution below",
       }));
+    }
+    if (col.field === "fg_policy") {
+      // Labelled like the material Policy type dropdown: name + the levels it reads.
+      return opts.map((o) => ({ value: o, label: o, title: FG_POLICY_TYPE_LABELS[o] ?? o }));
     }
     if (col.field === "fulfillment_mode") {
       return opts.map((o) => ({
@@ -967,6 +979,62 @@ export function StagePolicyTable({
         basis={basis as "days_of_supply" | "forward_visible"}
         onBasisChange={(b) => onCellChange(rowKey, "basis", b)}
         basisNotSimulated={notSimulatedNote("basis")}
+      />
+    );
+  };
+
+  /**
+   * The Plant stage's "FG replenishment" cell — the same layout as the material
+   * Replenishment cell: only the levels the row's FG policy reads (S · s,S · D),
+   * each a symbol and an input. Values resolve exactly as the discrete columns
+   * did (draft → this row's override → the products master); clearing a value
+   * resets it to the master. An empty base-stock S is derived by the engine
+   * (one week of projected demand) and is shown greyed; min-max needs s and S,
+   * days of cover needs D — without them the run falls back to base-stock, so
+   * the empty cell says so instead of looking optional.
+   */
+  const renderFgParamsCell = (rowKey: string, r: Record<string, unknown>, paramW?: number) => {
+    const policy = String(getEffective(rowKey, r, "fg_policy", "production") || "base_stock");
+    const fields = FG_POLICY_PARAMS[policy] ?? FG_POLICY_PARAMS.base_stock;
+    const perDay = Number(r.__demand_per_day);
+    const weekDemand = Number.isFinite(perDay) && perDay > 0 ? perDay * 7 : undefined;
+    const required: Record<string, string | undefined> = {
+      fg_reorder_point: policy === "min_max" ? "Min-max needs s and S (s < S) — without them the run uses base-stock" : undefined,
+      fg_base_stock: policy === "min_max" ? "Min-max needs s and S (s < S) — without them the run uses base-stock" : undefined,
+      fg_cover_days: policy === "days_of_cover" ? "Days of cover needs D — without it the run uses base-stock" : undefined,
+    };
+    const params = fields.map(({ field }) => {
+      const c = fgParamColByField.get(field)!;
+      const res = resolveCell({
+        rowKey, row: r, col: c, draft: drafts[rowKey]?.[field], families, masterColByField,
+        masterRowById, derived, defaults, overrides, scope: spec.scope, familyDefault: getDefault,
+      });
+      const n = typeof res.value === "number" ? res.value : res.value == null || res.value === "" ? NaN : Number(res.value);
+      const value = Number.isFinite(n) ? n : undefined;
+      const derivedS = field === "fg_base_stock" && policy === "base_stock";
+      return {
+        field,
+        value,
+        onCommit: (v: number | undefined) => onCellChange(rowKey, field, v === undefined ? null : v),
+        invalid: value === undefined ? required[field] : undefined,
+        placeholder: derivedS ? (weekDemand !== undefined ? `≈${Math.round(weekDemand)}` : "≈1 wk") : undefined,
+        placeholderNote: derivedS
+          ? "derived: one week of the projected demand. Type a number to set the target yourself; a typed S is used as typed"
+          : undefined,
+        valueNote: res.hasOverride || drafts[rowKey]?.[field] !== undefined
+          ? `your value on this row${res.base !== undefined ? ` — clear it to return to the item master (${res.base})` : " — clear it to use the default"}`
+          : res.baseSource === "master"
+            ? "from the item master (products) — type a number to override it on this row"
+            : undefined,
+      };
+    });
+    return (
+      <ReplenishmentCell
+        policyType={policy}
+        paramSpec={FG_POLICY_PARAMS}
+        paramW={paramW}
+        params={params}
+        labelFor={(f) => fgParamColByField.get(f)?.label ?? f}
       />
     );
   };
@@ -1530,6 +1598,8 @@ export function StagePolicyTable({
     if (col.readOnly) return "readonly";
     if (col.field === "sourcing_firm" && firms && firms.length > 0)
       return firms.length <= 4 ? "segmented" : "select";
+    // The FG policy type is a dropdown like the material Policy type.
+    if (opts && col.field === "fg_policy") return "select";
     if (opts) return opts.length <= 4 ? "segmented" : "select";
     if (typeof liveDefault === "boolean" || typeof value === "boolean") return "toggle";
     // A master column whose empty state is DECLARED has `liveDefault ===
@@ -1890,6 +1960,18 @@ export function StagePolicyTable({
               </td>
             );
           }
+          // The FG levels, laid out like the material Replenishment cell.
+          if (col.synthetic && col.field === "__fg_params") {
+            return (
+              <td
+                key={col.field}
+                className="border-b p-0 align-middle group-hover:bg-[#fafafa]"
+                style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
+              >
+                {renderFgParamsCell(rowKey, r, fc.paramW)}
+              </td>
+            );
+          }
           // The dynamic "Replenishment parameters" vector cell.
           if (col.synthetic && col.field === "__inv_params") {
             return (
@@ -2013,7 +2095,11 @@ export function StagePolicyTable({
               )}
 
               {kind === "select" && (
-                <Select value={String(cellValue ?? liveDefault ?? "")} onValueChange={commit}>
+                <Select
+                  // An empty FG policy is base-stock — the engine's default, shown as such.
+                  value={String(cellValue ?? liveDefault ?? (col.field === "fg_policy" ? "base_stock" : ""))}
+                  onValueChange={commit}
+                >
                   <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
                     {/* An empty distribution runs the PRODUCT's, × the row's share. */}
                     <SelectValue placeholder={col.field === "row_demand_distribution" ? "product's" : "—"} />

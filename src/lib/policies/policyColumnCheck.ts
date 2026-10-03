@@ -376,6 +376,15 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     verdict: "conditional",
     note: "MTS products only.",
   },
+  "plant:__fg_params": {
+    shows: "the FG replenishment cell, laid out like the material Replenishment cell: only the levels the row's FG policy reads (S · s,S · D); an empty base-stock S shows the derived target greyed",
+    savedTo: "the individual fields below",
+    engine: "see the individual fields",
+    verdict: "info",
+    note:
+      "The greyed S uses the grid's demand (the product's customer lanes × 7) — the engine derives its own from the forecast. " +
+      "Min-max without s and S, or days of cover without D, is marked: the run would fall back to base-stock.",
+  },
   "plant:fg_base_stock": {
     shows: "your override → products.fg_base_stock → empty (derived: a week of forecast + P-P.4)",
     savedTo: "override production.fg_base_stock (Plant row)",

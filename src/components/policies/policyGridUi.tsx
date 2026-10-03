@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { LAYER, tint } from "@/components/intelligence/piUi";
 import { kappaIsRead } from "@/lib/policies/registryPolicyTypes";
 
+
 /* ── provenance ──────────────────────────────────────────────────────── */
 
 /**
@@ -691,15 +692,19 @@ export const POLICY_TYPE_OPTIONS = [
  */
 export function ReplenishmentCell({
   policyType,
+  paramSpec,
   params,
   labelFor,
-  basis,
+  basis = "days_of_supply",
   onBasisChange,
   showBasis,
   paramW,
   basisNotSimulated,
 }: {
   policyType: string;
+  /** The type → parameters table; the material one (POLICY_PARAMS) unless
+   *  given — the FG cell passes FG_POLICY_PARAMS. */
+  paramSpec?: Record<string, Array<{ field: string; symbol: string }>>;
   params: Array<{
     field: string;
     value: number | undefined;
@@ -712,12 +717,14 @@ export function ReplenishmentCell({
     placeholder?: string;
     /** How the placeholder is made, for its hover. */
     placeholderNote?: string;
+    /** Where a SHOWN value comes from (e.g. the item master), for its hover. */
+    valueNote?: string;
     /** §23 WP 13.4 — the engine does not read this parameter on this stage. */
     notSimulated?: string;
   }>;
   labelFor: (field: string) => string;
-  basis: "days_of_supply" | "forward_visible";
-  onBasisChange: (b: "days_of_supply" | "forward_visible") => void;
+  basis?: "days_of_supply" | "forward_visible";
+  onBasisChange?: (b: "days_of_supply" | "forward_visible") => void;
   /** §23 WP 13.4 — the engine reads `basis` nowhere; said where it is shown. */
   basisNotSimulated?: string;
   showBasis?: boolean;
@@ -726,10 +733,11 @@ export function ReplenishmentCell({
   paramW?: number;
 }) {
   const hasValue = (f: string) => params.find((x) => x.field === f)?.value !== undefined;
-  const spec = (POLICY_PARAMS[policyType] ?? POLICY_PARAMS.min_max).filter(
+  const table = paramSpec ?? POLICY_PARAMS;
+  const spec = (table[policyType] ?? Object.values(table)[0]).filter(
     ({ field }) => field !== "coverage_weeks" || kappaIsRead(policyType, hasValue),
   );
-  const visibleBasis = showBasis || basis !== "days_of_supply";
+  const visibleBasis = !!onBasisChange && (showBasis || basis !== "days_of_supply");
   const w = paramW ?? 52;
   return (
     <div className="flex w-full items-center gap-[7px] overflow-hidden px-1">
@@ -746,6 +754,7 @@ export function ReplenishmentCell({
               placeholder={p?.placeholder ?? "—"}
               title={
                 p?.notSimulated ??
+                (p?.value !== undefined && p.valueNote ? p.valueNote : undefined) ??
                 (p?.placeholder
                   ? `engine default: ${p.placeholder}${p.placeholderNote ? ` — ${p.placeholderNote}` : ""}`
                   : undefined)
@@ -787,7 +796,7 @@ export function ReplenishmentCell({
           <CellSegmented
             tiny
             value={basis}
-            onChange={onBasisChange}
+            onChange={(b) => onBasisChange?.(b)}
             options={[
               { value: "days_of_supply", label: "days_of_supply", title: basisNotSimulated ?? "Policy Basis · days_of_supply" },
               { value: "forward_visible", label: "forward_visible", title: basisNotSimulated ?? "Policy Basis · forward_visible" },

@@ -172,8 +172,8 @@ export function fitColumns({
   if (avail < keepWidth + 40) {
     visible = visible.map((c) => {
       if (c.userSized) return c;
-      if (c.key === "type") return { ...c, sub: "active ▾", w: 74, compact: true };
-      if (c.key === "params" || c.key === "__inv_params")
+      if (c.key === "type" || c.key === "fg_policy") return { ...c, sub: "active ▾", w: 74, compact: true };
+      if (c.key === "params" || c.key === "__inv_params" || c.key === "__fg_params")
         return { ...c, sub: "levels", w: 148, paramW: 42 };
       if (c.kind === "chip" && !c.foldedFamily) {
         return { ...c, sub: "sizing", w: 84, shortChip: true };
