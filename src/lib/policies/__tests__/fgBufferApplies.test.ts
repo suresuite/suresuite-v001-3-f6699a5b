@@ -42,3 +42,19 @@ describe("demand is authored on the Customer stage only (§4 D286)", () => {
     expect(fields).not.toContain("demand_cv");
   });
 });
+
+describe("no FG buffer control — a saved one is a removable notice (WP 14.8)", () => {
+  it("shows only for a saved, non-none buffer that acts on some line", async () => {
+    const { legacyFgBufferShown, legacyFgBufferNote } = await import("../projectRules");
+    expect(legacyFgBufferShown({ fg_safety_stock: "none" }, 3)).toBe(false);
+    expect(legacyFgBufferShown({}, 3)).toBe(false);
+    expect(legacyFgBufferShown({ fg_safety_stock: "service_level" }, 0)).toBe(false);
+    expect(legacyFgBufferShown({ fg_safety_stock: "service_level" }, 1)).toBe(true);
+    expect(legacyFgBufferNote({ fg_safety_stock: "fixed_days", fg_safety_stock_days: 3 }, 2)).toMatch(/3 days of demand.*2 products/);
+  });
+
+  it("an empty S says what it means on the row", () => {
+    const s = STAGE_TABLE_SPEC.plant.cols.find((c) => c.field === "fg_base_stock")!;
+    expect(s.master?.nullMeans?.token).toMatch(/1 wk demand/);
+  });
+});

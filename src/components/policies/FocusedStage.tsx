@@ -13,7 +13,7 @@ import * as XLSX from "xlsx";
 import { StagePolicyTable } from "./StagePolicyTable";
 import { MobileStagePolicyList } from "./MobileStagePolicyList";
 import { MobileGroup, MobileNote, MobilePanel, MobileRow } from "@/components/mobile";
-import { ProjectRuleBar } from "./ProjectRuleBar";
+import { LegacySettingNotice, ProjectRuleBar } from "./ProjectRuleBar";
 import { PresetDiffBanner } from "./PresetDiffBanner";
 import { LaneTruncationNotice } from "@/components/policies/LaneTruncationNotice";
 import { RunValidateStage } from "./RunValidateStage";
@@ -22,7 +22,14 @@ import type { StageRowsQuery } from "@/hooks/useStageGuards";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/policies/schemas";
 import type { ProjectContext } from "@/lib/policies/resolvePreset";
-import { CUSTOMER_RULE, FG_BUFFER_RULE, customerRuleFields, fgBufferNote, type RuleField } from "@/lib/policies/projectRules";
+import {
+  CUSTOMER_RULE,
+  FG_BUFFER_RULE,
+  customerRuleFields,
+  legacyFgBufferNote,
+  legacyFgBufferShown,
+  type RuleField,
+} from "@/lib/policies/projectRules";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import {
@@ -171,10 +178,8 @@ export function FocusedStage({
 
   // The stage's project-level settings, one line above its grid
   // (`projectRules.ts`): the Customer stage's allocation rule and the backorder
-  // an empty row inherits; the Plant stage's FG buffer, only while some line
-  // gets the buffer — an MTS product on base-stock whose S is left empty. A
-  // typed target (S, min-max, days of cover) gets nothing on top, so for a
-  // project of typed targets the line would be a control that does nothing.
+  // an empty row inherits. The Plant stage has no project control — only a
+  // notice for an FG buffer an older version saved, while it still acts.
   const ruleBar = ({ fgBufferRows, customerCount }: { fgBufferRows: number; customerCount: number }) => {
     if (stageKey === "customer") {
       return (
@@ -189,17 +194,21 @@ export function FocusedStage({
         />
       );
     }
-    if (stageKey === "plant" && fgBufferRows > 0) {
+    // No FG buffer control (owner decision, WP 14.8): how much FG to keep is
+    // the row's S. A buffer an older version saved is still read, so it shows
+    // here, where it acts, until it is removed.
+    const inv = defaults.inventory as unknown as Record<string, unknown>;
+    if (stageKey === "plant" && legacyFgBufferShown(inv, fgBufferRows)) {
       return (
-        <ProjectRuleBar
-          family="inventory"
+        <LegacySettingNotice
           title={FG_BUFFER_RULE.title}
-          hint={FG_BUFFER_RULE.hint}
-          fields={FG_BUFFER_RULE.fields}
-          value={defaults.inventory}
-          onSave={(v) => saveDefault("inventory", v)}
+          note={legacyFgBufferNote(inv, fgBufferRows)}
+          actionLabel="Remove buffer"
           readOnly={!canImport}
-          note={fgBufferNote(fgBufferRows)}
+          onAction={async () => {
+            await saveDefault("inventory", { ...defaults.inventory, fg_safety_stock: "none" });
+            toast.success("FG safety buffer removed");
+          }}
         />
       );
     }

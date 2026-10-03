@@ -338,7 +338,7 @@ Covers: demand management, production, fulfillment, FG inventory, MPS, MRP, disp
 | P-P.1 | `inventory_control` | inventory control | tactical | ✅ **extended** | min_max ✅ · s_S · base_stock · (R,Q) · periodic — extension closes G1's biggest loss: absolute `reorder_point` / `order_up_to` / `moq` / `review_period_days` honored, coverage-κ retained as the default sizing heuristic · **✚ `mrp` (time-phased, per material, G20)** · **✚ basis `planned_requirements`** | per-material control params; `materials.moq`; for `mrp`: lead time, MOQ, safety-stock days |
 | P-P.2 | `lot_sizing` | production planning | tactical | 🧩 | fixed · lot_for_lot · EOQ/EPQ · period_order_quantity (B2's MRP rounds to MOQ only; lot rules stay here until a study shows they matter) | `production.setup_cost`, `setup_time_hours`, holding cost |
 | P-P.3 | `safety_stock_materials` | safety stock | strategic | ✅ | fixed_days · service_level · king · abc_xyz (implemented; expose the abc_xyz variant the UI currently can't reach — G1) | service targets; demand/lead-time variability |
-| P-P.4 | `fg_safety_stock` | safety stock | strategic | ✅ (MTS; one project line above the /policies Plant grid, shown while a product holds FG stock — PLAN.md §24 WP 14.8) | service_level · fixed_days · fixed_units; uniform / abc_by_revenue segmentation | `products.sell_price`, demand stats |
+| P-P.4 | `fg_safety_stock` | safety stock | strategic | ✅ (MTS; no /policies control by owner decision — how much FG to keep is the Plant row's S; a saved value shows as a removable notice — PLAN.md §24 WP 14.8) | service_level · fixed_days · fixed_units; uniform / abc_by_revenue segmentation | `products.sell_price`, demand stats |
 | P-P.5 | `short_term_capacity` | capacity | operational | ✅ | overtime with premium, revenue-positive activation | `production.capacity_units_per_day`, overtime premium |
 | P-P.6 | `standing_capacity_reserve` | capacity | strategic | 🧩 | pre-paid capacity buffer | reserve size, cost |
 | P-P.9 | `material_allocation` | allocation | operational | ✅ (unreachable today — G3) | rolling-horizon LP (HiGHS) · greedy; objectives max_revenue / max_fill_rate / priority_weighted / fg_replenish | product priorities/prices |
@@ -1353,7 +1353,7 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-P.1 | inventory_control | plant | inventory control | tactical | ✅ extended | PH-70/80; min_max ✅ + s_S / base_stock / (R,Q) / periodic with absolute params; ✚ `mrp` type per material: BOM × planned production − stock − on the way, ≥ MOQ, released one lead time ahead (G20, B2) |
 | P-P.2 | lot_sizing | plant | production planning | tactical | 🧩 M8 | fixed / L4L / EOQ-EPQ / POQ (B2's MRP uses MOQ only) |
 | P-P.3 | safety_stock_materials | plant | safety stock | strategic | ✅ | PH-70; fixed_days / service_level / king / abc_xyz |
-| P-P.4 | fg_safety_stock | plant | safety stock | strategic | ✅ (MTS) | PH-70; UI: project line above the Plant grid (WP 14.8) |
+| P-P.4 | fg_safety_stock | plant | safety stock | strategic | ✅ (MTS) | PH-70; UI: none by design — S on the row; a saved value is a removable notice (WP 14.8) |
 | P-P.5 | short_term_capacity | plant | capacity | operational | ✅ | PH-40; overtime, revenue-positive activation |
 | P-P.6 | standing_capacity_reserve | plant | capacity | strategic | 🧩 M8 | pre-paid buffer |
 | P-P.7 | process_flexibility | plant | production planning | strategic | 🧩 M8 | |
