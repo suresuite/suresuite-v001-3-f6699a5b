@@ -14,7 +14,7 @@ import {
 } from "@/lib/policies/schemas";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import { downloadWorkbook } from "@/lib/policies/excel";
-import { buildPolicyVersionWorkbook } from "@/lib/policies/verifiableExports";
+import { buildPolicyVersionEngineInput } from "@/lib/policies/engineInputExport";
 import { currentPolicyVersion } from "@/lib/policies/currentPolicyVersion";
 
 export interface PolicyVersion {
@@ -77,7 +77,7 @@ interface UsePoliciesResult {
    *  goes through the same per-version RPC, so the server still refuses any
    *  version bound to a run or model card. */
   deleteVersions: (versionIds: string[]) => Promise<string[]>;
-  /** 6.D — download a saved version's policy bundle as an .xlsx workbook. */
+  /** 6.D + §4 D289 — download what the engine receives for a saved version, as .xlsx. */
   exportVersion: (version: PolicyVersion) => Promise<void>;
   /** D230 — "Edit Policies" on this project, as /profile lists it. Every write above
    *  refuses without it; the page shows `policyEditRefusal` instead of letting a cell
@@ -702,50 +702,36 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     [baseVersionId, refreshVersions, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
-  // 6.D + W2/G17 — download a saved version's policy bundle as an .xlsx
-  // workbook with per-cell PROVENANCE: values equal to the registry schema
-  // default are marked as such (they may be placeholders, not real data),
-  // and _meta states explicitly that this is the policy snapshot ONLY.
-  // Reads the stored v2 snapshot { defaults, fulfillment_strategy, overrides };
-  // v1 snapshots (a flat family map, no `defaults` key) are handled too.
+  // 6.D + W2/G17 + §4 D289 — download WHAT THE ENGINE RECEIVES for this version:
+  // the mapped scsim input, computed in the browser engine by the same mapping a
+  // run performs, from this policy version and the dataset version a run of it
+  // read (`engineInputExport.ts`). Before D289 this wrote the stored bundle with
+  // the page's defaults filled in — neither the dataset nor the mapping, so its
+  // numbers could differ from the run's, and nothing tied its content to its hash.
   const exportVersion = useCallback(async (version: PolicyVersion) => {
     if (refused(canExport, rights.refusal("export"))) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = supabase as any;
-    const { data, error } = await sb.rpc("get_policy_version_snapshot", {
-      p_version_id: version.id,
-    });
-    if (error || !data) {
-      console.error("exportVersion failed", error);
-      toast.error("Could not load this version to export");
-      return;
-    }
-    const snap = data as Record<string, unknown>;
-    const rawDefaults = (snap.defaults ?? snap) as Record<string, unknown>;
-    const families = PolicyFamilyEnum.options;
-    const bundle = Object.fromEntries(
-      families.map((f) => [f, parseFamily(f, rawDefaults[f])]),
-    ) as unknown as PolicyBundle;
-    const snapOverrides = (Array.isArray(snap.overrides) ? snap.overrides : []).map(
-      (o: Record<string, unknown>) => ({
-        scope: o.scope,
-        target_key: o.target_key,
-        family: o.family,
-        patch: (o.patch ?? {}) as Record<string, unknown>,
-      }),
-    ) as OverrideRow[];
+    if (!projectId) return;
     const name = version.label || `version-${version.id.slice(0, 8)}`;
-    const wb = buildPolicyVersionWorkbook(
-      version,
-      [...families],
-      bundle,
-      snapOverrides,
-      (snap.fulfillment_strategy as string | undefined) ?? null,
-    );
-    const safe = name.replace(/[^a-z0-9._-]+/gi, "-").slice(0, 48);
-    downloadWorkbook(wb, `policy-${safe}.xlsx`);
-    toast.success("Version exported (policy snapshot only — with provenance)");
-  }, [canExport, rights, refused]);
+    const toastId = toast.loading("Preparing the simulation input — reading the two frozen versions…");
+    try {
+      const wb = await buildPolicyVersionEngineInput(projectId, version, (p) => {
+        toast.loading(
+          p === "reading"
+            ? "Preparing the simulation input — reading the two frozen versions…"
+            : p === "ready"
+              ? "Mapping the inputs exactly as a run does…"
+              : "Loading the simulation engine in your browser (the first time takes ~20 s)…",
+          { id: toastId },
+        );
+      });
+      const safe = name.replace(/[^a-z0-9._-]+/gi, "-").slice(0, 48);
+      downloadWorkbook(wb, `simulation-input-${safe}.xlsx`);
+      toast.success("Exported: exactly what the engine receives for this version", { id: toastId });
+    } catch (err) {
+      console.error("exportVersion failed", err);
+      toast.error(`Could not export this version: ${(err as Error)?.message ?? String(err)}`, { id: toastId });
+    }
+  }, [canExport, rights, refused, projectId]);
 
   // ONE answer for every page (§4 D242): the version whose content is live.
   const currentVersion = currentPolicyVersion(versions, currentHash);

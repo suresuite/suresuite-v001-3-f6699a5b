@@ -40,6 +40,7 @@ from __future__ import annotations
 from typing import Any, Callable, Optional
 
 from .datamap import build_project_data
+from .engine_input import describe
 from .policy_snapshot import snapshot_to_policies
 from .run_shape import build_run_update
 from .scsim_bridge import compute_run_from_project
@@ -98,6 +99,25 @@ def project_data_from_snapshots(
         scenario=scenario or {},
         project_model=project_model,
     )
+
+
+def engine_input_from_snapshots(
+    dataset: dict[str, Any],
+    policy_snapshot: dict[str, Any],
+    scenario: dict[str, Any],
+    project_model: Optional[str] = None,
+    recovery: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """What the engine RECEIVES for these frozen inputs — the mapped scsim
+    `Scenario` that `run_from_snapshots` would simulate, with each field's unit and
+    meaning, where every master-backed value came from, and the mapper's notes
+    (PLAN.md §4 D289). The same two calls a run makes, stopped before the
+    simulation: the policy version's Export is built from this, so the file is the
+    run's input rather than a second reading of the snapshot."""
+    from scsim.io import from_project_data
+
+    data = project_data_from_snapshots(dataset, policy_snapshot, scenario, project_model, recovery)
+    return describe(from_project_data(data))
 
 
 def run_from_snapshots(
