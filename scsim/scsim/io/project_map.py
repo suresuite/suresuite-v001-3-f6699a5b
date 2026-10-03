@@ -147,6 +147,12 @@ class ProductRow:
     # reaches the engine. Ignored for non-triangular demand kinds.
     demand_min: Optional[float] = None         # a_p (master); else b·(1−cv)
     demand_max: Optional[float] = None         # c_p (master); else b·(1+cv)
+    # FG inventory policy, MTS only (PLAN.md §24 WP 14.4, design doc §3.2).
+    fg_policy: Optional[str] = None            # base_stock | min_max | days_of_cover
+    fg_base_stock: Optional[float] = None      # S (units)
+    fg_reorder_point: Optional[float] = None   # s (units), min_max
+    fg_cover_days: Optional[float] = None      # D (days), days_of_cover
+    fg_initial_on_hand: Optional[float] = None  # FG opening stock (units), RFC 4
 
 
 @dataclass
@@ -352,12 +358,12 @@ class MappingResult:
 # the master OR the Plant-stage override of it carries a value.
 #
 # `customer` (PLAN.md §24 WP 14.2) is a Customer-stage row, `node:<customer>::<product>`.
-# The seven production-family keys declare it TOO, and that is a measured fact, not
-# a feature: `_composite_patches` resolves ANY `node:<x>::<product>` key to the
-# product, so a production patch on a Customer row would reach the product. No
-# Customer cell renders a production field, so nothing can write one today; the
-# probe that found it is `test_declared_scopes_are_the_scopes_the_mapper_reads`
-# (§16 · WP 14.2).
+# From WP 14.2 to WP 14.4 the seven production-family keys declared it too, because
+# `_composite_patches` resolved ANY `node:<x>::<product>` key to the product, so a
+# production patch on a Customer row reached the product. WP 14.4 closed that reach
+# (`exclude=` the existing Customer rows) when its five FG keys would have had to
+# declare the same false scope; the probe that found it is
+# `test_declared_scopes_are_the_scopes_the_mapper_reads` (§16 · WP 14.2, WP 14.4).
 #
 # `scopes` is REQUIRED (§23 WP 13.4, §4 D204 b): WHERE the mapper reads the key —
 # `default` (the project-wide policy), `supplier` (a Supplier-stage row,
@@ -512,7 +518,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "sell_price",
-        "scopes": ("plant", "customer"),
+        "scopes": ("plant",),
         "family": "production",
         "target": "Product.unit_price",
         "catalog_ref": None,
@@ -526,7 +532,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "production_capacity",
-        "scopes": ("plant", "customer"),
+        "scopes": ("plant",),
         "family": "production",
         "target": "Product.production_capacity",
         "catalog_ref": None,
@@ -541,7 +547,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "demand_mean",
-        "scopes": ("plant", "customer"),
+        "scopes": ("plant",),
         "family": "production",
         "target": "Product.demand_mode",
         "catalog_ref": None,
@@ -554,7 +560,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "demand_cv",
-        "scopes": ("plant", "customer"),
+        "scopes": ("plant",),
         "family": "production",
         "target": "Product.demand_cv",
         "catalog_ref": None,
@@ -578,7 +584,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "capacity_units_per_day",
-        "scopes": ("default", "plant", "customer"),
+        "scopes": ("default", "plant"),
         "family": "production",
         # NOT a policy parameter. This one lands on an ENTITY field, which is why
         # door 2 could never have declared it and why the row needed this table
@@ -601,7 +607,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         # nothing on screen holding the 0.85. It is read by `_map_policies`'s
         # capacity branch exactly as `capacity_units_per_day` is.
         "key": "utilization_cap_pct",
-        "scopes": ("default", "plant", "customer"),
+        "scopes": ("default", "plant"),
         "family": "production",
         "target": "Product.production_capacity",
         "catalog_ref": None,
@@ -641,7 +647,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     },
     {
         "key": "allocation_priority_weight",
-        "scopes": ("plant", "customer"),
+        "scopes": ("plant",),
         "family": "production",
         "target": "material_allocation.priority_weights",
         "catalog_ref": "P-X.3",
@@ -789,6 +795,81 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "empty_note": "none — triangular rows need it",
         "transform": "units per week, triangular only. Order: the Customer-stage row -> "
                      "outbound_logistics.demand_max",
+    },
+    # ── FG inventory policy per product, MTS (PLAN.md §24 WP 14.4, D284 d) ──
+    # Plant-stage rows (`node:<plant>::<product>`, family `production`) over the
+    # `products` master. ONE SOURCE PER NUMBER: a typed level IS the target and
+    # P-P.4 adds nothing on top. Read for an MTS product only.
+    {
+        "key": "fg_policy",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_policy",
+        "catalog_ref": None,
+        "master": "products.fg_policy",
+        "rows": "plant",
+        "domain": "fg_policy",
+        "empty_default": None,
+        "empty_note": "base_stock",
+        "transform": "enum — base_stock (S) · min_max (s, S) · days_of_cover (D). Order: the "
+                     "Plant-stage row -> products.fg_policy -> base_stock. An incomplete min_max "
+                     "or days_of_cover runs as base_stock, warned. MTS only",
+    },
+    {
+        "key": "fg_base_stock",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_base_stock",
+        "catalog_ref": None,
+        "master": "products.fg_base_stock",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "derived: one week of forecast, plus P-P.4's buffer when it is on",
+        "transform": "units, >= 0: S, the end-of-week FG target (base_stock, min_max). Order: "
+                     "the Plant-stage row -> products.fg_base_stock -> derived. MTS only",
+    },
+    {
+        "key": "fg_reorder_point",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_reorder_point",
+        "catalog_ref": None,
+        "master": "products.fg_reorder_point",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — read by min_max only",
+        "transform": "units, >= 0: s — min_max builds up to S only when the stock left after "
+                     "the week's demand is below s. MTS only",
+    },
+    {
+        "key": "fg_cover_days",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_cover_days",
+        "catalog_ref": None,
+        "master": "products.fg_cover_days",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — read by days_of_cover only",
+        "transform": "days, >= 0: D — the target is D/7 x the projected weekly demand, so it "
+                     "moves with the forecast. MTS only",
+    },
+    {
+        "key": "fg_initial_on_hand",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fg_initial_on_hand",
+        "catalog_ref": None,
+        "master": "products.fg_initial_on_hand",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "the policy target — the run starts at it",
+        "transform": "units, >= 0: FG opening stock (engine RFC 4). Order: the Plant-stage row "
+                     "-> products.fg_initial_on_hand -> the target. MTS only",
     },
     # ── Per-row fulfillment (PLAN.md §24 WP 14.3, D284 c) ───────────────────
     # Backorder, its window and cost are read at the project default AND on a
@@ -1190,6 +1271,7 @@ def _composite_target(key_body: str, targets: set[str]) -> Optional[str]:
 
 def _composite_patches(
     policies: dict, family: str, targets: set[str], w: list[MappingWarning],
+    exclude: frozenset[str] = frozenset(),
 ) -> dict[str, dict]:
     """Index ``node:<owner>::<target>`` patches of ``family`` by their target.
 
@@ -1208,6 +1290,10 @@ def _composite_patches(
     out: dict[str, dict] = {}
     for key in sorted(k for k in policies if isinstance(k, str)):
         if not key.startswith("node:") or "::" not in key:
+            continue
+        # A Customer row `<customer>::<product>` is not the product's row (WP
+        # 14.4 closed the reach WP 14.2 found): its patches are the row's own.
+        if key[len("node:"):] in exclude:
             continue
         target = _composite_target(key[len("node:"):], targets)
         if target is None:
@@ -1267,15 +1353,88 @@ def _negbin_k(mean: float, cv: float) -> float:
     return max(1e-3, mean * mean / (var - mean))
 
 
+_FG_POLICIES = ("base_stock", "min_max", "days_of_cover")
+
+
+def _resolve_fg(
+    pid: str, master: ProductRow, prod_row: dict, overrides: dict[str, Optional[float]],
+    tally: "_SourceTally", w: list[MappingWarning],
+) -> dict[str, Any]:
+    """The product's FG policy and levels (WP 14.4): the Plant-stage row's
+    override → the products master → the engine default (base-stock, derived S,
+    start at the target). Recorded for page-equals-run for every product; the
+    engine receives them for an MTS product only.
+
+    An incomplete policy (min-max without s or S, s ≥ S; days of cover without
+    D) is NOT a crash: the product runs base-stock with whatever S it has, and
+    the run says so — the pre-run check is where such a row should be caught.
+    """
+    ent = f"product:{pid}"
+    out: dict[str, Any] = {}
+    for field in ("fg_base_stock", "fg_reorder_point", "fg_cover_days", "fg_initial_on_hand"):
+        ov = overrides.get(field)
+        mv = getattr(master, field)
+        if ov is not None:
+            out[field] = ov
+            tally.add(f"products.{field}", "override", pid, count=True)
+        elif mv is not None:
+            out[field] = float(mv)
+            tally.add(f"products.{field}", "master", pid, count=True)
+        else:
+            out[field] = None
+            tally.add(f"products.{field}", "default", pid, count=False)
+        tally.value(f"products.{field}", pid, out[field])
+    raw = prod_row.get("fg_policy")
+    token = str(raw).strip().lower() if raw not in (None, "") else None
+    if token is not None and token not in _FG_POLICIES:
+        w.append(MappingWarning("warn", ent, "fg_policy",
+                                f"/policies override {raw!r} is not an FG policy — ignored, "
+                                f"the item master decides"))
+        token = None
+    if token is not None:
+        policy, src = token, "override"
+    elif master.fg_policy:
+        policy, src = str(master.fg_policy).strip().lower(), "master"
+        if policy not in _FG_POLICIES:
+            w.append(MappingWarning("warn", ent, "fg_policy",
+                                    f"products.fg_policy {master.fg_policy!r} is not an FG policy "
+                                    f"→ base_stock"))
+            policy = "base_stock"
+    else:
+        policy, src = "base_stock", "default"
+    tally.add("products.fg_policy", src, pid, count=src != "default")
+    if policy == "min_max" and not (
+            out["fg_base_stock"] is not None and out["fg_reorder_point"] is not None
+            and out["fg_reorder_point"] < out["fg_base_stock"]):
+        w.append(MappingWarning("warn", ent, "fg_policy",
+                                "min_max needs s (fg_reorder_point) below S (fg_base_stock) — "
+                                "run as base_stock"))
+        policy = "base_stock"
+    if policy == "days_of_cover" and out["fg_cover_days"] is None:
+        w.append(MappingWarning("warn", ent, "fg_policy",
+                                "days_of_cover needs D (fg_cover_days) — run as base_stock"))
+        policy = "base_stock"
+    tally.value("products.fg_policy", pid, policy)
+    out["fg_policy"] = policy
+    return out
+
+
 def _build_product(
     row: ProductRow, *, price: float, capacity: float, mode: FulfillmentMode,
     mean: float, cv: float, kind: str, warnings: list[MappingWarning],
+    fg: Optional[dict[str, Any]] = None,
 ) -> Product:
     common = dict(
         id=row.id, name=str(row.name or row.id),
         unit_price=max(price, 1e-9), production_capacity=max(capacity, 1e-6),
         fulfillment_mode=mode,
     )
+    # FG policy and levels reach an MTS product only (WP 14.4); an MTO product
+    # holds no FG stock. A product that sets none keeps the entity defaults.
+    if fg and mode == FulfillmentMode.MTS:
+        common.update({k: v for k, v in fg.items() if v is not None and k != "fg_policy"})
+        if fg.get("fg_policy") and fg["fg_policy"] != "base_stock":
+            common["fg_policy"] = fg["fg_policy"]
     if kind in ("triangular", "triangular_av", "triangularav", ""):
         a, b, c = triangular_av(max(mean, 0.0), max(cv, 0.0))
         # Master-supplied explicit bounds win over the symmetric AV form
@@ -1881,7 +2040,9 @@ def from_project_data(data: ProjectData) -> MappingResult:
     # so the composite index is what makes a per-row line-capacity edit reach
     # the engine at all; the bare "node:<product>" form still wins nothing and
     # loses nothing (§4 D75).
-    prod_composite = _composite_patches(data.policies, "production", prod_ids, w)
+    prod_composite = _composite_patches(
+        data.policies, "production", prod_ids, w,
+        exclude=frozenset(f"{cid}::{pid}" for pid, cid in set(cust_share) | set(row_spec)))
     products: list[Product] = []
     product_modes: set[FulfillmentMode] = set()
     for p in data.products:
@@ -1972,8 +2133,19 @@ def from_project_data(data: ProjectData) -> MappingResult:
         tally.value("products.demand_mean", p.id, mean)
         tally.value("products.demand_cv", p.id, cv)
         kind = _resolve_demand_kind(p.demand_distribution, sc.demand_model)
+        # Each FG override read as a literal, so the D90 gate sees the reader.
+        fg = _resolve_fg(p.id, p, prod_row, {
+            "fg_base_stock": _ovr(prod_row, "fg_base_stock", ent, "fg_base_stock"),
+            "fg_reorder_point": _ovr(prod_row, "fg_reorder_point", ent, "fg_reorder_point"),
+            "fg_cover_days": _ovr(prod_row, "fg_cover_days", ent, "fg_cover_days"),
+            "fg_initial_on_hand": _ovr(prod_row, "fg_initial_on_hand", ent, "fg_initial_on_hand"),
+        }, tally, w)
+        if mode != FulfillmentMode.MTS and any(fg[k] is not None for k in fg if k != "fg_policy"):
+            w.append(MappingWarning("info", f"product:{p.id}", "fg_policy",
+                                    "FG policy / levels are set but the product is MTO — an MTO "
+                                    "product holds no finished-goods stock, so they are not read"))
         products.append(_build_product(p, price=price, capacity=cap, mode=mode,
-                                       mean=mean, cv=cv, kind=kind, warnings=w))
+                                       mean=mean, cv=cv, kind=kind, warnings=w, fg=fg))
     if not products:
         raise ValueError("project has no products to simulate")
 
@@ -2744,6 +2916,9 @@ def _map_policies(
         priority: dict[str, float] = {}
         for key, families in policies.items():
             if not isinstance(key, str) or not key.startswith("node:") or "::" not in key:
+                continue
+            # Nor a Customer row (WP 14.4 — the same reach `_composite_patches` had).
+            if key[len("node:"):] in row_keys:
                 continue
             _node, _, prod = key[len("node:"):].partition("::")
             v = (families.get("production") or {}).get("allocation_priority_weight")

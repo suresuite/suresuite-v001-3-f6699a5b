@@ -408,6 +408,8 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
   // customer · demand per row (WP 14.2) — the engine's own enum domains
   row_demand_mode: ["forecast", "model"],
   row_demand_distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
+  // PLAN.md §24 WP 14.4 — the Plant row's FG policy (MTS).
+  fg_policy: ["base_stock", "min_max", "days_of_cover"],
   // production
   lot_policy: LotPolicy.options,
   scheduling: SchedulingRule.options,
@@ -637,6 +639,12 @@ export const FIELD_LABELS: Record<string, string> = {
   row_demand_variation: "Demand variation (CV for normal, ± fraction for triangularAV)",
   row_demand_min: "Demand min (units/wk, triangular)",
   row_demand_max: "Demand max (units/wk, triangular)",
+  // plant · FG policy per product (PLAN.md §24 WP 14.4) — MTS only.
+  fg_policy: "FG policy (base-stock / min-max / days of cover)",
+  fg_base_stock: "FG target S (units)",
+  fg_reorder_point: "FG reorder point s (units, min-max)",
+  fg_cover_days: "FG cover D (days, days of cover)",
+  fg_initial_on_hand: "FG opening stock (units)",
   // fulfillment extensions
   sourcing_firm: "Sourcing firm",
   price: "Price (€/unit, this row)",

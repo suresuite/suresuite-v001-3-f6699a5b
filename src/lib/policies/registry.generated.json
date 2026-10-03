@@ -190,7 +190,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.4.0",
+  "engine_version": "0.5.0",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -595,7 +595,8 @@
         "FgPolicy": {
           "enum": [
             "base_stock",
-            "min_max"
+            "min_max",
+            "days_of_cover"
           ],
           "title": "FgPolicy",
           "type": "string"
@@ -723,17 +724,65 @@
             }
           ],
           "default": null,
-          "notes": "S^FG_p; derived if None. MTS only.",
+          "notes": "S^FG_p: the order-up-to level (base_stock, min_max); derived if None under base_stock. MTS only.",
           "scope": "P",
           "title": "Fg Base Stock",
+          "unit": "units"
+        },
+        "fg_cover_days": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "D: days_of_cover only \u2014 target = D/7 \u00d7 projected weekly demand; moves with the forecast.",
+          "scope": "P",
+          "title": "Fg Cover Days",
+          "unit": "days"
+        },
+        "fg_initial_on_hand": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "FG opening stock (engine RFC 4). None = start at the policy target.",
+          "scope": "P",
+          "title": "Fg Initial On Hand",
           "unit": "units"
         },
         "fg_policy": {
           "$ref": "#/$defs/FgPolicy",
           "default": "base_stock",
-          "notes": "MTS only.",
+          "notes": "base_stock (S) \u00b7 min_max (s, S) \u00b7 days_of_cover (D). MTS only.",
           "scope": "P",
           "unit": "enum"
+        },
+        "fg_reorder_point": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "s: min_max only \u2014 produce up to S when the stock left after this week's demand falls below s.",
+          "scope": "P",
+          "title": "Fg Reorder Point",
+          "unit": "units"
         },
         "forecast_bias": {
           "default": 0.0,
@@ -1338,7 +1387,8 @@
         "owns": [
           "production_plan",
           "overtime_capacity",
-          "substitutions"
+          "substitutions",
+          "planned_production"
         ]
       },
       {
@@ -3613,8 +3663,7 @@
       "master": "products.sell_price",
       "rows": "plant",
       "scopes": [
-        "plant",
-        "customer"
+        "plant"
       ],
       "target": "Product.unit_price",
       "transform": "currency per unit, must be > 0. Order: the Plant-stage row (`node:<plant>::<product>`) -> products.sell_price (master) -> the demand-weighted outbound price -> 1.0"
@@ -3629,8 +3678,7 @@
       "master": "products.production_capacity",
       "rows": "plant",
       "scopes": [
-        "plant",
-        "customer"
+        "plant"
       ],
       "target": "Product.production_capacity",
       "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.production_capacity (master) -> the line capacity (capacity_units_per_day x 7 x utilization) -> max(2 x demand, 1000)"
@@ -3644,8 +3692,7 @@
       "master": "products.demand_mean",
       "rows": "plant",
       "scopes": [
-        "plant",
-        "customer"
+        "plant"
       ],
       "target": "Product.demand_mode",
       "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.demand_mean (master) -> the weekly outbound volume -> 0"
@@ -3660,8 +3707,7 @@
       "master": "products.demand_cv",
       "rows": "plant",
       "scopes": [
-        "plant",
-        "customer"
+        "plant"
       ],
       "target": "Product.demand_cv",
       "transform": "sigma / mean, >= 0. Order: the Plant-stage row -> products.demand_cv (master) -> the scenario demand model's cv -> 0.30. Read by the triangular and negative-binomial draws; not under Poisson"
@@ -3682,8 +3728,7 @@
       "key": "capacity_units_per_day",
       "scopes": [
         "default",
-        "plant",
-        "customer"
+        "plant"
       ],
       "shadowed_by": "products.production_capacity",
       "target": "Product.production_capacity",
@@ -3695,8 +3740,7 @@
       "key": "utilization_cap_pct",
       "scopes": [
         "default",
-        "plant",
-        "customer"
+        "plant"
       ],
       "shadowed_by": "products.production_capacity",
       "target": "Product.production_capacity",
@@ -3737,8 +3781,7 @@
       "family": "production",
       "key": "allocation_priority_weight",
       "scopes": [
-        "plant",
-        "customer"
+        "plant"
       ],
       "target": "material_allocation.priority_weights",
       "transform": "per-product weight, collected from composite `node:<node>::<product>` override keys. Read only when the scenario asks for `allocate_materials`, and its presence switches the objective to priority_weighted"
@@ -3869,6 +3912,81 @@
       ],
       "target": "CustomerLink.demand_max",
       "transform": "units per week, triangular only. Order: the Customer-stage row -> outbound_logistics.demand_max"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "fg_policy",
+      "empty_default": null,
+      "empty_note": "base_stock",
+      "family": "production",
+      "key": "fg_policy",
+      "master": "products.fg_policy",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_policy",
+      "transform": "enum \u2014 base_stock (S) \u00b7 min_max (s, S) \u00b7 days_of_cover (D). Order: the Plant-stage row -> products.fg_policy -> base_stock. An incomplete min_max or days_of_cover runs as base_stock, warned. MTS only"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "derived: one week of forecast, plus P-P.4's buffer when it is on",
+      "family": "production",
+      "key": "fg_base_stock",
+      "master": "products.fg_base_stock",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_base_stock",
+      "transform": "units, >= 0: S, the end-of-week FG target (base_stock, min_max). Order: the Plant-stage row -> products.fg_base_stock -> derived. MTS only"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 read by min_max only",
+      "family": "production",
+      "key": "fg_reorder_point",
+      "master": "products.fg_reorder_point",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_reorder_point",
+      "transform": "units, >= 0: s \u2014 min_max builds up to S only when the stock left after the week's demand is below s. MTS only"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 read by days_of_cover only",
+      "family": "production",
+      "key": "fg_cover_days",
+      "master": "products.fg_cover_days",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_cover_days",
+      "transform": "days, >= 0: D \u2014 the target is D/7 x the projected weekly demand, so it moves with the forecast. MTS only"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "the policy target \u2014 the run starts at it",
+      "family": "production",
+      "key": "fg_initial_on_hand",
+      "master": "products.fg_initial_on_hand",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fg_initial_on_hand",
+      "transform": "units, >= 0: FG opening stock (engine RFC 4). Order: the Plant-stage row -> products.fg_initial_on_hand -> the target. MTS only"
     },
     {
       "catalog_ref": "P-C.1",

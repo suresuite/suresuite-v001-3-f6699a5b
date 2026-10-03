@@ -229,9 +229,31 @@ class Product(BaseModel):
     fulfillment_mode: FulfillmentMode = Field(
         FulfillmentMode.MTO, json_schema_extra=_meta("enum", "P"),
     )
-    fg_policy: FgPolicy = Field(FgPolicy.BASE_STOCK, json_schema_extra=_meta("enum", "P", "MTS only."))
+    # FG inventory policy (WP 14.4, ADR 0002 decision 3; design doc §3.2). All
+    # levels are END-OF-WEEK finished-goods targets, MTS only. ONE SOURCE PER
+    # NUMBER: a typed level IS the target and P-P.4 adds nothing on top; P-P.4
+    # sizes the buffer only for base_stock with S empty (today's derivation).
+    fg_policy: FgPolicy = Field(
+        FgPolicy.BASE_STOCK, json_schema_extra=_meta(
+            "enum", "P", "base_stock (S) · min_max (s, S) · days_of_cover (D). MTS only."))
     fg_base_stock: Optional[float] = Field(
-        None, ge=0, json_schema_extra=_meta("units", "P", "S^FG_p; derived if None. MTS only."),
+        None, ge=0, json_schema_extra=_meta(
+            "units", "P", "S^FG_p: the order-up-to level (base_stock, min_max); derived if None "
+                          "under base_stock. MTS only."),
+    )
+    fg_reorder_point: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "units", "P", "s: min_max only — produce up to S when the stock left after this "
+                          "week's demand falls below s."),
+    )
+    fg_cover_days: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "days", "P", "D: days_of_cover only — target = D/7 × projected weekly demand; "
+                         "moves with the forecast."),
+    )
+    fg_initial_on_hand: Optional[float] = Field(
+        None, ge=0, json_schema_extra=_meta(
+            "units", "P", "FG opening stock (engine RFC 4). None = start at the policy target."),
     )
     forecast_model: ForecastModel = Field(
         ForecastModel.MA, json_schema_extra=_meta("enum", "P", "MTS plans to forecast."),
@@ -256,6 +278,15 @@ class Product(BaseModel):
                 raise ValueError(f"product {self.id}: demand_max < demand_mode")
         if self.demand_model == DemandModel.BOOTSTRAP and not self.demand_history:
             raise ValueError(f"product {self.id}: bootstrap demand requires demand_history")
+        if self.fg_policy == FgPolicy.MIN_MAX:
+            if self.fg_base_stock is None or self.fg_reorder_point is None:
+                raise ValueError(f"product {self.id}: fg_policy=min_max needs fg_reorder_point (s) "
+                                 f"and fg_base_stock (S)")
+            if self.fg_reorder_point >= self.fg_base_stock:
+                raise ValueError(f"product {self.id}: fg_policy=min_max needs s < S "
+                                 f"({self.fg_reorder_point} ≥ {self.fg_base_stock})")
+        if self.fg_policy == FgPolicy.DAYS_OF_COVER and self.fg_cover_days is None:
+            raise ValueError(f"product {self.id}: fg_policy=days_of_cover needs fg_cover_days (D)")
         if self.demand_model == DemandModel.NORMAL and self.demand_cv is None:
             raise ValueError(f"product {self.id}: normal demand requires demand_cv "
                              f"(σ = cv · demand_mode)")

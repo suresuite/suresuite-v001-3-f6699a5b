@@ -183,6 +183,12 @@ def build_project_data(
                 demand_distribution=r.get("demand_distribution"),
                 demand_mean=_num(r.get("demand_mean")), demand_cv=_num(r.get("demand_cv")),
                 demand_min=_num(r.get("demand_min")), demand_max=_num(r.get("demand_max")),
+                # WP 14.4 — the FG policy and levels (MTS), and FG opening stock.
+                fg_policy=r.get("fg_policy"),
+                fg_base_stock=_num(r.get("fg_base_stock")),
+                fg_reorder_point=_num(r.get("fg_reorder_point")),
+                fg_cover_days=_num(r.get("fg_cover_days")),
+                fg_initial_on_hand=_num(r.get("fg_initial_on_hand")),
             )
             for r in products if r.get("product_id")
         ],

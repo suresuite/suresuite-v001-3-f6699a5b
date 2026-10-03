@@ -193,7 +193,10 @@ def test_inspection_run_emits_item_series_rows():
     mat = by_kind["material"][0]["series"]
     assert set(mat) == {"on_hand", "in_transit", "orders"}
     prod = by_kind["product"][0]["series"]
-    assert set(prod) == {"demand", "production", "fulfillment", "backlog", "lost_units"}
+    # PLAN.md §24 WP 14.4 added the plan's own record: projected demand, the
+    # requirement and planned production (built is `production`).
+    assert set(prod) == {"demand", "production", "fulfillment", "backlog", "lost_units",
+                         "projected_demand", "requirement", "planned"}
     horizon_weeks = 52  # 365 days → engine floor
     for series in list(mat.values()) + list(prod.values()):
         assert len(series) == horizon_weeks

@@ -21,7 +21,9 @@ export default function PlantStage() {
         <P>
           A product's <Term>fulfillment_mode</Term> decides how much of this stage applies to it: a
           make-to-order product holds no finished goods, so its inventory columns describe a
-          decision the run never has to take.
+          decision the run never has to take. For a make-to-stock product the FG policy columns
+          decide how much to build: planned production is the policy's requirement plus any
+          backlog, capped at capacity.
         </P>
         <StageSummary stage="plant" />
       </Section>
@@ -30,11 +32,26 @@ export default function PlantStage() {
         <StageColumns
           stage="plant"
           notes={{
-            initial_on_hand: (
+            fg_policy: (
               <>
-                Opening stock of the finished product. The strategic engine builds opening inventory
-                from materials only, so there is no finished-goods opening stock for this to feed —
-                see <DocLink to="products">Products</DocLink> for the whole story.
+                Make-to-stock products only. <Term>base_stock</Term> builds up to S each week,{" "}
+                <Term>min_max</Term> builds up to S only when the stock left after the week's demand
+                is below s, <Term>days_of_cover</Term> targets D days of the projected demand.
+                Empty is base-stock with the derived target.
+              </>
+            ),
+            fg_base_stock: (
+              <>
+                S, in units. A typed S is the target — the finished-goods safety stock is never added
+                on top of it.
+              </>
+            ),
+            fg_reorder_point: <>s, in units — read by min-max only, and must be below S.</>,
+            fg_cover_days: <>D, in days — read by days of cover only; the target moves with the forecast.</>,
+            fg_initial_on_hand: (
+              <>
+                The finished-goods stock the run starts with; empty starts at the policy target. See{" "}
+                <DocLink to="products">Products</DocLink> for the whole policy.
               </>
             ),
             reorder_point: (

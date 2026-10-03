@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 990;
+export const REFERENCE_COLUMN_COUNT = 995;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -2353,12 +2353,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:230"
+        "evidence": "src/hooks/useItemMasters.tsx:236"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:230"
+        "evidence": "src/hooks/useItemMasters.tsx:236"
       }
     ],
     "governance": {
@@ -7116,12 +7116,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:230"
+        "evidence": "src/hooks/useItemMasters.tsx:236"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:230"
+        "evidence": "src/hooks/useItemMasters.tsx:236"
       }
     ],
     "governance": {
@@ -15102,12 +15102,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:230"
+        "evidence": "src/hooks/useItemMasters.tsx:236"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:230"
+        "evidence": "src/hooks/useItemMasters.tsx:236"
       }
     ],
     "governance": {
@@ -17428,7 +17428,16 @@ export const REFERENCE_TABLES: RefTable[] = [
       "product_id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "products_fg_policy_check",
+        "definition": "CHECK (fg_policy IS NULL OR fg_policy IN ('base_stock', 'min_max', 'days_of_cover'))"
+      },
+      {
+        "name": "products_fg_levels_nonnegative",
+        "definition": "CHECK (coalesce(fg_base_stock, 0) >= 0 AND coalesce(fg_reorder_point, 0) >= 0 AND coalesce(fg_cover_days, 0) >= 0 AND coalesce(fg_initial_on_hand, 0) >= 0)"
+      }
+    ],
     "ingestDataset": {
       "wizardId": "item_master_products",
       "factClass": "master",
@@ -17970,6 +17979,140 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "fg_policy",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": "fg_policy",
+        "required": false,
+        "validate": "base_stock | min_max | days_of_cover; blank lands nothing",
+        "meaning": "The finished-goods inventory policy of an MTS product (PLAN.md §24 WP 14.4, ADR 0002 decision 3): `base_stock` fills to S, `min_max` fills to S only when the stock left after the week's demand is below s, `days_of_cover` fills to D/7 × the projected weekly demand, so its target moves with the forecast. NULL is base-stock with today's derived target. An MTO product holds no FG stock and does not read it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "NULL",
+            "value": "base_stock",
+            "provenance": "default",
+            "visibleAs": "the Plant cell's empty note"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_resolve_fg -> Product.fg_policy (MTS)",
+        "engineMissingDefault": "base_stock",
+        "engineTransform": "the Plant-stage override, else this; an incomplete min_max or days_of_cover runs as base_stock, warned",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "fg_base_stock",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "units of product",
+        "csvHeader": "fg_base_stock",
+        "required": false,
+        "validate": "numeric >= 0; blank lands nothing",
+        "meaning": "S — the end-of-week finished-goods target in units, for `base_stock` and `min_max` (WP 14.4). A STATED S is the target: P-P.4's safety stock is never added on top of it (one source per number). Empty under base-stock is the derived target: one week of forecast, plus P-P.4's buffer when it is on.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_resolve_fg -> Product.fg_base_stock (MTS)",
+        "engineMissingDefault": "derived: one week of forecast (+ P-P.4)",
+        "engineTransform": "the Plant-stage override, else this",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "fg_reorder_point",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "units of product",
+        "csvHeader": "fg_reorder_point",
+        "required": false,
+        "validate": "numeric >= 0; blank lands nothing",
+        "meaning": "s — `min_max` only: the plant builds up to S when the stock left after the week's demand falls below s, and builds nothing otherwise (WP 14.4). Must be below S.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_resolve_fg -> Product.fg_reorder_point (MTS, min_max)",
+        "engineMissingDefault": null,
+        "engineTransform": "the Plant-stage override, else this",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "fg_cover_days",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "days",
+        "csvHeader": "fg_cover_days",
+        "required": false,
+        "validate": "numeric >= 0; blank lands nothing",
+        "meaning": "D — `days_of_cover` only: how many days of FUTURE demand the stock should cover. The target is D/7 × the projected weekly demand, so it moves with the forecast (WP 14.4). Days, not converted: the engine divides by 7 itself.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_resolve_fg -> Product.fg_cover_days (MTS, days_of_cover)",
+        "engineMissingDefault": null,
+        "engineTransform": "the Plant-stage override, else this; target = D/7 x projected weekly demand",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "fg_initial_on_hand",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "units of product",
+        "csvHeader": "fg_initial_on_hand",
+        "required": false,
+        "validate": "numeric >= 0; blank lands nothing",
+        "meaning": "The finished-goods stock an MTS product starts the run with — engine RFC 4, closed by WP 14.4 (the capability first, then this column, in RFC 4's own order). Empty starts the run at the policy target, which is today's behaviour.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "NULL",
+            "value": "the FG target",
+            "provenance": "default",
+            "visibleAs": "the Plant cell's empty note"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_resolve_fg -> Product.fg_initial_on_hand (MTS)",
+        "engineMissingDefault": "the policy target",
+        "engineTransform": "the Plant-stage override, else this",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
         "computedBy": null
       }
     ]
@@ -20493,12 +20636,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "component ItemSeriesExplorer (mounted by RunValidateStage) → select kind,item_id from run_item_series",
-        "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79"
+        "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "component ItemSeriesExplorer (mounted by ResultsDashboard) → select kind,item_id from run_item_series",
-        "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79"
+        "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83"
       }
     ],
     "governance": {

@@ -36,7 +36,11 @@
     "demand_mean": 50,
     "demand_cv": 0.2,
     "demand_distribution": "triangular",
-    "fulfillment_mode": "mto"
+    "fulfillment_mode": "mto",
+    "fg_policy": "min_max",
+    "fg_base_stock": 400,
+    "fg_reorder_point": 100,
+    "fg_initial_on_hand": 150
    },
    {
     "product_id": "P2",
@@ -332,7 +336,9 @@
     "target_key": "Plant::P2",
     "family": "production",
     "patch": {
-     "demand_mean": 40
+     "demand_mean": 40,
+     "fg_policy": "days_of_cover",
+     "fg_cover_days": 10
     }
    },
    {
@@ -546,6 +552,56 @@
    "P2": {
     "source": "override",
     "value": 40.0
+   }
+  },
+  "products.fg_base_stock": {
+   "P1": {
+    "source": "master",
+    "value": 400.0
+   },
+   "P2": {
+    "source": "default",
+    "value": null
+   }
+  },
+  "products.fg_cover_days": {
+   "P1": {
+    "source": "default",
+    "value": null
+   },
+   "P2": {
+    "source": "override",
+    "value": 10.0
+   }
+  },
+  "products.fg_initial_on_hand": {
+   "P1": {
+    "source": "master",
+    "value": 150.0
+   },
+   "P2": {
+    "source": "default",
+    "value": null
+   }
+  },
+  "products.fg_policy": {
+   "P1": {
+    "source": "master",
+    "value": "min_max"
+   },
+   "P2": {
+    "source": "override",
+    "value": "days_of_cover"
+   }
+  },
+  "products.fg_reorder_point": {
+   "P1": {
+    "source": "master",
+    "value": 100.0
+   },
+   "P2": {
+    "source": "default",
+    "value": null
    }
   },
   "products.production_capacity": {

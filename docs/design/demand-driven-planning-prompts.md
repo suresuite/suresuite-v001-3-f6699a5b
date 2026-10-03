@@ -446,6 +446,14 @@ PRECONDITIONS — verify:
 - P-S.2 (multi-sourcing) and P-S.1 (backup) act on PH-80 orders. Read their hook
   priorities so MRP orders still flow through them.
 
+   Inherited from WP 14.4: ctx.planned_production is [products × H], H =
+   model.plan_horizon (1 today; set it at compile, before a SimContext is built — the
+   context sizes its plan arrays from it). core/planning.plan_ahead runs inside
+   mech.default_plan at PH-40; its later columns already carry only backorder rows'
+   shortfall (core/rowbacklog.step_rows, the step P-C.1 runs). Extend the honesty test
+   test_the_plan_does_not_read_future_draws; golden #7's plan side is already pinned by
+   test_the_worked_example_plans_160_in_week_5_when_both_rows_backorder.
+
 DO:
 1. policy_type "mrp" in InventoryControlParams and MaterialInventoryOverride.
 2. New transient key gross_requirements [materials × H], owned by PH-70:

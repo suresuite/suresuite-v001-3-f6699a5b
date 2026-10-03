@@ -236,7 +236,8 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
   const KNOWN_BREAKS = [
     "customer.primary_source",
     "customer.sourcing_firm",
-    "plant.initial_on_hand",
+    // plant.initial_on_hand left this list in WP 14.4 (§4 D89's remainder, RFC
+    // 4): the cell is `fg_initial_on_hand` now, master-backed and read.
     "plant.review_period_days",
     // supplier.primary_source left this list when a saved Supplier-stage primary
     // became the engine's primary link (`SupplierLink.primary`, §4 D188). The

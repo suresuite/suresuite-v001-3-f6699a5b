@@ -331,6 +331,27 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // number here could only ever speak by disagreeing (the WP 0.1 gap
       // check's second divergence).
       col("utilization_cap_pct", "production", { readOnly: true }),
+      // THE FG INVENTORY POLICY, MTS (PLAN.md §24 WP 14.4, ADR 0002 decision 3):
+      // base-stock fills to S, min-max fills to S only below s, days of cover
+      // fills to D/7 × the projected weekly demand. A typed level IS the target —
+      // P-P.4's buffer is never added on top of it. Over the `products` master,
+      // edits are Plant-row overrides (§23 WP 13.1).
+      col("fg_policy", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_policy", idFrom: "product_id" },
+      }),
+      col("fg_base_stock", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_base_stock", idFrom: "product_id" },
+      }),
+      col("fg_reorder_point", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_reorder_point", idFrom: "product_id" },
+      }),
+      col("fg_cover_days", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_cover_days", idFrom: "product_id" },
+      }),
       // Fulfillment (backorder, allocation, service level) is a customer-stage
       // concern only — the engine reads it from the project fulfillment default,
       // never from a plant node — so no fulfillment column is offered here.
@@ -344,18 +365,16 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("order_up_to", "inventory", { visibleWhen: plantInvType("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200, vectorGroup: "invParams" }),
       col("rop_q_quantity", "inventory", { visibleWhen: plantInvType("rop"), defaultWhenMissing: 0, vectorGroup: "invParams" }),
       col("review_period_days", "inventory", { visibleWhen: plantInvType("periodic_review"), defaultWhenMissing: 1, vectorGroup: "invParams" }),
-      // NO `master:` BLOCK, AND ITS ABSENCE IS THE FIX (§4 D89). This column was
-      // declared `master: { table: "products", field: "initial_on_hand" }` — a
-      // copy of the supplier stage's correct `materials.initial_on_hand` fifty
-      // lines above — and `products` has no such column. `masterValueFor`
-      // returns undefined for a column that does not exist, so every cell fell
-      // through to the policy bundle while the Parameter Sheet said "reaches
-      // engine · from item master". `masterPointersResolve.test.ts` is now a GATE
-      // on that class, so the next such copy fails on the commit that makes it.
-      // Restoring the pointer means adding the column AND a scsim reader for it:
-      // `context.py:150` builds on-hand from `net.materials` only, so there is no
-      // finished-goods initial inventory in the strategic engine to feed (§16).
-      col("initial_on_hand", "inventory", { visibleWhen: plantNeedsInventory }),
+      // FG OPENING STOCK IS A REAL CELL SINCE PLAN.md §24 WP 14.4 (§4 D89's
+      // remainder, engine RFC 4). Until then this was `initial_on_hand` with no
+      // `master:` block — its pointer had named `products.initial_on_hand`, a
+      // column that did not exist, and no scsim reader existed either. Engine
+      // 0.5.0 starts an MTS product at `fg_initial_on_hand`, and the column
+      // followed the capability in RFC 4's own order, so the pointer is real now.
+      col("fg_initial_on_hand", "production", {
+        visibleWhen: plantNeedsInventory,
+        master: { table: "products", field: "fg_initial_on_hand", idFrom: "product_id" },
+      }),
       col("safety_stock_days", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 7 }),
       col("holding_cost_pct", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.2 }),
       col("service_level_target", "inventory", { visibleWhen: plantNeedsInventory, defaultWhenMissing: 0.95 }),
@@ -574,6 +593,12 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   row_demand_variation: { sub: "CV (normal) · ± (triangularAV)", w: 96, kind: "num", dec: 2, prio: 5 },
   row_demand_min: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
   row_demand_max: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
+  // ---- plant · FG policy (WP 14.4)
+  fg_policy: { sub: "base · min-max · cover", w: 120, kind: "text", keep: true, align: "left" },
+  fg_base_stock: { sub: "S · units", w: 84, kind: "int", prio: 5 },
+  fg_reorder_point: { sub: "s · units · min-max", w: 88, kind: "int", prio: 4 },
+  fg_cover_days: { sub: "D · days · cover", w: 84, kind: "num", dec: 1, prio: 4 },
+  fg_initial_on_hand: { sub: "units · opening", w: 88, kind: "int", prio: 6 },
   // ---- customer · fulfillment per row (WP 14.3)
   backorder_allowed: { sub: "this row waits", w: 76, kind: "toggle", keep: true, filterable: false, align: "center" },
   max_backorder_days: { sub: "days → whole wk", w: 84, kind: "int", unit: "d", prio: 6 },
@@ -625,6 +650,11 @@ export const SHORT_LABEL: Record<string, string> = {
   row_demand_variation: "Variation",
   row_demand_min: "Min",
   row_demand_max: "Max",
+  fg_policy: "FG policy",
+  fg_base_stock: "FG S",
+  fg_reorder_point: "FG s",
+  fg_cover_days: "FG cover",
+  fg_initial_on_hand: "Initial FG",
   backorder_allowed: "Backorder",
   max_backorder_days: "Max backorder",
   backorder_cost_per_day: "Backorder cost",
@@ -635,7 +665,7 @@ export const SHORT_LABEL: Record<string, string> = {
 
 /** Per-stage label overrides — same field, different meaning by context. */
 const STAGE_LABEL_OVERRIDE: Partial<Record<StageKey, Record<string, string>>> = {
-  plant: { initial_on_hand: "Initial FG" },
+  // (`plant.initial_on_hand` → "Initial FG" left with the column in WP 14.4.)
 };
 
 export function shortLabelFor(stage: StageKey, field: string, fallback: string): string {

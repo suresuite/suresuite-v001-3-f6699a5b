@@ -1029,3 +1029,52 @@ def test_a_production_capacity_override_shadows_the_line_capacity_and_says_which
     assert res.scenario.network.products[0].production_capacity == pytest.approx(150.0)
     assert any(w.field == "production_capacity" and "the /policies override" in w.reason
                for w in res.warnings)
+
+
+# ── FG policy per product (PLAN.md §24 WP 14.4, D284 d) ─────────────────────
+
+def _mts_base(**fg) -> ProjectData:
+    d = _base()
+    d.products = [ProductRow(id="p1", sell_price=20.0, demand_mean=100.0,
+                             production_capacity=200.0, fulfillment_mode="mts", **fg)]
+    return d
+
+
+def test_the_fg_policy_and_levels_reach_an_mts_product_from_the_master():
+    res = from_project_data(_mts_base(fg_policy="min_max", fg_base_stock=400.0,
+                                      fg_reorder_point=100.0, fg_initial_on_hand=250.0))
+    p = res.scenario.network.products[0]
+    assert (p.fg_policy.value, p.fg_base_stock, p.fg_reorder_point, p.fg_initial_on_hand) == (
+        "min_max", 400.0, 100.0, 250.0)
+    assert res.resolved["products.fg_policy"]["p1"] == {"source": "master", "value": "min_max"}
+
+
+def test_a_plant_row_override_beats_the_master():
+    d = _mts_base(fg_policy="base_stock", fg_base_stock=300.0)
+    d.policies = {"node:Plant::p1": {"production": {"fg_policy": "days_of_cover",
+                                                    "fg_cover_days": 14}}}
+    p = from_project_data(d).scenario.network.products[0]
+    assert (p.fg_policy.value, p.fg_cover_days, p.fg_base_stock) == ("days_of_cover", 14.0, 300.0)
+
+
+def test_an_incomplete_policy_runs_as_base_stock_and_says_so():
+    res = from_project_data(_mts_base(fg_policy="min_max", fg_base_stock=400.0))
+    assert res.scenario.network.products[0].fg_policy.value == "base_stock"
+    assert any(w.field == "fg_policy" and "min_max needs" in w.reason for w in res.warnings)
+
+
+def test_an_mto_product_reads_no_fg_policy_and_the_run_says_so():
+    d = _base()
+    d.products = [ProductRow(id="p1", sell_price=20.0, demand_mean=100.0,
+                             production_capacity=200.0, fg_base_stock=300.0)]
+    res = from_project_data(d)
+    assert res.scenario.network.products[0].fg_base_stock is None
+    assert any(w.field == "fg_policy" and "MTO" in w.reason for w in res.warnings)
+
+
+def test_a_customer_row_no_longer_reaches_the_product():
+    """WP 14.2 found `_composite_patches` sent any `node:<x>::<product>` key to the
+    product; WP 14.4 closed it — a Customer row's patch is the row's own."""
+    d = _base()
+    d.policies = {"node:c1::p1": {"production": {"sell_price": 999.0}}}
+    assert from_project_data(d).scenario.network.products[0].unit_price == 20.0

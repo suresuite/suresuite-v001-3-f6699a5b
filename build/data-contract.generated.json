@@ -1,25 +1,25 @@
 {
   "$generator": "scripts/data-contract/generate.mjs",
   "$doc": "The data contract: the introspected schema merged with the authored sidecars and the engine registry snapshot. Generated — do not edit; `npm run contract:check` fails on drift.",
-  "engine_version": "0.4.0",
+  "engine_version": "0.5.0",
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 399,
-      "migrations_applied": 391,
-      "last_migration": "20261003000001_demand_per_row.sql"
+      "migrations_found": 400,
+      "migrations_applied": 392,
+      "last_migration": "20261003000002_fg_policy_per_product.sql"
     },
     "sidecars": 76,
     "registry": {
-      "engine_version": "0.4.0",
+      "engine_version": "0.5.0",
       "policies": 23
     }
   },
   "counts": {
     "tables_in_schema": 93,
     "tables_covered": 76,
-    "columns_covered": 990,
-    "check_constraints": 92,
+    "columns_covered": 995,
+    "check_constraints": 94,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -3760,14 +3760,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:230",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:230",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         }
       ],
@@ -11041,14 +11041,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:230",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:230",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         }
       ],
@@ -23070,14 +23070,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:230",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc ensure_item_masters",
           "grain": "table",
-          "evidence": "src/hooks/useItemMasters.tsx:230",
+          "evidence": "src/hooks/useItemMasters.tsx:236",
           "confirmed": true
         }
       ],
@@ -26847,6 +26847,20 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000020_item_masters_land.sql"
+        },
+        {
+          "name": "products_fg_policy_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (fg_policy IS NULL OR fg_policy IN ('base_stock', 'min_max', 'days_of_cover'))",
+          "added_by": "20261003000002_fg_policy_per_product.sql"
+        },
+        {
+          "name": "products_fg_levels_nonnegative",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (coalesce(fg_base_stock, 0) >= 0 AND coalesce(fg_reorder_point, 0) >= 0 AND coalesce(fg_cover_days, 0) >= 0 AND coalesce(fg_initial_on_hand, 0) >= 0)",
+          "added_by": "20261003000002_fg_policy_per_product.sql"
         }
       ],
       "indexes": [],
@@ -27692,6 +27706,209 @@
             "csv_header": null,
             "required": false,
             "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_policy",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The finished-goods inventory policy of an MTS product (PLAN.md §24 WP 14.4, ADR 0002 decision 3): `base_stock` fills to S, `min_max` fills to S only when the stock left after the week's demand is below s, `days_of_cover` fills to D/7 × the projected weekly demand, so its target moves with the forecast. NULL is base-stock with today's derived target. An MTO product holds no FG stock and does not read it.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_policy (MTS)",
+            "transform": "the Plant-stage override, else this; an incomplete min_max or days_of_cover runs as base_stock, warned",
+            "missing_default": "base_stock"
+          },
+          "substitutions": [
+            {
+              "when": "NULL",
+              "value": "base_stock",
+              "provenance": "default",
+              "visible_as": "the Plant cell's empty note"
+            }
+          ],
+          "ingest": {
+            "csv_header": "fg_policy",
+            "required": false,
+            "validate": "base_stock | min_max | days_of_cover; blank lands nothing",
+            "rule": {
+              "kind": "enum",
+              "values": [
+                "base_stock",
+                "min_max",
+                "days_of_cover"
+              ],
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_base_stock",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": "units of product",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "S — the end-of-week finished-goods target in units, for `base_stock` and `min_max` (WP 14.4). A STATED S is the target: P-P.4's safety stock is never added on top of it (one source per number). Empty under base-stock is the derived target: one week of forecast, plus P-P.4's buffer when it is on.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_base_stock (MTS)",
+            "transform": "the Plant-stage override, else this",
+            "missing_default": "derived: one week of forecast (+ P-P.4)"
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "fg_base_stock",
+            "required": false,
+            "validate": "numeric >= 0; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_reorder_point",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": "units of product",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "s — `min_max` only: the plant builds up to S when the stock left after the week's demand falls below s, and builds nothing otherwise (WP 14.4). Must be below S.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_reorder_point (MTS, min_max)",
+            "transform": "the Plant-stage override, else this",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "fg_reorder_point",
+            "required": false,
+            "validate": "numeric >= 0; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_cover_days",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": "days",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "D — `days_of_cover` only: how many days of FUTURE demand the stock should cover. The target is D/7 × the projected weekly demand, so it moves with the forecast (WP 14.4). Days, not converted: the engine divides by 7 itself.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_cover_days (MTS, days_of_cover)",
+            "transform": "the Plant-stage override, else this; target = D/7 x projected weekly demand",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "fg_cover_days",
+            "required": false,
+            "validate": "numeric >= 0; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fg_initial_on_hand",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql",
+          "unit": "units of product",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The finished-goods stock an MTS product starts the run with — engine RFC 4, closed by WP 14.4 (the capability first, then this column, in RFC 4's own order). Empty starts the run at the policy target, which is today's behaviour.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_resolve_fg -> Product.fg_initial_on_hand (MTS)",
+            "transform": "the Plant-stage override, else this",
+            "missing_default": "the policy target"
+          },
+          "substitutions": [
+            {
+              "when": "NULL",
+              "value": "the FG target",
+              "provenance": "default",
+              "visible_as": "the Plant cell's empty note"
+            }
+          ],
+          "ingest": {
+            "csv_header": "fg_initial_on_hand",
+            "required": false,
+            "validate": "numeric >= 0; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -31456,7 +31673,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "component ItemSeriesExplorer (mounted by RunValidateStage) → select kind,item_id from run_item_series",
           "grain": "table",
-          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
           "confirmed": true,
           "note": "Run & Validate is where an inspection run is STARTED, and the explorer sits under it: it first reads the run's item index (ids only), then fetches one item's `series` on demand — the payload is a few MB for a large project, so it is never read whole."
         },
@@ -31464,7 +31681,7 @@
           "page": "SimulationLab.tsx",
           "via": "component ItemSeriesExplorer (mounted by ResultsDashboard) → select kind,item_id from run_item_series",
           "grain": "table",
-          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
           "confirmed": true,
           "note": "Simulation Lab dispatches no inspection run, so this panel shows rows only for a run started from Run & Validate, and says so rather than rendering empty without a reason (§4 D113's shape)."
         }
@@ -31696,14 +31913,14 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
               "confirmed": true
             },
             {
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
               "confirmed": true
             }
           ],
@@ -31743,14 +31960,14 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
               "confirmed": true
             },
             {
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:79",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
               "confirmed": true
             }
           ],
@@ -31790,14 +32007,14 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:109",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:113",
               "confirmed": true
             },
             {
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:109",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:113",
               "confirmed": true
             }
           ],
@@ -43562,5 +43779,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "2cea4e23e233"
+  "contract_version": "7c907a6018f7"
 }

@@ -124,6 +124,7 @@ class TransportMode(str, Enum):
 class FgPolicy(str, Enum):
     BASE_STOCK = "base_stock"
     MIN_MAX = "min_max"
+    DAYS_OF_COVER = "days_of_cover"  # WP 14.4 (ADR 0002 decision 3)
 
 
 class ForecastModel(str, Enum):

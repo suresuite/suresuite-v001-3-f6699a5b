@@ -159,7 +159,9 @@ class FgSafetyStock(PolicyPlugin):
             ss = ctx.forecast * p.fixed_days_cover / 7.0
         else:
             ss = np.full(m.n_prods, p.fixed_units or 0.0)
-        return np.where(m.mts_mask, np.maximum(ss, 0.0), 0.0)
+        # One source per number (WP 14.4, design doc §3.2): a TYPED level (S,
+        # (s, S) or D) IS the target — the buffer is never added on top of it.
+        return np.where(m.mts_mask & ~m.fg_typed, np.maximum(ss, 0.0), 0.0)
 
     def on_phase(self, phase: PhaseId, ctx: SimContext) -> None:
         ss = self._ss(ctx)

@@ -380,6 +380,22 @@ Found by WP 14.3 (defaults shipped; the owner may overrule):
     segment: it is served and reported per row, and left out of the per-customer and
     per-segment fill rates.
 
+Found by WP 14.4 (defaults shipped; the owner may overrule):
+
+12. **When an FG target is set, and which demand it reads.** As before, the target is set
+    at the end of week t (PH-70) and used by week t+1's plan; days of cover reads the
+    projected demand of week t+1. Week t's MTS plan fills from the stock left after this
+    week's ACTUAL demand — the §3.2 formula's "start − projected demand" with the week
+    already known; the projection uses the projected demand for later weeks.
+13. **What the projection assumes about later weeks.** Nominal capacity (no overtime, no
+    disruption the plan has not seen), the current derived target for an untyped
+    base-stock product, and — off the per-row fulfillment path, where backlog ages are not
+    tracked — the actual backlog entering at age 0, so it can only expire later than it
+    would. Week t is always the actual state.
+14. **An incomplete FG policy** (min-max without both levels or with s ≥ S; days of cover
+    without D) runs as base-stock with whatever S it has, and the run says so. FG fields
+    on an MTO product are ignored with an info line.
+
 
 ---
 

@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 76 of 93 tables are covered,
-990 columns in all. A table that is not here is listed
+995 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -59,7 +59,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`policy_overrides`](policy_overrides.md) | 4 | `policy-ui` | 10 | One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family. |
 | [`policy_presets`](policy_presets.md) | 4 | `policy-ui` | 9 | One named policy bundle a user can apply to a project — the DECISION plane's catalog of starting points. A system preset (`is_system`) ships with the product; a user preset belongs to its `owner_id`. |
 | [`policy_versions`](policy_versions.md) | 4 | `policy-ui` | 14 | One saved snapshot of a project's whole policy bundle, with the bundle it replaced and the hash of both. The audit trail of the /policies grid: what the policies WERE at a moment somebody chose to record, which is what makes a simulation result reproducible from the policy side. |
-| [`products`](products.md) | 2 | `data-ingestion` | 18 | One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs. |
+| [`products`](products.md) | 2 | `data-ingestion` | 23 | One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs. |
 | [`project_erp_links`](project_erp_links.md) | G | `data-ingestion` | 15 | One authorized link between one project and one company in one external system: project ownership proved on this side, company membership proved on that side by the linking user's own OAuth consent. One link is one credential and one project — never shared, so revoking one project's link cannot be bypassed by a sibling. |
 | [`project_graph_state`](project_graph_state.md) | 3 | `analysis` | 13 | One row per project: every hash of the project's LIVE data — the composite `graph_hash`, its two domains and the three levels — stored, so a page that asks "has this project's graph changed?" reads a row instead of rebuilding a snapshot of thirteen tables. A CACHE of a pure function of tier 2, safe to drop: the next read rebuilds it. |
 | [`project_members`](project_members.md) | G | `platform` | 8 | One person's standing on one project. This is the level of access the platform did not have until WP 2.2 — between "in the organization" (sees every project) and "not in it" (sees none). |
@@ -91,4 +91,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `2cea4e23e233`, engine `0.4.0`.*
+*Generated from data contract `7c907a6018f7`, engine `0.5.0`.*

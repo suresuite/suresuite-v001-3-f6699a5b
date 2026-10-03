@@ -377,6 +377,9 @@ const UploadWizard = ({
         'demand_mean',
         'demand_cv',
       ],
+      // PLAN.md §24 WP 14.4 — the FG policy and levels of an MTS product, and its
+      // FG opening stock (engine RFC 4). Optional: an MTO product leaves them blank.
+      optionalHeaders: ['fg_policy', 'fg_base_stock', 'fg_reorder_point', 'fg_cover_days', 'fg_initial_on_hand'],
       category: 'item-master',
     },
     {

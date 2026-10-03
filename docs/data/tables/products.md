@@ -19,6 +19,14 @@
 
 ## Constraints
 
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `products_fg_policy_check` | `CHECK (fg_policy IS NULL OR fg_policy IN ('base_stock', 'min_max', 'days_of_cover'))` | `20261003000002_fg_policy_per_product.sql` |
+| `products_fg_levels_nonnegative` | `CHECK (coalesce(fg_base_stock, 0) >= 0 AND coalesce(fg_reorder_point, 0) >= 0 AND coalesce(fg_cover_days, 0) >= 0 AND coalesce(fg_initial_on_hand, 0) >= 0)` | `20261003000002_fg_policy_per_product.sql` |
+
 | Constraint | Kind | Definition |
 |---|---|---|
 | — | PRIMARY KEY | `PRIMARY KEY (project_id, product_id)` |
@@ -89,6 +97,11 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `source_synced_at` | — | `timestamp with time zone` | — | — | When the external system last confirmed this row. |
 | `ingest_run_id` | — | `uuid` | — | — | The ingestion run that last wrote this row (WP 3.3, D55), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path — which, on the day this column lands, is every row — and for rows whose run has since been deleted. |
 | `source_row_id` | — | `uuid` | — | — | The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run. |
+| `fg_policy` | `fg_policy` | `text` | — | no | The finished-goods inventory policy of an MTS product (PLAN.md §24 WP 14.4, ADR 0002 decision 3): `base_stock` fills to S, `min_max` fills to S only when the stock left after the week's demand is below s, `days_of_cover` fills to D/7 × the projected weekly demand, so its target moves with the forecast. NULL is base-stock with today's derived target. An MTO product holds no FG stock and does not read it. |
+| `fg_base_stock` | `fg_base_stock` | `numeric` | `units of product` | no | S — the end-of-week finished-goods target in units, for `base_stock` and `min_max` (WP 14.4). A STATED S is the target: P-P.4's safety stock is never added on top of it (one source per number). Empty under base-stock is the derived target: one week of forecast, plus P-P.4's buffer when it is on. |
+| `fg_reorder_point` | `fg_reorder_point` | `numeric` | `units of product` | no | s — `min_max` only: the plant builds up to S when the stock left after the week's demand falls below s, and builds nothing otherwise (WP 14.4). Must be below S. |
+| `fg_cover_days` | `fg_cover_days` | `numeric` | `days` | no | D — `days_of_cover` only: how many days of FUTURE demand the stock should cover. The target is D/7 × the projected weekly demand, so it moves with the forecast (WP 14.4). Days, not converted: the engine divides by 7 itself. |
+| `fg_initial_on_hand` | `fg_initial_on_hand` | `numeric` | `units of product` | no | The finished-goods stock an MTS product starts the run with — engine RFC 4, closed by WP 14.4 (the capability first, then this column, in RFC 4's own order). Empty starts the run at the policy target, which is today's behaviour. |
 
 ## Each column in full
 
@@ -563,8 +576,100 @@ The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_numb
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `fg_policy`
+
+The finished-goods inventory policy of an MTS product (PLAN.md §24 WP 14.4, ADR 0002 decision 3): `base_stock` fills to S, `min_max` fills to S only when the stock left after the week's demand is below s, `days_of_cover` fills to D/7 × the projected weekly demand, so its target moves with the forecast. NULL is base-stock with today's derived target. An MTO product holds no FG stock and does not read it.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `level` |
+| Unit | dimensionless |
+| Added by | `20261003000002_fg_policy_per_product.sql` |
+| Read by the engine | `project_map.py::_resolve_fg -> Product.fg_policy (MTS)` |
+| Transform | the Plant-stage override, else this; an incomplete min_max or days_of_cover runs as base_stock, warned |
+| When NULL, the engine uses | base_stock |
+| Validated at ingest | base_stock \| min_max \| days_of_cover; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+**Substitutions** — every point where a value you did not supply can stand in
+for one you did.
+
+| When | The value used | Shown as | Visible where |
+|---|---|---|---|
+| NULL | base_stock | `default` | the Plant cell's empty note |
+
+### `fg_base_stock`
+
+S — the end-of-week finished-goods target in units, for `base_stock` and `min_max` (WP 14.4). A STATED S is the target: P-P.4's safety stock is never added on top of it (one source per number). Empty under base-stock is the derived target: one week of forecast, plus P-P.4's buffer when it is on.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `units of product` — fixed |
+| Added by | `20261003000002_fg_policy_per_product.sql` |
+| Read by the engine | `project_map.py::_resolve_fg -> Product.fg_base_stock (MTS)` |
+| Transform | the Plant-stage override, else this |
+| When NULL, the engine uses | derived: one week of forecast (+ P-P.4) |
+| Validated at ingest | numeric >= 0; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `fg_reorder_point`
+
+s — `min_max` only: the plant builds up to S when the stock left after the week's demand falls below s, and builds nothing otherwise (WP 14.4). Must be below S.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `units of product` — fixed |
+| Added by | `20261003000002_fg_policy_per_product.sql` |
+| Read by the engine | `project_map.py::_resolve_fg -> Product.fg_reorder_point (MTS, min_max)` |
+| Transform | the Plant-stage override, else this |
+| Validated at ingest | numeric >= 0; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `fg_cover_days`
+
+D — `days_of_cover` only: how many days of FUTURE demand the stock should cover. The target is D/7 × the projected weekly demand, so it moves with the forecast (WP 14.4). Days, not converted: the engine divides by 7 itself.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `days` — fixed |
+| Added by | `20261003000002_fg_policy_per_product.sql` |
+| Read by the engine | `project_map.py::_resolve_fg -> Product.fg_cover_days (MTS, days_of_cover)` |
+| Transform | the Plant-stage override, else this; target = D/7 x projected weekly demand |
+| Validated at ingest | numeric >= 0; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `fg_initial_on_hand`
+
+The finished-goods stock an MTS product starts the run with — engine RFC 4, closed by WP 14.4 (the capability first, then this column, in RFC 4's own order). Empty starts the run at the policy target, which is today's behaviour.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `units of product` — fixed |
+| Added by | `20261003000002_fg_policy_per_product.sql` |
+| Read by the engine | `project_map.py::_resolve_fg -> Product.fg_initial_on_hand (MTS)` |
+| Transform | the Plant-stage override, else this |
+| When NULL, the engine uses | the policy target |
+| Validated at ingest | numeric >= 0; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+**Substitutions** — every point where a value you did not supply can stand in
+for one you did.
+
+| When | The value used | Shown as | Visible where |
+|---|---|---|---|
+| NULL | the FG target | `default` | the Plant cell's empty note |
+
 ---
 
-*Generated from data contract `2cea4e23e233`, engine `0.4.0`,
+*Generated from data contract `7c907a6018f7`, engine `0.5.0`,
 sidecar `supabase/contract/products.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -23,7 +23,7 @@ __version__ = "0.2.0"
 # Engine semantic version. Bump per change-governance tiers (Part IX §9.5):
 #   Tier 2 (new variable, behavior-neutral default) -> patch
 #   Tier 3 (new phase / contract change)            -> minor or major + ADR
-ENGINE_VERSION = "0.4.0"  # §24 WP 14.3 · ADR 0002 · §4 D284 (c): per-row fulfillment (P-C.1 reads `demand_rows`, a hook-contract change, Tier 3 → minor); `revenue_max` is real (was priority), a customer's `sla_fill_floor_pct` is its rows' default target under sla_tier, and max backorder days round half up
+ENGINE_VERSION = "0.5.0"  # §24 WP 14.4 · ADR 0002 · §4 D284 (d): planned production over a horizon (new transient key `planned_production`, PH-40, Tier 3 → minor); FG policies base-stock / min-max / days of cover and FG opening stock; P-P.4 never adds on top of a typed S
 
 from scsim.entities.config import SimulationSettings, StatisticsReport  # noqa: E402,F401
 from scsim.entities.network import (  # noqa: E402,F401

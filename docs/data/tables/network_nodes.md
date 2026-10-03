@@ -591,6 +591,6 @@ WP 4.3 · when the run that wrote the computed columns finished. It is provenanc
 
 ---
 
-*Generated from data contract `2cea4e23e233`, engine `0.4.0`,
+*Generated from data contract `7c907a6018f7`, engine `0.5.0`,
 sidecar `supabase/contract/network_nodes.contract.yaml`, table created by `20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

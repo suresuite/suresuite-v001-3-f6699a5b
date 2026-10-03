@@ -35,7 +35,7 @@ from typing import ClassVar, Literal, Optional
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from scsim.core.allocation import allocate_batched
+from scsim.core.rowbacklog import step_rows
 from scsim.core.context import SimContext
 from scsim.core.phases import (
     DEMAND,
@@ -122,6 +122,10 @@ class UnmetDemandHandling(PolicyPlugin):
 
     def setup(self, ctx: SimContext) -> None:
         p: UnmetDemandParams = self.params
+        # WP 14.4 — every row's backorder settings, published at setup so the
+        # plan (PH-40) carries only what fulfillment would carry (decision 6),
+        # before this policy's first PH-60 has run.
+        ctx.row_fulfillment = self._row_settings(ctx)
         if p.rule in ("backorder", "partial_backorder") and p.backorder_horizon > 0:
             ctx.policy_state[self.id] = {
                 # age_buckets[p, k] = backlog units that have waited k weeks
@@ -194,6 +198,29 @@ class UnmetDemandHandling(PolicyPlugin):
         if not active:
             return {"active": False}
         R = m.n_rows
+        rs = ctx.row_fulfillment or self._row_settings(ctx)
+        accept, horizon, penalty = rs["accept"], rs["horizon"], rs["penalty"]
+        H = rs["max_horizon"]
+        if alloc is None:
+            # No P-C.2: the project rule is P-C.2's own default (fcfs), which at
+            # weekly buckets is the equal-fill-rate split.
+            alloc = {"rule": "fair_share", "priority": m.row_cust_priority.copy(),
+                     "price": m.row_price.copy(), "floor_pct": np.zeros(R)}
+        T = m.settings.horizon
+        return {
+            "active": True, "alloc": alloc, "accept": accept, "horizon": horizon,
+            "penalty": penalty, "buckets": np.zeros((R, H + 1)),
+            # KPI accumulators, one column per week.
+            "demand": np.zeros((R, T)), "served_new": np.zeros((R, T)),
+            "lost": np.zeros((R, T)), "cost": np.zeros((R, T)),
+        }
+
+    def _row_settings(self, ctx: SimContext) -> dict:
+        """Each row's share that waits, horizon (weeks) and penalty: the
+        project's rule, overridden row by row (``row_overrides``)."""
+        p: UnmetDemandParams = self.params
+        m = ctx.model
+        R = m.n_rows
         index = {rid: r for r, rid in enumerate(m.row_ids)}
         project_waits = 0.0 if p.rule == "lost_sales" else (
             1.0 if p.rule == "backorder" else p.partial_accept_prob)
@@ -211,22 +238,9 @@ class UnmetDemandHandling(PolicyPlugin):
             if ov.backorder_penalty is not None:
                 penalty[r] = ov.backorder_penalty
         waits = accept > 0
-        penalty = np.where(waits, penalty, 0.0)
-        H = int(horizon[waits].max()) if waits.any() else 0
-        if alloc is None:
-            # No P-C.2: the project rule is P-C.2's own default (fcfs), which at
-            # weekly buckets is the equal-fill-rate split.
-            alloc = {"rule": "fair_share", "priority": m.row_cust_priority.copy(),
-                     "price": m.row_price.copy(), "floor_pct": np.zeros(R)}
-        T = m.settings.horizon
-        return {
-            "active": True, "alloc": alloc, "accept": accept, "horizon": horizon,
-            "penalty": penalty, "buckets": np.zeros((R, H + 1)),
-            "cols": np.arange(H + 1)[None, :],
-            # KPI accumulators, one column per week.
-            "demand": np.zeros((R, T)), "served_new": np.zeros((R, T)),
-            "lost": np.zeros((R, T)), "cost": np.zeros((R, T)),
-        }
+        return {"accept": accept, "horizon": horizon,
+                "penalty": np.where(waits, penalty, 0.0),
+                "max_horizon": int(horizon[waits].max()) if waits.any() else 0}
 
     def _on_phase_rows(self, ctx: SimContext, st: dict) -> None:
         m = ctx.model
@@ -237,26 +251,13 @@ class UnmetDemandHandling(PolicyPlugin):
         # rows re-split that total below, oldest backlog first within a row).
         supply = np.where(m.mts_mask, ctx.fg_served_backlog + ctx.fg_served_new,
                           ctx.production_output)
-        alloc = st["alloc"]
-        buckets = st["buckets"]
+        # The ONE row step the plan also projects with (core/rowbacklog.py,
+        # WP 14.4): decision 6 holds by construction.
         d_rows = np.maximum(ctx.demand_rows, 0.0)
-        sb_age, s_new = allocate_batched(
-            supply, buckets, d_rows, m.row_ptr, alloc["rule"],
-            priority=alloc["priority"], price=alloc["price"], floor_pct=alloc["floor_pct"])
-        buckets -= sb_age
-        np.maximum(buckets, 0.0, out=buckets)
-        unmet_new = np.maximum(d_rows - s_new, 0.0)
-        waiting = unmet_new * st["accept"]
-        lost = unmet_new - waiting
-        # Each row expires at ITS horizon: the bucket of age h_r goes to lost
-        # sales, then everything ages one week and the new waiting enters age 0.
-        horizon = st["horizon"]
-        expire_col = buckets[np.arange(m.n_rows), np.minimum(horizon, buckets.shape[1] - 1)]
-        lost = lost + expire_col
-        buckets[st["cols"] >= horizon[:, None]] = 0.0
-        if buckets.shape[1] > 1:
-            buckets[:, 1:] = buckets[:, :-1].copy()
-        buckets[:, 0] = waiting
+        wk = step_rows(supply, st["buckets"], d_rows, m.row_ptr, st["alloc"],
+                       st["accept"], st["horizon"])
+        st["buckets"] = buckets = wk.buckets
+        sb_age, s_new, lost = wk.served_backlog, wk.served_new, wk.lost
         backlog_rows = buckets.sum(axis=1)
 
         cost_rows = backlog_rows * st["penalty"]

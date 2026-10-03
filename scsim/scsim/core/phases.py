@@ -57,6 +57,7 @@ FORECAST = "forecast"  # ADR 0001: produced at PH-10, consumed by PH-40/PH-70 (M
 FIRM_KNOWLEDGE = "firm_knowledge"
 FG_FULFILLMENT = "fg_fulfillment"
 PRODUCTION_PLAN = "production_plan"
+PLANNED_PRODUCTION = "planned_production"  # WP 14.4 / ADR 0002: [products × H]; column 0 = production_plan
 OVERTIME_CAPACITY = "overtime_capacity"
 SUBSTITUTIONS = "substitutions"
 PRODUCTION_OUTPUT = "production_output"
@@ -96,7 +97,7 @@ PIPELINE: tuple[PhaseSpec, ...] = (
               "Firm-visible events (t ≥ start + detection_lag). P-S.4 / P-X.1 evaluate here."),
     PhaseSpec(PhaseId.PH30, "fulfill_from_stock", (FG_FULFILLMENT,),
               "MTS serves D_p from I^FG; no-op for MTO products."),
-    PhaseSpec(PhaseId.PH40, "production_planning", (PRODUCTION_PLAN, OVERTIME_CAPACITY, SUBSTITUTIONS),
+    PhaseSpec(PhaseId.PH40, "production_planning", (PRODUCTION_PLAN, OVERTIME_CAPACITY, SUBSTITUTIONS, PLANNED_PRODUCTION),
               "Plan production: default greedy plan; P-P.5/P-P.9 et al. adjust here."),
     PhaseSpec(PhaseId.PH50, "production_execute", (PRODUCTION_OUTPUT,),
               "Pure mechanics (Eqs. 8/9): produce Q_p, consume materials."),

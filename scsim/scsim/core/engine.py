@@ -45,6 +45,7 @@ from scsim.core.phases import (
     KPI_ROWS,
     MATERIAL_DEMAND,
     OVERTIME_CAPACITY,
+    PLANNED_PRODUCTION,
     PRODUCTION_OUTPUT,
     PRODUCTION_PLAN,
     PURCHASE_ORDERS,
@@ -60,6 +61,7 @@ from scsim.core.phases import (
     PhaseId,
     validate_hooks,
 )
+from scsim.core.planning import fg_gap, fg_target_for, plan_ahead
 from scsim.disruption.injector import any_stochastic, resolve_events, validate_events
 from scsim.entities.config import StatisticsReport, WarmupReport
 from scsim.entities.enums import (
@@ -212,7 +214,10 @@ def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
     want_mto = ctx.demand + ctx.backlog
     if model.mts_mask.any():
         backlog_unserved = ctx.backlog - ctx.fg_served_backlog
-        gap = np.maximum(ctx.fg_target - ctx.fg_on_hand, 0.0) + backlog_unserved
+        # The FG policy's ask (WP 14.4): base-stock and days of cover fill to the
+        # target, min-max only below s — `max(target − stock, 0)` for the first two,
+        # exactly as before.
+        gap = fg_gap(model, ctx.fg_target, ctx.fg_on_hand) + backlog_unserved
         want = np.where(model.mts_mask, gap, want_mto)
     else:
         want = want_mto
@@ -228,6 +233,8 @@ def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
     # answer to "should I buy another line".
     ctx.trace.prod_cap_bound[:, ctx.week] = (want > cap + 1e-9) & (cap > 0.0)
     ctx.production_plan = np.minimum(want, cap)
+    # Planned production over the horizon (WP 14.4): column 0 is the plan above.
+    plan_ahead(model, ctx, want, ctx.production_plan)
 
 
 def _mech_production_execute(model: CompiledModel, ctx: SimContext) -> None:
@@ -263,8 +270,9 @@ def _mech_fg_target_base(model: CompiledModel, ctx: SimContext) -> None:
     cycle stock. P-P.4 adds the real FG safety stock on top (priority 55)."""
     if not model.mts_mask.any():
         return
-    base = np.where(model.fg_base_stock_override >= 0,
-                    model.fg_base_stock_override, ctx.forecast)
+    # WP 14.4: a typed S, D/7 × next week's projected demand (days of cover), else
+    # this week's forecast (today's derivation). Read at next week's PH-40.
+    base = fg_target_for(model, ctx.forecast, ctx.projected_demand(ctx.week + 1, 1)[:, 0])
     ctx.fg_target = np.where(model.mts_mask, base, 0.0)
 
 
@@ -419,6 +427,9 @@ def _mech_accounting(model: CompiledModel, ctx: SimContext, policies: list[Polic
                 ctx.cost.add(component, amount)
     if tr.keep_matrices:
         tr.D[:, t] = D
+        tr.PD[:, t] = ctx.plan_projected_demand[:, 0]
+        tr.REQ[:, t] = ctx.plan_requirement[:, 0]
+        tr.PLAN[:, t] = ctx.planned_production[:, 0]
         tr.Q[:, t] = ctx.production_output
         tr.F[:, t] = F
         tr.B[:, t] = ctx.backlog
@@ -447,9 +458,9 @@ _MECHANIC_HOOKS: list[tuple[str, Hook, Callable]] = [
                                      writes={FG_FULFILLMENT, ST_FG_ON_HAND}),
      _mech_fulfill_from_stock),
     ("mech.default_plan", Hook(phase=PhaseId.PH40, priority=50,
-                               reads={DEMAND, FG_FULFILLMENT, OVERTIME_CAPACITY,
+                               reads={DEMAND, DEMAND_ROWS, FG_FULFILLMENT, OVERTIME_CAPACITY,
                                       ST_BACKLOG, ST_FG_TARGET},
-                               writes={PRODUCTION_PLAN}),
+                               writes={PRODUCTION_PLAN, PLANNED_PRODUCTION}),
      _mech_default_plan),
     ("mech.production_execute", Hook(phase=PhaseId.PH50, priority=50,
                                      reads={PRODUCTION_PLAN, OVERTIME_CAPACITY},
@@ -653,7 +664,10 @@ def _initialize_state(compiled: CompiledScenario, ctx: SimContext) -> None:
         _log.debug("computed init: %s", init)
     ctx.on_hand = init.astype(float)
     if model.mts_mask.any():
-        ctx.fg_on_hand = ctx.fg_target.copy()  # MTS starts at its stock target
+        # MTS starts at its FG opening stock (engine RFC 4, WP 14.4), else at its
+        # stock target — today's behaviour.
+        ctx.fg_on_hand = np.where(model.mts_mask & (model.fg_initial >= 0),
+                                  model.fg_initial, ctx.fg_target)
     W = model.ring_width
     for m in range(model.n_mats):
         link = model.primary_link[m]
@@ -983,6 +997,11 @@ def run_scenario(
             "material.in_transit": tr.I_transit,
             "material.orders": tr.O_mat,
             "product.demand": tr.D,
+            # WP 14.4 — the plan's record: what it projected, required and planned
+            # (built is `product.production`).
+            "product.projected_demand": tr.PD,
+            "product.requirement": tr.REQ,
+            "product.planned": tr.PLAN,
             "product.production": tr.Q,
             "product.fulfillment": tr.F,
             "product.backlog": tr.B,

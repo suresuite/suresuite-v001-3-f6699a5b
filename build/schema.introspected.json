@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 399,
-  "migrations_applied": 391,
+  "migrations_found": 400,
+  "migrations_applied": 392,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261003000001_demand_per_row.sql",
+  "last_migration": "20261003000002_fg_policy_per_product.sql",
   "counts": {
     "tables": 93,
     "views": 8,
@@ -15698,6 +15698,66 @@
           "unique": false,
           "references": null,
           "added_by": "20260916000020_item_masters_land.sql"
+        },
+        {
+          "name": "fg_policy",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql"
+        },
+        {
+          "name": "fg_base_stock",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql"
+        },
+        {
+          "name": "fg_reorder_point",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql"
+        },
+        {
+          "name": "fg_cover_days",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql"
+        },
+        {
+          "name": "fg_initial_on_hand",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000002_fg_policy_per_product.sql"
         }
       ],
       "constraints": [
@@ -15719,6 +15779,20 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000020_item_masters_land.sql"
+        },
+        {
+          "name": "products_fg_policy_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (fg_policy IS NULL OR fg_policy IN ('base_stock', 'min_max', 'days_of_cover'))",
+          "added_by": "20261003000002_fg_policy_per_product.sql"
+        },
+        {
+          "name": "products_fg_levels_nonnegative",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (coalesce(fg_base_stock, 0) >= 0 AND coalesce(fg_reorder_point, 0) >= 0 AND coalesce(fg_cover_days, 0) >= 0 AND coalesce(fg_initial_on_hand, 0) >= 0)",
+          "added_by": "20261003000002_fg_policy_per_product.sql"
         }
       ],
       "indexes": [],
@@ -24267,7 +24341,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261003000001_demand_per_row.sql"
+      "defined_by": "20261003000002_fg_policy_per_product.sql"
     },
     {
       "name": "_build_dataset_snapshot",

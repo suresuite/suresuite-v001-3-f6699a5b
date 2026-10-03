@@ -50,6 +50,12 @@ export interface ProductRow extends RowSource {
   demand_cv: number | null;
   demand_min: number | null; // a_p — explicit triangular lower bound (null → mean·(1−cv))
   demand_max: number | null; // c_p — explicit triangular upper bound, e.g. historical max (null → mean·(1+cv))
+  // PLAN.md §24 WP 14.4 — the FG policy (MTS) and FG opening stock.
+  fg_policy?: string | null; // base_stock | min_max | days_of_cover
+  fg_base_stock?: number | null; // S, units
+  fg_reorder_point?: number | null; // s, units (min_max)
+  fg_cover_days?: number | null; // D, days (days_of_cover)
+  fg_initial_on_hand?: number | null; // units
 }
 
 export interface SupplierRow extends RowSource {

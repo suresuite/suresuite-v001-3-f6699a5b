@@ -928,6 +928,146 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "plant",
+    "field": "fg_policy",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fg_policy` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fg_policy` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_policy (MTS)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
+    "field": "fg_base_stock",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fg_base_stock` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fg_base_stock` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units of product`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_base_stock (MTS)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
+    "field": "fg_reorder_point",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fg_reorder_point` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fg_reorder_point` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units of product`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_reorder_point (MTS, min_max)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
+    "field": "fg_cover_days",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fg_cover_days` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fg_cover_days` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`days`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_cover_days (MTS, days_of_cover)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
     "field": "type",
     "family": "inventory",
     "hops": [
@@ -1127,32 +1267,38 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "plant",
-    "field": "initial_on_hand",
-    "family": "inventory",
+    "field": "fg_initial_on_hand",
+    "family": "production",
     "hops": [
       {
         "kind": "hook",
-        "detail": "rendered by the plant grid as `initial_on_hand` (family `inventory`)",
+        "detail": "rendered by the plant grid as `fg_initial_on_hand` (family `production`)",
         "evidence": "src/lib/policies/columnSpecs.ts"
       },
       {
         "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "detail": "`products.fg_initial_on_hand` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units of product`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_initial_on_hand (MTS)",
         "evidence": null
       },
       {
         "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
         "evidence": null
       }
     ],
-    "breaks": [
-      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/datamap.py:172."
-    ],
-    "breakClass": "legacy-only",
-    "breakEvidence": [
-      "sim-worker/sim_worker/datamap.py:172"
-    ]
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   },
   {
     "stage": "plant",
@@ -1882,8 +2028,7 @@ export const CHAINS: PolicyChain[] = [
 export const BREAKS_BY_CLASS: Record<string, string[]> = {
   "legacy-only": [
     "supplier.review_period_days",
-    "plant.review_period_days",
-    "plant.initial_on_hand"
+    "plant.review_period_days"
   ],
   "unread": [
     "customer.primary_source"
@@ -2766,6 +2911,21 @@ export const ITEM_SERIES: ItemSeries[] = [
     "kind": "product",
     "key": "demand",
     "label": "Demand"
+  },
+  {
+    "kind": "product",
+    "key": "projected_demand",
+    "label": "Projected demand (plan)"
+  },
+  {
+    "kind": "product",
+    "key": "requirement",
+    "label": "Requirement (plan)"
+  },
+  {
+    "kind": "product",
+    "key": "planned",
+    "label": "Planned production"
   },
   {
     "kind": "product",
@@ -4454,5 +4614,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 55;
-export const BROKEN_COUNT = 5;
+export const CHAIN_COUNT = 59;
+export const BROKEN_COUNT = 4;

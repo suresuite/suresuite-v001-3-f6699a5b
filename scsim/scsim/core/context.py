@@ -226,6 +226,22 @@ class CompiledModel:
         self.fg_base_stock_override = np.array(
             [-1.0 if p.fg_base_stock is None else p.fg_base_stock for p in net.products]
         )
+        # FG policies (WP 14.4, ADR 0002 decision 3): 0 base_stock, 1 min_max,
+        # 2 days_of_cover. `fg_typed` marks a product whose target is a TYPED
+        # level (S, (s, S) or D): P-P.4 adds nothing on top of it.
+        from scsim.entities.enums import FgPolicy as _Fg
+        _code = {_Fg.BASE_STOCK: 0, _Fg.MIN_MAX: 1, _Fg.DAYS_OF_COVER: 2}
+        self.fg_policy_code = np.array([_code[p.fg_policy] for p in net.products], dtype=int)
+        self.fg_reorder_point = np.array(
+            [np.nan if p.fg_reorder_point is None else p.fg_reorder_point for p in net.products])
+        self.fg_cover_days = np.array(
+            [np.nan if p.fg_cover_days is None else p.fg_cover_days for p in net.products])
+        self.fg_initial = np.array(
+            [-1.0 if p.fg_initial_on_hand is None else p.fg_initial_on_hand for p in net.products])
+        self.fg_typed = (self.fg_policy_code != 0) | (self.fg_base_stock_override >= 0)
+        # Planning horizon H (weeks of planned production, week t first). 1 until
+        # MRP sets it (WP 14.5): with H = 1 the plan IS this week's production plan.
+        self.plan_horizon = 1
         # Full COGS per FG unit (P-P.4 holding basis): Σ_m r_{p,m} · c_m.
         self.fg_unit_cogs = np.asarray(self.bom @ self.mat_cost).ravel()
 
@@ -691,6 +707,9 @@ class WeeklyTrace:
     prod_cap_bound: np.ndarray = field(init=False)
     sup_cap_bound: np.ndarray = field(init=False)
     D: Optional[np.ndarray] = None
+    PD: Optional[np.ndarray] = None
+    REQ: Optional[np.ndarray] = None
+    PLAN: Optional[np.ndarray] = None
     Q: Optional[np.ndarray] = None
     F: Optional[np.ndarray] = None
     B: Optional[np.ndarray] = None
@@ -713,6 +732,11 @@ class WeeklyTrace:
         self.sup_cap_bound = np.zeros((self.n_sups, T))
         if self.keep_matrices:
             self.D = np.zeros((self.n_prods, T))
+            # WP 14.4 — the plan's own record per product: projected demand,
+            # requirement and planned production for the week (inspection only).
+            self.PD = np.zeros((self.n_prods, T))
+            self.REQ = np.zeros((self.n_prods, T))
+            self.PLAN = np.zeros((self.n_prods, T))
             self.Q = np.zeros((self.n_prods, T))
             self.F = np.zeros((self.n_prods, T))
             self.B = np.zeros((self.n_prods, T))
@@ -824,10 +848,20 @@ class SimContext:
         # The project's ONE allocation rule and its per-row inputs, published by
         # P-C.2 at setup (the P-C.6 publish-at-setup pattern); None = no P-C.2.
         self.row_allocation: Optional[dict] = None
+        # Every row's backorder settings (share that waits, horizon, penalty),
+        # published by P-C.1 at setup (WP 14.4); None = no P-C.1 (lost sales).
+        self.row_fulfillment: Optional[dict] = None
         self.forecast = model.mean_demand_p.copy()
         self.fg_served_backlog = np.zeros(model.n_prods)  # PH-30 (MTS)
         self.fg_served_new = np.zeros(model.n_prods)
         self.production_plan = np.zeros(model.n_prods)
+        # PH-40 (WP 14.4): planned production over the horizon, [products × H];
+        # column 0 is this week's `production_plan`. The requirement behind each
+        # column and the projected demand it was planned against ride along.
+        H = model.plan_horizon
+        self.planned_production = np.zeros((model.n_prods, H))
+        self.plan_requirement = np.zeros((model.n_prods, H))
+        self.plan_projected_demand = np.zeros((model.n_prods, H))
         self.overtime_extra = np.zeros(model.n_prods)
         self.production_output = np.zeros(model.n_prods)
         self.fulfillment = np.zeros(model.n_prods)

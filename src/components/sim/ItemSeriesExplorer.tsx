@@ -35,6 +35,10 @@ const SERIES_LABEL: Record<string, string> = {
   fulfillment: "Fulfillment",
   backlog: "Backlog",
   lost_units: "Lost units",
+  // PLAN.md §24 WP 14.4 — the plan's own record per product.
+  projected_demand: "Projected demand (plan)",
+  requirement: "Requirement (plan)",
+  planned: "Planned production",
 };
 
 const SERIES_COLORS = [

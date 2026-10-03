@@ -226,6 +226,12 @@ export const FAMILY_FIELDS: Record<PolicyFamily, Record<string, PolicyFieldSpec>
   production: {
     capacity_units_per_day: n(0, undefined, true),
     allocation_priority_weight: n(0, undefined, true),
+    // Plant-row FG policy (PLAN.md §24 WP 14.4), MTS.
+    fg_policy: en(["base_stock", "min_max", "days_of_cover"], true),
+    fg_base_stock: n(0, undefined, true),
+    fg_reorder_point: n(0, undefined, true),
+    fg_cover_days: n(0, undefined, true),
+    fg_initial_on_hand: n(0, undefined, true),
     // P-P.2 lot sizing is a PLANNED catalog policy — configuring it is refused
     // with the milestone (§5.2 refusal rules; pinned by pc-04).
     lot_policy: { ...en(["fixed", "epq", "lot_for_lot", "pohm"]), pendingPolicy: "lot_sizing" },

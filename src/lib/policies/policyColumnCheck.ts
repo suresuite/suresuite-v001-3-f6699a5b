@@ -388,12 +388,43 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   "plant:order_up_to": { shows: "override → 200", savedTo: "override inventory.order_up_to (plant row)", engine: "plant rows are DROPPED", verdict: "ignored" },
   "plant:rop_q_quantity": { shows: "override → 0", savedTo: "override inventory.rop_q_quantity (plant row)", engine: "plant rows are DROPPED", verdict: "ignored" },
   "plant:review_period_days": { shows: "override → 1", savedTo: "override inventory.review_period_days", engine: "not read", verdict: "ignored" },
-  "plant:initial_on_hand": {
-    shows: "override ('Initial FG')",
-    savedTo: "override inventory.initial_on_hand",
-    engine: "no reader — the engine keeps no finished-goods starting stock",
-    verdict: "ignored",
+  // PLAN.md §24 WP 14.4 — the FG policy per product and FG opening stock. The
+  // opening-stock cell replaced `initial_on_hand`, which had no reader (D89).
+  "plant:fg_initial_on_hand": {
+    shows: "your override → products.fg_initial_on_hand → empty (the run starts at the target)",
+    savedTo: "override production.fg_initial_on_hand (Plant row — /policies never writes the master)",
+    engine: "the MTS product's FG opening stock (engine RFC 4)",
+    verdict: "conditional",
+    note: "MTS products only.",
     refs: ["D89"],
+  },
+  "plant:fg_policy": {
+    shows: "your override → products.fg_policy → empty (base-stock)",
+    savedTo: "override production.fg_policy (Plant row)",
+    engine: "Product.fg_policy: base-stock, min-max or days of cover; an incomplete policy runs as base-stock, warned",
+    verdict: "conditional",
+    note: "MTS products only.",
+  },
+  "plant:fg_base_stock": {
+    shows: "your override → products.fg_base_stock → empty (derived: a week of forecast + P-P.4)",
+    savedTo: "override production.fg_base_stock (Plant row)",
+    engine: "S — the end-of-week FG target (base-stock, min-max); P-P.4 adds nothing on top of a typed S",
+    verdict: "conditional",
+    note: "MTS products only.",
+  },
+  "plant:fg_reorder_point": {
+    shows: "your override → products.fg_reorder_point",
+    savedTo: "override production.fg_reorder_point (Plant row)",
+    engine: "s — min-max builds up to S only below it",
+    verdict: "conditional",
+    note: "Read under min-max only, MTS products only.",
+  },
+  "plant:fg_cover_days": {
+    shows: "your override → products.fg_cover_days",
+    savedTo: "override production.fg_cover_days (Plant row)",
+    engine: "D — target = D/7 × the projected weekly demand",
+    verdict: "conditional",
+    note: "Read under days of cover only, MTS products only.",
   },
   "plant:safety_stock_days": { shows: "override → 7", savedTo: "override inventory.safety_stock_days (plant row)", engine: DROPPED_PER_ROW, verdict: "ignored" },
   "plant:holding_cost_pct": { shows: "override → 0.2", savedTo: "override inventory.holding_cost_pct (plant row)", engine: DROPPED_PER_ROW, verdict: "ignored" },

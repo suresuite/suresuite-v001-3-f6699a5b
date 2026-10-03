@@ -217,6 +217,6 @@ The Legal Entity Identifier the claim is about, where one resolved. CHECK-constr
 
 ---
 
-*Generated from data contract `2cea4e23e233`, engine `0.4.0`,
+*Generated from data contract `7c907a6018f7`, engine `0.5.0`,
 sidecar `supabase/contract/external_evidence.contract.yaml`, table created by `20260727000001_network_cartographer.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

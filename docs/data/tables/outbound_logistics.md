@@ -76,8 +76,8 @@ partially or get corrected — the write fails.
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:421` | yes |
-| `ProjectPolicies.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:230` | yes |
-| `SimulationLab.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:230` | yes |
+| `ProjectPolicies.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:236` | yes |
+| `SimulationLab.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:236` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -459,6 +459,6 @@ A triangular row's upper bound — a rate in the row's `time_unit`, weekly after
 
 ---
 
-*Generated from data contract `2cea4e23e233`, engine `0.4.0`,
+*Generated from data contract `7c907a6018f7`, engine `0.5.0`,
 sidecar `supabase/contract/outbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

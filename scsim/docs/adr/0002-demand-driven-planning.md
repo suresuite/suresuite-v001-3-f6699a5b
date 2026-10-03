@@ -96,3 +96,20 @@ demand**, and **the plan never reads the realized future demand draws** (gate
   whose customers state `sla_fill_floor_pct`, and a max-backorder value at a
   half week (3.5 days → 1 week, was 0) run differently. Golden digests (engine
   and worker) unchanged.
+* **WP 14.4** (engine 0.4.0 → **0.5.0**, Tier 3: a new transient key) — planned
+  production over a horizon. New key **`planned_production`** (`[products × H]`,
+  owned by **PH-40**; `pipeline_schema.json` re-frozen) with the requirement and
+  projected demand behind each column; column 0 is `production_plan`, computed
+  exactly as before, so execution is unchanged. Later columns project with
+  `core/rowbacklog.step_rows` — the step P-C.1 now also runs — so only the
+  shortfall of backorder rows carries, within their window, split by the project
+  rule (decision 6). H = 1 until WP 14.5 sets `model.plan_horizon`. FG policies
+  real: `FgPolicy.DAYS_OF_COVER` appended; `Product.fg_reorder_point`,
+  `fg_cover_days`, `fg_initial_on_hand`; min-max builds only below s; days of
+  cover targets D/7 × projected demand; an MTS product starts at its FG opening
+  stock (RFC 4). P-P.1 publishes nothing new; P-C.1 publishes every row's
+  backorder settings at setup (`ctx.row_fulfillment`). Inspection series per
+  product: projected demand, requirement, planned. **Declared behaviour change:**
+  P-P.4 is no longer added on top of a TYPED `fg_base_stock` (one source per
+  number) — reachable only through the engine API, the mapper never set it.
+  Golden digests (engine and worker) unchanged.

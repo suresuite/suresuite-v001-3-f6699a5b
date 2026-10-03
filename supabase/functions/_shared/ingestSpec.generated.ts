@@ -884,6 +884,75 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
           "blank": "null"
         },
         "validate": "numeric >= 0"
+      },
+      {
+        "column": "fg_policy",
+        "csvHeader": "fg_policy",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "enum",
+          "values": [
+            "base_stock",
+            "min_max",
+            "days_of_cover"
+          ],
+          "blank": "null"
+        },
+        "validate": "base_stock | min_max | days_of_cover; blank lands nothing"
+      },
+      {
+        "column": "fg_base_stock",
+        "csvHeader": "fg_base_stock",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; blank lands nothing"
+      },
+      {
+        "column": "fg_reorder_point",
+        "csvHeader": "fg_reorder_point",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; blank lands nothing"
+      },
+      {
+        "column": "fg_cover_days",
+        "csvHeader": "fg_cover_days",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; blank lands nothing"
+      },
+      {
+        "column": "fg_initial_on_hand",
+        "csvHeader": "fg_initial_on_hand",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; blank lands nothing"
       }
     ],
     "normalize": []

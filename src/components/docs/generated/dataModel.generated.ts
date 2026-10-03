@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "2cea4e23e233";
-export const ENGINE_VERSION = "0.4.0";
-export const LAST_MIGRATION = "20261003000001_demand_per_row.sql";
+export const CONTRACT_VERSION = "7c907a6018f7";
+export const ENGINE_VERSION = "0.5.0";
+export const LAST_MIGRATION = "20261003000002_fg_policy_per_product.sql";
 
 export const COUNTS = {
   "tablesInSchema": 93,
   "tablesDescribed": 76,
-  "columnsDescribed": 990,
+  "columnsDescribed": 995,
   "tablesUndescribed": 17
 } as const;
 
@@ -141,7 +141,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "products",
         "grain": "One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs.",
-        "columns": 18,
+        "columns": 23,
         "owner": "data-ingestion"
       },
       {

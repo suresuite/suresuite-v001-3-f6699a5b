@@ -488,13 +488,19 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         "price": ("outbound_logistics.unit_price", "customer"),
         "row_priority": ("customers.priority_weight", "customer"),
         "sla_fill_floor_pct": ("customers.sla_fill_floor_pct", "customer"),
+        # PLAN.md §24 WP 14.4 — the product's FG policy and levels.
+        "fg_policy": ("products.fg_policy", "plant"),
+        "fg_base_stock": ("products.fg_base_stock", "plant"),
+        "fg_reorder_point": ("products.fg_reorder_point", "plant"),
+        "fg_cover_days": ("products.fg_cover_days", "plant"),
+        "fg_initial_on_hand": ("products.fg_initial_on_hand", "plant"),
     }
     for k in POLICY_BUNDLE_KEYS:
         assert bool(k.get("master")) == bool(k.get("rows")) == bool(k.get("domain")), k
         # One ENUM domain joined in WP 14.2 for the Customer row's
         # distribution; the numeric three are the mapper's `_override_num`.
         assert k.get("domain") in (None, "positive", "nonnegative", "fraction", "percent",
-                                   "distribution"), k
+                                   "distribution", "fg_policy"), k
         assert k["catalog_ref"] is None or not k.get("master"), k
 
 
@@ -519,7 +525,10 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         return ProjectData(
             suppliers=[SupplierRow("S1"), SupplierRow("S3")],
             materials=[MaterialRow("M1", cost=10.0)],
-            products=[ProductRow("P1", sell_price=100.0, demand_mean=50.0, fulfillment_mode="mts")],
+            # WP 14.4 — the master states s, S and D so every FG override has a
+            # complete policy to land in.
+            products=[ProductRow("P1", sell_price=100.0, demand_mean=50.0, fulfillment_mode="mts",
+                                 fg_base_stock=400.0, fg_reorder_point=100.0, fg_cover_days=10.0)],
             supply_arcs=[
                 SupplyArc("S1", "M1", unit_price=10, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
                 SupplyArc("S3", "M1", unit_price=11, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
@@ -563,6 +572,8 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "row_demand_variation": 0.5, "row_demand_min": 5, "row_demand_max": 500,
         "backorder_allowed": True, "max_backorder_days": 21, "backorder_cost_per_day": 3,
         "row_priority": 4, "price": 55, "sla_fill_floor_pct": 70,
+        "fg_policy": "min_max", "fg_base_stock": 500, "fg_reorder_point": 50, "fg_cover_days": 21,
+        "fg_initial_on_hand": 250,
     }
     keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1",
             "customer": "node:C1::P1"}
