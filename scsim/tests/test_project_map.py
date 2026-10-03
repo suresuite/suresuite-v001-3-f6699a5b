@@ -718,12 +718,12 @@ def test_supplier_row_inventory_override_reaches_engine():
     engine override — the class of edit that was silently dropped before."""
     d = _base()
     d.policies = {"node:s1::m1": {"inventory": {
-        "type": "rop", "rop_q_quantity": 900, "coverage_weeks": 4,
+        "type": "min_max", "reorder_point": 300, "coverage_weeks": 4,
     }}}
     res = from_project_data(d)
     inv = res.scenario.policies["inventory_control"]
     assert inv["material_overrides"]["m1"] == {
-        "policy_type": "rop_q", "rop_q_quantity": 900.0, "coverage_weeks": 4.0}
+        "policy_type": "min_max", "reorder_point": 300.0, "coverage_weeks": 4.0}
     assert any(w.level == "info" and w.field == "material_overrides"
                for w in res.warnings)
     assert not any(w.field == "inventory" and w.level == "warn"

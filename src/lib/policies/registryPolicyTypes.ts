@@ -128,7 +128,8 @@ const INVENTORY_TYPES: Array<{
 }> = [
   { registryValue: "min_max", storedValue: "min_max", label: "Min-max (s, S)", headline: ["reorder_point", "order_up_to"], rest: ["coverage_weeks", "basis"] },
   { registryValue: "base_stock", storedValue: "base_stock", label: "Base stock (S)", headline: ["order_up_to"], rest: ["coverage_weeks", "basis"] },
-  { registryValue: "rop_q", storedValue: "rop", label: "(R, Q)", headline: ["rop_q_quantity", "reorder_point"], rest: ["coverage_weeks", "basis"] },
+  // (R,Q): Q and R only — κ sizes no (R,Q) level, and Q is required.
+  { registryValue: "rop_q", storedValue: "rop", label: "(R, Q)", headline: ["rop_q_quantity", "reorder_point"], rest: ["basis"] },
   { registryValue: "periodic", storedValue: "periodic_review", label: "Periodic review (T, S)", headline: ["review_period_days", "order_up_to"], rest: ["coverage_weeks", "basis"] },
   // WP 14.5 — MRP has no level of its own: it orders the plan's need over the
   // lead time, net of stock and the pipeline. Its buffer is the row's
@@ -187,14 +188,13 @@ export function inventoryParamsForType(storedType: string): RegistryParam[] {
  * row's parameters carry a value. κ only sizes the FORMULA order-up-to level
  * S = E[D]·(T_s+κ) (and its safety-stock term), so it is unread when:
  *   - the row states S itself (min-max, base stock, periodic review);
- *   - an (R,Q) row has a lot Q — it orders Q, and its S is R + Q;
+ *   - the row is (R,Q) — it orders Q (required), and its S is R + Q;
  *   - the row is MRP, which orders from the plan and has no level.
  * The grid shows κ only where this is true (scsim P-P.1 `_set_levels`).
  */
 export function kappaIsRead(storedType: string, hasValue: (field: string) => boolean): boolean {
   const engineType = enginePolicyTypeFor(storedType) ?? "min_max";
-  if (engineType === "mrp") return false;
-  if (engineType === "rop_q") return !hasValue("rop_q_quantity");
+  if (engineType === "mrp" || engineType === "rop_q") return false;
   return !hasValue("order_up_to");
 }
 

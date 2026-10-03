@@ -953,7 +953,11 @@ export function StagePolicyTable({
             field: p.field,
             value: n !== undefined && Number.isFinite(n) ? n : undefined,
             onCommit: (v: number | undefined) => onCellChange(rowKey, p.field, v),
-            invalid: paramFeasibility(p, value ?? undefined) ?? undefined,
+            invalid:
+              paramFeasibility(p, value ?? undefined) ??
+              (p.field === "rop_q_quantity" && n === undefined
+                ? "(R,Q) needs a lot size Q — the run orders Q each time the position falls below R"
+                : undefined),
             placeholder: placeholderFor[p.field],
             placeholderNote: placeholderNoteFor[p.field],
             notSimulated: notSimulatedNote(p.field),
