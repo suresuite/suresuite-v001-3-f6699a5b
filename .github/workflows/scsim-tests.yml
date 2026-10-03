@@ -12,6 +12,7 @@ on:
       - "public/engine/**"
       - "docs/research/mrp-vs-reorder-point.md"
       - "scripts/tron_ver2/**"
+      - "src/components/docs/generated/engineChangelog.generated.ts"
       - ".github/workflows/scsim-tests.yml"
   workflow_dispatch:
 
@@ -65,6 +66,13 @@ jobs:
     timeout-minutes: 20   # measured ~50s
     steps:
       - uses: actions/checkout@v4
+        with:
+          # PLAN.md §25 · WP 15.4 — the engine change record's history rules (2, 3,
+          # 6, 7) compare this tree with its base: the merge base with main on a
+          # branch, the first parent on main. A depth-1 clone has neither, and the
+          # gate would print SKIPPED for exactly the rules that catch an unbumped
+          # behaviour change.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -86,6 +94,21 @@ jobs:
 
       - name: Engine test suite (incl. golden traces, G-RNG, perf guard)
         run: python -m pytest tests -q
+        working-directory: scsim
+
+      # PLAN.md §25 · WP 15.4 · gate `engine-ledger` (§4 D295): ENGINE_VERSION has
+      # its entry in scsim/CHANGELOG.yaml; a moved frozen digest is a bump whose
+      # entry names exactly the moved runs; a contract change is Tier 3 with an
+      # ADR; an unbumped engine change appends an amendment; nothing published
+      # is rewritten.
+      - name: Engine change record (gate engine-ledger, rules 1–7)
+        if: ${{ !cancelled() }}
+        run: python scripts/engine_changelog.py check --base auto
+        working-directory: scsim
+
+      - name: Engine change record — generated changelog page and /docs module are current
+        if: ${{ !cancelled() }}
+        run: python scripts/engine_changelog.py generate --check
         working-directory: scsim
 
       - name: Docs CI gate — generated reference pages must match the registry

@@ -484,7 +484,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D292** | **An engine build is identified by a label it declares about itself, not by its content.** Both writers derive `code_version` from `ENGINE_VERSION`, so two builds with different code and the same `ENGINE_VERSION` look like one engine to the RunKey, to run reuse, to comparability and to the Validated Model's engine drift. Only the frozen golden digests (12 scsim scenarios plus 2 committed datasets) stand between a change made without a version bump and a **false reuse**, and outside those 14 cases a change can move results with no gate noticing. That breaks the failure-mode rule WP 10.4 chose: *"a needless re-run, never a false reuse"* | `sim-worker/sim_worker/worker.py:82-85` (boot report), `sim-worker/sim_worker/run_shape.py:43-46` (run row); the reuse/comparability readers at `src/lib/sim/comparability.ts:78-80`, `src/hooks/useModelValidation.tsx:248-251` | WP 15.1 |
 | **D293** | **One engine carries two version numbers that disagree.** `scsim.__version__` is `0.2.0` and names the wheel the browser and the library install (`scsim-0.2.0-py3-none-any.whl`); `ENGINE_VERSION` is `0.6.1` and is the number every result carries. The package version has not moved through eleven engine versions, so a file name says nothing about the engine inside it, and `pip show scsim` reports a version no result has ever named | `scsim/scsim/__init__.py:21` vs `:26`; `scsim/pyproject.toml` (`version = "0.2.0"`); `public/engine/manifest.json` | WP 15.1 |
 | **D294** | **No engine build can be retrieved by version.** WP 12.4's bucket keeps each wheel at a content-addressed path it never overwrites (correct, and kept), but its only index, `engine/index.json`, is upserted to the LATEST build. `public/engine/` is overwritten at every build, the repository has no tags, and the Fly image a worker run used is recorded nowhere: the deploy workflow ships `main`. So "install engine 0.4.0 and re-run this result" has no answer except git archaeology, and the archived wheels cannot be found without already knowing their hash | `scripts/publish_engine_wheels.mjs:76` (`index.json`, upsert); `scripts/build_engine_wheels.sh` (rewrites `public/engine/`); `.github/workflows/deploy-sim-worker.yml` (no image or commit recorded) | WP 15.3 |
-| **D295** | **The engine's change history is a code comment, and each version bump overwrites it.** Each version's rationale is the trailing comment on the `ENGINE_VERSION` line, replaced by the next bump. The rest is scattered over ADR 0002's *Changes* (which covers its own scope only), §16 (the data-layer drift log), and commit messages. The golden-digest gate tells the author to "bump ENGINE_VERSION, record it in ADR 0002 and PLAN.md §16", and nothing checks that the record exists, that it names the scenarios that moved, or that the bump's tier (Part IX §9.5: patch vs minor/major + ADR) matches what changed | `scsim/scsim/__init__.py:23-26`; `scsim/tests/test_golden_digests.py:216-218`; `sim-worker/tests/test_golden_runs.py:106` | WP 15.4 |
+| **D295** | **The engine's change history is a code comment, and each version bump overwrites it.** Each version's rationale is the trailing comment on the `ENGINE_VERSION` line, replaced by the next bump. The rest is scattered over ADR 0002's *Changes* (which covers its own scope only), §16 (the data-layer drift log), and commit messages. The golden-digest gate tells the author to "bump ENGINE_VERSION, record it in ADR 0002 and PLAN.md §16", and nothing checks that the record exists, that it names the scenarios that moved, or that the bump's tier (Part IX §9.5: patch vs minor/major + ADR) matches what changed | `scsim/scsim/__init__.py:23-26`; `scsim/tests/test_golden_digests.py:216-218`; `sim-worker/tests/test_golden_runs.py:106` | **✅ CLOSED by WP 15.4 (2026-10-03)** — `scsim/CHANGELOG.yaml` is the one source: all 18 versions, each with tier, ADR, comparability and the reference runs it moved. `scripts/engine_changelog.py` gates it in `scsim-tests.yml` (rules 1–4, 6, 7, each mutation-tested in `test_changelog.py`) and generates `scsim/docs/changelog.md` and the /docs module. `ENGINE_VERSION` carries the version alone, and both golden tests point at the record. Unbumped changes are amendments; the backfill publishes the 44 engine commits no record describes as a count |
 | **D296** | **No user can see what an engine version changed, so the warnings an engine change triggers cannot be acted on.** /docs has no engine-version page. A comparison across two builds says only "engine versions differ (a vs b) — re-run one side". A Validated Model goes stale with "the engine changed" after any engine change, including one that touches no policy the model uses. Both messages are correct and neither can say WHAT changed, whether it affects this model's policies or KPIs, or where the old build can be obtained (T1, T3) | `src/lib/sim/comparability.ts:78-80`; `src/lib/sim/validatedModel.ts:248` (`driftReasons`); the docs registry `src/components/docs/registry.ts` (no such page) | WP 15.6 |
 
 ### 4.1 Code map — the data layer
@@ -23377,6 +23377,67 @@ what changed":
 D-number resolves; R7 this entry; R8 D291–D296 are owned by open packages; R10 §17 agrees with
 §25's markers; R16 the D-numbers are unique).
 
+### WP 15.4 — The engine change record, authored once · 2026-10-03 · no migration
+
+**Promised by the plan (§25)**: one source, `scsim/CHANGELOG.yaml`, backfilled from the full history;
+the gate's rules 1–4 in `scsim-tests.yml`; two generated views; the golden tests pointing at the
+record; `ENGINE_VERSION` carrying the version alone. **Preconditions held?** Yes: WP 15.4 depends
+on nothing. The base merge before it found `main` red on R7 (its merge of PR 375 renumbered a §16
+heading D289 → D290), ported as a struck-through pointer under the rule's own remedy.
+
+**What changed.**
+- `scsim/CHANGELOG.yaml`: all **18** engine versions, 0.1.0 (2026-06-12) to 0.6.1, newest first.
+  Each has its tier, ADR, plain summary, technical note, policies, KPIs, moved reference runs,
+  comparability and refs.
+- `scsim/scripts/engine_changelog.py`: the gate (`check`, `--base auto`) and the generator. It
+  writes `scsim/docs/changelog.md` (now in the mkdocs nav, beside ADR 0002, which the nav lacked)
+  and `src/components/docs/generated/engineChangelog.generated.ts` for WP 15.6.
+- `scsim/tests/test_changelog.py` (29): the committed record holds, its views are current, and
+  every rule is mutation-tested. The mutations: a bump with no entry; disorder; a duplicate; Tier 3
+  without an ADR, or as a patch; an unknown policy or KPI; a new entry with unknown
+  `goldens_moved`; an unquoted all-digit sha; a Tier 3 amendment; `identical` while a run moved; a
+  moved digest with no bump; an incomplete `goldens_moved`; a schema change marked Tier 2 or
+  unbumped; an unbumped source change with no amendment; and a rewritten, removed or edited entry.
+  The tests also show three things are NOT a change: a reworded worker warning, a schema whose
+  only change is its version stamp, and completing a null commit.
+- `scsim-tests.yml`: the `scsim` job checks out with `fetch-depth: 0` and runs the gate and
+  `generate --check`. PyYAML joins `scsim[dev]`.
+- `ENGINE_VERSION` keeps the version alone, with a pointer to the record. Both golden tests' failure
+  messages now say "add its entry to scsim/CHANGELOG.yaml (goldens_moved names this run)" instead
+  of "record it in ADR 0002 and PLAN.md §16".
+
+**Discovered.**
+- **The plan's four rules could not catch the commit that motivated them, so two were added.**
+  `e34945f4` (D290, on `main` the day this phase was planned) changed what the engine reads and
+  moved no frozen digest, because it is neutral for a project that sets nothing. Rules 1–4 pass
+  that. **Rule 6** (engine source changed with no bump ⇒ an appended amendment) catches it.
+  **Rule 7** (append-only) keeps an amendment from being achieved by editing history. §25.3 is
+  updated in this commit.
+- **Four engine changes shipped with no version, and two of them change results.** Under 0.6.1:
+  `a603f6c4` ((R,Q) κ no longer mapped) and `e34945f4` (row lead time). Under 0.6.0: `0c7ff8dd`
+  (row `fulfillment_mode`) and `07449896` (a Plant-row demand override no longer read; D286
+  states the consequence for projects that saved one). All four are now amendments, so a user
+  reading "0.6.0 · comparable" also reads what changed under it later.
+- **44 engine-source commits across the backfilled versions are described by no record.** They
+  are counted per version (`unrecorded_changes`) and published as a count, not invented. 0.2.0 (15)
+  and 0.2.3 (14) carry most of them.
+- **No Phase 14 version moved a frozen digest.** Each was neutral by default and changed results
+  only for projects using its new fields. That is why every entry from 0.3.0 says `changed-for`
+  with a named population rather than `identical` or `not-comparable`.
+- **`main`'s committed browser wheels were stale.** `build_engine_wheels.sh --check` fails on the
+  base: `public/engine/` predates `e34945f4`'s `project_map.py` change, so the browser ran a
+  different 0.6.1 build from the worker, with nothing in its label to say so. That is D292's
+  failure, live. Rebuilt here; WP 15.1's fingerprint is what makes the difference visible.
+- **"21 versions" in this session's first count was wrong**: it is 18. The count came from a
+  shallow clone's partial history plus an estimate.
+
+**Gap check.** `scsim` 503 passed (incl. 29 new), `sim-worker` 174 passed, vitest 1715 passed
+(after the base merge), `contract:check` holds (the same 2 warnings as the base), `check:docs`,
+`audit:ui` and typecheck (15 of 15 held) clean, the gate itself passes against the merge base
+("the base predates the change record"). **Not covered**: rule 5 is WP 15.1's; an amendment's
+comparability is prose, so a reader learns THAT a build changed results, not by how much (WP
+15.5's report).
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -23396,7 +23457,7 @@ D-number resolves; R7 this entry; R8 D291–D296 are owned by open packages; R10
 | **12** | **12.1 – 12.7** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2 ✅** the snapshot read API (largest production snapshot 592 KB — one gzipped response, no cap). **12.3 ✅** personal keys (`20261002000001`, `rehearsal/700`). **12.4 ✅** the engine through `GET /v1/engine`, private bucket, content-addressed (D274 recorded). **12.5 ✅** the `suresuite` package (a local run equals the platform's, in a clean venv). **12.6 ✅** notebook 05 — simulate on your own machine (renumbered **03** when the series was trimmed to four, §16 · 2026-10-02). **12.7 ✅** every user may mint a personal, read-only key (`20261002000005`, `rehearsal/730`). **PHASE COMPLETE**; push-back (upload, client-computed runs badged until verified) is the next phase, not started |
 | **13** | **13.1 – 13.5** | **what you see on /policies is what runs: /policies writes overrides and never the item masters, the worker reads the frozen versions, the Validated Model binds both, every cell reaches the engine or says it does not** | — | **13.1 ✅** /policies writes overrides and never the masters (`20261002000008`, `rehearsal/760`; D281 closed — a save replaced a row's whole patch). **13.2 ✅** the worker computes through `run_from_snapshots` from the run's frozen dataset and policy versions; the browser too; D282 closed. **13.3 ✅** a Validated Model binds its evidence run's two versions, a model run replays them, the database refuses a model run on other data (`20261002000009`, `rehearsal/770`). **13.4 ✅** D204 (a)(b) closed (`20261002000010`, `rehearsal/780`), one capacity per row, gate `page-equals-run` (`pageEqualsRun.test.ts`, zero differing cells, mutation-tested). **13.5 ✅** the gate row in CLAUDE.md, the tests wired into `data-contract.yml`, the manual's callout removed, D280 closed. **PHASE COMPLETE.** Nothing reaches production until merge; the after-merge §15 reading is owed (D153)
 | **14** | **14.0 – 14.8** | **demand-driven planning: demand per customer × product row, planned production = min(requirement, capacity) with FG policies, MRP for materials, per-row fulfillment; multi-stage later** | — | **14.0 ✅** the planning baseline pinned, the shared allocation helper (`core/allocation.py`) with P-C.2 delegating, ADR 0002, and frozen golden digests (engine + worker) that make "byte-identical" checkable. Registered 2026-10-02 (§24, D284); prompts in `docs/design/demand-driven-planning-prompts.md`. **14.1 ✅** demand per customer × product row in the engine (engine 0.3.0): row specs and forecasts, a real `normal` clipped at 0 and counted, the plan's projected-demand view, projection-error KPIs. **14.2 ✅** demand per row from the data: per-row specs on `outbound_logistics`, a `demand_forecasts` table spread evenly at promotion, both in the snapshot's simulation scope, the Customer table's demand cells as row overrides, and a pre-run finding per missing parameter. **14.3 ✅** per-row fulfillment (engine 0.4.0): backorder, window, cost and fill rate per customer × product row, one allocation rule per project with per-row priority / price / service target, `revenue_max` real, the customers' contracted floor consumed and uploadable. **14.4 ✅** planned production over a horizon = min(requirement, capacity) with fulfillment's own row step for the carry-forward (engine 0.5.0), base-stock / min-max / days-of-cover FG policies and FG opening stock on `products` (RFC 4 closed), Plant cells as overrides. **14.5 ✅** MRP for materials (engine 0.6.0): `policy_type = "mrp"` orders BOM × planned production over the lead time, net of stock and the pipeline, ≥ MOQ; golden #7 exact; late-receipt and shortage KPIs; the MRP record in inspection runs; ≈ +12–16 % per replication at TRON scale. **14.6 ✅** the CRN-paired MRP-vs-reorder-point study, regenerated and byte-compared in CI (`docs/research/mrp-vs-reorder-point.md`), gate `plan-from-demand` in CLAUDE.md, G20 closed in the blueprint for planning, the manual's "How planning works" page. **PHASE COMPLETE (14.7 excluded by design — multi-stage waits for the owner)**. **14.8 ✅** /policies follow-up: each Plant row's own MTS / MTO is a cell the engine reads and the FG policy shows only behind it, the 13 Plant cells no run read are gone, the Customer card became one project line, P-P.4's buffer has no control (the row's S says how much); demand is authored on the Customer stage only (D286), and its parameters follow the row's distribution (D287) |
-| **15** | **15.0 – 15.7** | **the engine ledger: one build identity, an append-only build ledger, an archive installable by version, one change record with a CI gate, a release quality report, and an "Engine versions & changes" page on /docs** | — | **15.0 ✅** the plan (§25), §4 D291–D296 registered from a verified reading, blueprint gap G21, gate `engine-ledger` named in `CLAUDE.md`. Five owner decisions are open (§25.5). WP 15.4 can start first; it depends on nothing. |
+| **15** | **15.0 – 15.7** | **the engine ledger: one build identity, an append-only build ledger, an archive installable by version, one change record with a CI gate, a release quality report, and an "Engine versions & changes" page on /docs** | — | **15.0 ✅** the plan (§25), §4 D291–D296 registered from a verified reading, blueprint gap G21, gate `engine-ledger` named in `CLAUDE.md`. Five owner decisions are open (§25.5). **15.4 ✅** the change record: `scsim/CHANGELOG.yaml` holds all 18 versions back to 0.1.0, with a gate in `scsim-tests.yml` (rules 1–4 as planned, plus 6 and 7, added because rules 1–4 could not catch the unbumped commit that motivated the phase) and two generated views. It found four unbumped engine changes, now amendments, and 44 engine commits no record describes, published as a count. |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -25931,6 +25992,11 @@ Enforced by:
 4. **Honest comparability.** An entry may claim `comparable: identical` only when no golden moved.
 5. **One identity.** The worker's boot report, the browser manifest and the library wheel name the
    same build for the same commit (WP 15.1).
+6. **Unbumped means amended** *(added by WP 15.4)*. When the engine source changed against the
+   base and `ENGINE_VERSION` did not, the current entry gains an appended amendment saying what
+   changed and its tier. A Tier 3 change cannot be an amendment.
+7. **Append-only** *(added by WP 15.4)*. An entry on the base branch is unchanged here, except for
+   amendments appended to it and a `commit` filled in once where it was null.
 
 The **failure mode is a needless re-run, never a false reuse.** This is WP 10.4's rule, applied
 to the engine.
@@ -26003,7 +26069,7 @@ to the engine.
   wheels whose sha256 matches the ledger, and `run_from_snapshots` reproduces a stored run of that
   version **byte-identically** (KPIs and digest).
 
-### WP 15.4 — The change record, authored once *(D295 · gate `engine-ledger` rules 1–4)*
+### WP 15.4 — The change record, authored once ✅ *(D295 · gate `engine-ledger` rules 1–4, 6, 7 — done, no migration; engine stays 0.6.1)*
 
 - **One source: `scsim/CHANGELOG.yaml`**, one entry per engine version:
   - `version`, `date`, `tier` (1/2/3), `adr` (required for Tier 3)

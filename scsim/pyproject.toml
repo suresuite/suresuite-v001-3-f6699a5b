@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 io = ["pyarrow>=14"]
-dev = ["pytest>=8", "pytest-cov"]
+dev = ["pytest>=8", "pytest-cov", "pyyaml>=6"]
 
 [tool.setuptools.packages.find]
 include = ["scsim*"]

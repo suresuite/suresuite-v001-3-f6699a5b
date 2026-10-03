@@ -21,8 +21,10 @@ nav:
   - Extending: extending.md
   - Performance: performance.md
   - Roadmap: roadmap.md
+  - Engine changelog (generated): changelog.md
   - ADRs:
       - 0001 MTS fulfillment mode: adr/0001-mts-fulfillment-mode.md
+      - 0002 Demand-driven planning: adr/0002-demand-driven-planning.md
   - Reference (generated):
       - Policy catalog: reference/policies.md
       - Variable dictionary: reference/variables.md
