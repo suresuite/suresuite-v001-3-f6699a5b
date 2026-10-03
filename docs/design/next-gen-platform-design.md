@@ -184,7 +184,7 @@ Numbered gaps, each cited to evidence. Later sections reference these IDs; §13'
 Stated here so later sections can either preserve them deliberately or lift them explicitly:
 
 - **Single focal plant, three echelons** (suppliers → plant → customers); `Supplier.tier` and `Lane.plant_id` are reserved extension points; tier-2/3 data can be uploaded but does not propagate into simulation.
-- **Weekly, fluid quantities.** Fixed 1-week time step; continuous quantities, not integer units; FG production completes in the same week (W^FG = 0); review cadences of 1/2/4 weeks. This is a deliberate fidelity boundary, and §5.8 respects it.
+- **Weekly, fluid quantities.** Fixed 1-week time step; continuous quantities, not integer units; W^FG = 0 by default — FG production completes in the week it starts; a per-product production lead time is opt-in (P-P.13, PLAN.md §25 WP 15.4), and a product that sets none completes in the same week exactly as before; review cadences of 1/2/4 weeks. The weekly bucket is a deliberate fidelity boundary, and §5.8 respects it: a production lead time is a whole number of weekly buckets, never a sub-weekly schedule.
 - **MTO is the core; MTS shipped in 0.2.0 (ADR 0001); ATO is a reserved enum that hard-errors; ETO/CTO exist only as UI strategy labels.**
 - **One production stage** (G20, the part B2 has not closed). Since engine 0.6.0 materials can be planned by MRP from the production plan (§13 B2, closed for packages A–E); reorder point remains the default. Multi-level BOMs are still flattened, so sub-assemblies carry no stock, WIP, lead time or capacity — package F (PLAN.md WP 14.7) lifts this, by owner decision.
 - **Demand and transport are data-driven, not policy-driven.** Demand comes from product data / outbound volume; transport lead times from network edges; the corresponding policy families are stored but hidden and unused (G1, G7).
@@ -319,7 +319,7 @@ Covers the brief's supplier list: production, capacity, lead time, order accepta
 | ID | Policy | Domain | Horizon | Status | Variants / algorithms | Required data |
 |---|---|---|---|---|---|---|
 | P-S.5 | `supplier_capacity_model` | capacity | strategic | ✚ | infinite · finite_queue (orders wait) · finite_reject (overflow rejected) — formalizes existing `ST_QUEUE` + capacity-gating mechanics as an explicit slot | `suppliers.capacity_per_week` (required for finite variants) |
-| P-S.6 | `lead_time_model` | lead time | tactical | ✚ | deterministic · stochastic(lognormal/gamma, sampled at ship time — existing engine support) · empirical (deferred until sampling design resolved, currently hard-errors) | `inbound_logistics.lead_time`, `materials.lead_time_dist`, `lead_time_cv` |
+| P-S.6 | `lead_time_model` | lead time | tactical | ✚ (widened by PLAN.md §25 WP 15.1–15.3) | **per supplier × material lane, chosen like demand**: deterministic · normal (mean + CV, truncated at 1 week) · lognormal (mean + CV) · gamma (mean + CV) · triangular (min, mode, max) · uniform (min, max). Variates are pre-drawn per (link, week) from WORLD streams before any policy acts (CRN-safe; lognormal/gamma keep their existing stream, the bounded and normal shapes draw standard uniforms from their own spawn key, keyed per lane). A bounded shape's planning lead time is its mean. empirical stays deferred and hard-errors at compile | `inbound_logistics.lead_time` (the mean) + the lane's own `lead_time_dist` and parameters, else `materials.lead_time_dist`, `lead_time_cv`, else deterministic |
 | P-S.7 | `supplier_allocation` | allocation | operational | ✚ | FCFS · proportional · priority-class — how a capacity-constrained supplier serves competing orders (single-plant v1: binds when multiple materials queue; multi-customer-of-supplier later) | none beyond P-S.5 |
 | P-S.8 | `shipment_discipline` | order management | operational | ✚ | ship_complete · partial_allowed · threshold(fill ≥ x%) — covers partial shipment and supplier-side backorder queueing | none |
 | P-S.1 | `backup_supplier` | supplier selection | operational | ✅ | contingent reroute on visible disruption; selection rule min_cost / min_leadtime / reliability; cooldown | backup source links + `unit_price`, `reliability_score` |
@@ -343,6 +343,7 @@ Covers: demand management, production, fulfillment, FG inventory, MPS, MRP, disp
 | P-P.6 | `standing_capacity_reserve` | capacity | strategic | 🧩 | pre-paid capacity buffer | reserve size, cost |
 | P-P.9 | `material_allocation` | allocation | operational | ✅ (unreachable today — G3) | rolling-horizon LP (HiGHS) · greedy; objectives max_revenue / max_fill_rate / priority_weighted / fg_replenish | product priorities/prices |
 | P-P.11 | `dispatching_rule` | order management | operational | ✚ | FIFO · EDD · priority_class · smallest-remaining — MTO backlog sequencing at weekly-bucket fidelity | order due dates / priority tiers |
+| P-P.13 | `production_lead_time` | production | operational | ✚ (PLAN.md §25 WP 15.4–15.5) | **a product parameter read by the PH-50 mechanic, not a plugin**: output started in week t completes in week t + L, L ≥ 0 whole weeks per product, with the same distribution choice as P-S.6 (deterministic default). Materials are consumed at start; MTS completions replenish FG stock, MTO completions ship against the backlog; work in progress is traced. Planned production is offset by the EXPECTED L only (gate `plan-from-demand`). L = 0 (the default) is today's same-week completion, byte-identical | `products.production_lead_time` + its distribution and parameters (a /policies Plant-row override, Production group) |
 | — | procurement timing & quantity | — | — | covered | procurement timing/quantity/prioritization are the PH-80 outputs of P-P.1 (reorder-point types, or the lead-time-offset planned releases of its `mrp` type, G20; +P-P.2 lots, +P-S.2 splits, +P-S.1 reroutes) — not separate policies | — |
 
 > **Retired: P-P.12 `fulfillment_discipline` (plant-side).** An earlier draft placed a plant "fulfillment discipline" slot here (ship-complete vs. partial, backorder release ordering, order splitting). Those responsibilities already live at the **customer** stage inside P-C.1 `unmet_demand_handling` at PH-60 (partial/backorder rule + FIFO release order) and P-C.2 `customer_allocation` — a second PH-60 writer of the same fulfillment/backlog state would only duplicate them. Fulfillment stays customer-side (§4.3, §5.4); no plant fulfillment policy is defined, and the UI collects fulfillment on the Customer stage only — per customer × product row, with the allocation rule and the backorder an empty row inherits as one project line (PLAN.md §24 WP 14.3, 14.8) — never per plant node. Whether a product holds FG stock at all (MTS / MTO) is the Plant row's own switch, and the FG policy appears only behind it.
@@ -388,7 +389,7 @@ Demand-side behavior, promoted from engine mechanics and data fields into config
 
 ### 5.6 Catalog summary
 
-v1 active surface: **26 policies** (9 implemented, 6 planned-activated, 11 new — of which 4 are promotions of existing mechanics, so genuinely new engine behavior is limited). Appendix A lists all entries including deferred ones with full metadata. *G20 (2026-10-02) adds no ID: it adds the P-P.1 `mrp` type, extends P-P.0 over a horizon, delivers P-C.4 per customer row, and makes P-C.1/P-C.2 work per row.*
+v1 active surface: **26 policies** (9 implemented, 6 planned-activated, 11 new — of which 4 are promotions of existing mechanics, so genuinely new engine behavior is limited). Appendix A lists all entries including deferred ones with full metadata. *G20 (2026-10-02) adds no ID: it adds the P-P.1 `mrp` type, extends P-P.0 over a horizon, delivers P-C.4 per customer row, and makes P-C.1/P-C.2 work per row. PLAN.md §25 (Phase 15, 2026-10-03) adds one ID, P-P.13 `production_lead_time` — a mechanic parameter, not a plugin, so the plugin count is unchanged — and widens P-S.6 to per-lane distributions.*
 
 ### 5.7 Parameters mean data (forward reference)
 
@@ -501,7 +502,7 @@ The design brief names nine interactions. Each is already — or becomes, with t
 | 2 | Forecasting → Production | `forecast` (PH-10) → PH-40 `production_plan` (MTS replenish-to-target planning reads the forecast; ADR 0001) |
 | 3 | Inventory → Procurement | `inventory_levels` (PH-70, P-P.1/P-P.3) → `purchase_orders` (PH-80 order release, Eqs. 4–6) |
 | 4 | Procurement → Production | `purchase_orders` → `state.pipeline`/`state.queue` (PH-80/90) → `arrivals` → `state.on_hand` → next week's PH-50 material feasibility (`greedy_feasible`, Eq. 8) |
-| 5 | Production → Transportation | `production_output` (PH-50) → PH-90 logistics (v1: FG completes same week; outbound lanes make this edge physical when P-T.1 lands) |
+| 5 | Production → Transportation | `production_output` (PH-50) → PH-90 logistics (FG completes in the week it starts unless the product sets a production lead time, P-P.13; outbound lanes make this edge physical when P-T.1 lands) |
 | 6 | Transportation → Customer service | `arrivals` (PH-90) → `state.on_hand` / `state.fg_on_hand` → PH-30/PH-60 `fulfillment` → fill-rate and backlog KPIs |
 | 7 | Capacity → Lead time | finite supplier capacity (P-S.5) gates the ship queue (PH-90): congestion in `state.queue` *is* endogenous lead-time extension — the emergent interaction, not a parameter |
 | 8 | Allocation → Service level | P-P.9 (PH-40) and P-C.2 (PH-60) reshape `fulfillment` → per-customer/per-product service KPIs (PH-99) |
@@ -1362,7 +1363,7 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-S.3 | capacity_reservation | supplier | capacity | strategic | 🧩 M8 | reserved capacity at premium |
 | P-S.4 | early_warning_failover | supplier | supplier selection | operational | ✅ | PH-20 detection resident; compresses detection lag, standing monitoring cost |
 | P-S.5 | supplier_capacity_model | supplier | capacity | strategic | ✚ | infinite / finite_queue / finite_reject; formalizes `ST_QUEUE` mechanics |
-| P-S.6 | lead_time_model | supplier | lead time | tactical | ✚ | deterministic / stochastic dists; empirical deferred |
+| P-S.6 | lead_time_model | supplier | lead time | tactical | ✚ | per lane: deterministic / normal / lognormal / gamma / triangular / uniform, chosen like demand (§25 WP 15.1–15.3); empirical deferred |
 | P-S.7 | supplier_allocation | supplier | allocation | operational | ✚ | FCFS / proportional / priority |
 | P-S.8 | shipment_discipline | supplier | order management | operational | ✚ | complete / partial / threshold |
 | P-F.0 | builtin_forecast | plant | forecasting | tactical | ✚ (promoted PH-10 mechanic) | named default of the forecasting slot |
@@ -1379,6 +1380,7 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-P.9 | material_allocation | plant | allocation | operational | ✅ | PH-40; rolling LP (HiGHS) / greedy — wire to UI (G3) |
 | P-P.10 | repurposing | plant | production planning | operational | 🧩 M8 | |
 | P-P.11 | dispatching_rule | plant | order management | operational | ✚ | FIFO / EDD / priority (weekly buckets) |
+| P-P.13 | production_lead_time | plant | production | operational | ✚ | PH-50 parameter, not a plugin: per-product production lead time L (default 0 = same-week), deterministic or the P-S.6 shapes; WIP traced; plan offset by E[L] (§25 WP 15.4–15.5) |
 | P-T.1 | multimodal_lane_portfolio | transport | transport | strategic | 🧩 M7 | prerequisite: lanes first-class (§8.3) |
 | P-T.2 | expedited_shipments | transport | transport | operational | ✅ | PH-90; premium pull-forward |
 | P-T.3 | mode_shift | transport | transport | operational | 🧩 M7 | needs P-T.1 |

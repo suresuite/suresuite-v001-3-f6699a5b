@@ -45,6 +45,7 @@ duplicated facts stated here, which is the defect this plan exists to end.)*
 | 22 | Phase 12 — The library |
 | 23 | Phase 13 — What you see on /policies is what runs |
 | 24 | Phase 14 — Demand-driven planning: customer demand → planned production → MRP → per-row fulfillment |
+| 25 | Phase 15 — Stochastic lead times, production lead time, FG inventory |
 
 ---
 
@@ -479,6 +480,10 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D288** | **The replenishment cells on /policies were not what the run used.** A Supplier-row s or S was meant to be the material's level, and P-P.3 added its safety stock ON TOP of it at PH-70, so a typed s = 400 ran as 400 + SS — while the greyed placeholder for an EMPTY level showed the bare formula without the safety stock the run adds. A formula s above a typed S raised S to it. The periodic type's T (`review_period_days`) was read by no scsim mapping: every periodic material was reviewed every 4 weeks whatever the row said. An (R,Q) row with a lot still sized its S — and so its opening stock — from κ, so the grid showed κ on rows where it should not matter; a value stored under an earlier type (an S left on a row switched to (R,Q), an s on a base-stock row) reached the engine although the page no longer showed it; Eq. 21 read the project κ, not the row's; a project Q was ignored unless the project's own type was (R,Q); and an MRP row rendered dead s / S / κ inputs. Found by the owner from the Replenishment column ("what is κ?") | `scsim/scsim/policies/strategic/p_p3_safety_stock.py` (`on_phase`, Eq. 21), `scsim/scsim/policies/builtin/p_p1_inventory_control.py` (`_set_levels`, `_release`), `scsim/scsim/io/project_map.py` (the inventory branch of `_map_policies`), `src/components/policies/policyGridUi.tsx` (`ReplenishmentCell`), all before this fix | **✅ CLOSED (2026-10-03, engine 0.6.1)** — a stated level is the level (no buffer added, never raised); T reaches `periodic_review_weeks` per material and at the project default; (R,Q) with a lot has S = R + Q; a row applies only the parameters its type shows (warned); κ is shown only where the run reads it (`kappaIsRead`) — never on (R,Q), whose Q is required (`rowNeedsLot` flags a row without one); the level placeholders include the days-based safety stock. `scsim/tests/test_stated_levels.py` (13, twelve of which fail on 0.6.0), `kappaIsRead.test.ts` |
 | **D289** | **A policy version's Export was neither readable nor the engine's input.** The version-history Export wrote the stored bundle one column per family key, every value row followed by a "provenance" row, JSON in cells — and it re-parsed the stored families through the page's Zod schemas, so a key the version did not store was written as the page's default rather than as stored. More important, a run reads the policy version TOGETHER WITH a dataset version through the mapper (`run_from_snapshots`, §23 WP 13.2), and the file carried neither the dataset nor the mapping: a cost, MOQ, capacity or demand in it was the policy override, never the number the run used when the override was empty, and nothing in the file tied its content to the `policy_hash` it printed. Reported by the owner ("super hard to read … not 100% the single source of truth for the data and the hash") | `src/hooks/usePolicies.tsx` (`exportVersion`, before this fix); `src/lib/policies/verifiableExports.ts` (`buildPolicyVersionWorkbook`, removed) | **✅ CLOSED (2026-10-03, no migration, engine unchanged)** — the Export is now the engine's own input: `sim_worker.local.engine_input_from_snapshots` runs the same two calls a run makes (`project_data_from_snapshots` → `from_project_data`) and stops before simulating, in the browser engine (`_inputs` in `engine.worker.ts`), on the version and the dataset version its latest run read (else the project's data as a run would freeze it now — the file says which). `engineInputWorkbook.ts` lays it out as Read me (both versions, both hashes, the hash RE-CHECKED from `snapshot::text` in the browser), one sheet per network list with units in the header and a source column beside every value the mapper resolved, Policies (every parameter, "this version" vs "engine default"), Settings, Disruptions, Where values came from, Mapping notes, Field guide, Policy as saved and Policy JSON (hashed). `sim-worker/tests/test_engine_input.py` captures the `Scenario` a real run hands `run_scenario` and requires the export's to equal it, worker and browser driver both (mutation-tested: dropping the overrides turns it red); `engineInputWorkbook.test.ts` requires every field of every row, every policy parameter and every setting to be in the file unchanged |
 | **D290** | **A Supplier row's lead time could not be changed on /policies.** The lane lead time — the T_s of every s / S the Replenishment column shows — was a READ-ONLY cell: the only way to plan with a different lead time was to edit `inbound_logistics.lead_time` in the inbound file and upload it again. It was read-only for a sound reason (an editable copy with no engine reader is a second author, the trap `material_price` documents), but the reader was missing, not the need. The cell also showed a blank lane as an AVERAGE of other lanes while the run used 2 weeks, and converted weeks to days without `lead_time_unit` (D189 (a)(b)). Reported by the owner from the Supplier grid: "the input data from the project could serve as the initial suggestion, but the user could edit" | `src/lib/policies/columnSpecs.ts` (`col("lead_time_days", …, { readOnly: true })`), `src/hooks/useStageRows.tsx` (the lane enrichment and its imputation), `scsim/scsim/io/project_map.py` (the arc loop, upload or 2 weeks only), all before this fix | **✅ CLOSED (2026-10-03, no migration, engine stays 0.6.1)** — `lead_time_weeks` joins `POLICY_BUNDLE_KEYS` (scope `supplier`, master `inbound_logistics.lead_time`, domain `positive`, empty default 2): the arc loop reads the Supplier row `node:<supplier>::<material>` first, for THAT link only, rounded and clamped as the upload is. The grid cell is master-backed on the lane (`supplierLaneMasters`, the engine's own link build), so it suggests the upload, saves an override, and resets to it; a typed value is rounded at entry (`ColSpec.round`). `test_project_map.py` (six), `laneLeadTimeOverride.test.ts`, and `page-equals-run` over a fixture lane with an override and one with no lead time |
+| **D291** | **A lead time's spread is per MATERIAL, offers two shapes, and no surface reaches it.** The engine's spread lives on `SupplierLink.lead_time_dist` / `lead_time_cv`, but the mapper fills both from the `materials` master only, so every supplier of one material shares one distribution; only CV-parameterised lognormal and gamma are drawn (no normal, triangular or uniform), `inbound_logistics` has no column for a lane's own spread, and /policies has no cell for it — a planner who knows one supplier is erratic and another is not cannot say so anywhere. The blueprint's P-S.6 row also still said draws are "sampled at ship time", stale since audit F-24 moved them to a pre-draw. Reported by the owner ("supplier lead time can be stochastic, configured like demand") | `scsim/scsim/io/project_map.py` (the arc loop: `lead_time_dist=…mrow.lead_time_dist`, `lead_time_cv=…mrow.lead_time_cv`); `scsim/scsim/entities/enums.py` (`LeadTimeDist`); `scsim/scsim/core/context.py` (the F-24 pre-draw); `supabase/contract/inbound_logistics.contract.yaml` (no spread field) | **OPEN** — §25 WP 15.1 (engine shapes), WP 15.2 (per-lane data + mapper), WP 15.3 (/policies cells) |
+| **D292** | **Production has no lead time: what the plant starts in a week is finished stock that same week.** `_mech_production_execute` adds MTS output to `fg_on_hand` in the week it is built and P-C.1 ships MTO output against demand in the same week (`W^FG = 0`), which the blueprint recorded as a deliberate fidelity boundary. A product that takes two weeks to make cannot be modelled: its finished stock, its service and the timing of its material requirements are all two weeks optimistic, and nothing on the page says so. Reported by the owner (production lead time per product, Production group) | `scsim/scsim/core/engine.py` (`_mech_production_execute`, "same-week completion, W^FG = 0 in v1"); `scsim/scsim/policies/builtin/p_c1_unmet_demand.py` (`Q = ctx.production_output`); blueprint §2.4 | **OPEN** — §25 WP 15.4 (engine, P-P.13), WP 15.5 (data + Plant cells) |
+| **D293** | **The Plant stage's finished-goods band reads differently from the Supplier stage's inventory band for the same idea.** The band and its switch are labelled "FG stock", and the FG policy's levels are separate columns (`fg_reorder_point`, `fg_base_stock`, `fg_cover_days`), where the Supplier stage puts the policy type first and every level the type reads into one "Replenishment parameters" cell. Two layouts for one concept, side by side on one page. Reported by the owner | `src/lib/policies/columnSpecs.ts` (`FG_BAND`, the `fulfillment_mode` label, the three FG level columns); `src/components/policies/StagePolicyTable.tsx` (the MTO empty state) | **OPEN** — §25 WP 15.6 |
+| **D294** | **A material's lead-time CV above 1 fails the whole run.** The `materials` sidecar accepts any `lead_time_cv` ≥ 0 at ingestion and in the Item Master editor, while `SupplierLink.lead_time_cv` is bounded `le=1.0`; the mapper passes the master value straight through, so one CV of 1.5 raises a validation error while the network is built — the run fails instead of warning. LATENT: found by reading (§25.1), no §15 measurement of a CV above 1 yet | `supabase/contract/materials.contract.yaml` (`lead_time_cv.ingest.rule`: `min: 0`, no max); `scsim/scsim/entities/network.py` (`lead_time_cv … le=1.0`); `scsim/scsim/io/project_map.py` (the arc loop) | **OPEN** — §25 WP 15.2 |
 
 ### 4.1 Code map — the data layer
 
@@ -23334,6 +23339,34 @@ saved) still breaks an exact cost tie on the UPLOADED lead time — `useStageRow
 overrides — so on that tie an override can make the suggestion and the run differ; a saved
 primary is unaffected. Open, unchanged: D189's price imputation and its (c).
 
+### WP 15.0 — Phase 15 planned: stochastic lead times, production lead time, FG inventory · 2026-10-03 · docs only
+
+**What the previous package promised.** D290 made the Supplier row's lead time an override of its
+lane, in weeks, and left the spread where it was: `materials.lead_time_dist` / `lead_time_cv`,
+per material, two shapes, no cell. Phase 14 left production completing in the week it starts
+(blueprint §2.4's "deliberate fidelity boundary") and the FG band labelled "FG stock".
+
+**What this package found.** The owner's brief for Phase 15 was written against a base one package
+older than this branch, and two of its "already verified" leads were wrong on arrival: the lane
+carries no spread columns (the brief said `inbound_logistics` did), and the lead time is no longer
+read-only (D290). Reading the engine for the brief's claims found one defect the brief did not
+name — **D294**: a material CV above 1 passes ingestion and fails the run at `SupplierLink`
+validation (reproduced: `ValidationError … less than or equal to 1`). The blueprint's P-S.6 row
+described sampling "at ship time", stale since F-24; its "empirical hard-errors" is true (a
+`CompileError`). The engine reads no per-product FG safety stock or holding cost, so the brief's
+conditional "add them only if the engine reads them" resolves to: do not.
+
+**What it did.** §25 (seven packages, the rules they are held to, and the reading behind them),
+§4 D291–D294, the §17 row, the contents row; blueprint P-S.6 widened, P-P.13 added (a PH-50
+parameter, not a plugin — the catalog's plugin count is unchanged), §2.4 and §7.2 row 5 amended.
+Two design decisions are recorded as rules rather than left to the packages: a bounded lead-time
+shape's planning lead time is its MEAN (§25.2 rule 3 — otherwise the plan and the draws describe
+two different lanes), and work in progress carries no holding cost in v1 (rule 8 — the page shows
+no WIP rate, so the engine charges none).
+
+**Gap check.** No later package changed: WP 15.2's rehearsal is `820`, 15.5's `830`, the next free
+numbers. Engine versions: 0.7.0 (15.1), 0.8.0 (15.4). `contract:check`, `check:docs` green.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -23353,6 +23386,7 @@ primary is unaffected. Open, unchanged: D189's price imputation and its (c).
 | **12** | **12.1 – 12.7** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2 ✅** the snapshot read API (largest production snapshot 592 KB — one gzipped response, no cap). **12.3 ✅** personal keys (`20261002000001`, `rehearsal/700`). **12.4 ✅** the engine through `GET /v1/engine`, private bucket, content-addressed (D274 recorded). **12.5 ✅** the `suresuite` package (a local run equals the platform's, in a clean venv). **12.6 ✅** notebook 05 — simulate on your own machine (renumbered **03** when the series was trimmed to four, §16 · 2026-10-02). **12.7 ✅** every user may mint a personal, read-only key (`20261002000005`, `rehearsal/730`). **PHASE COMPLETE**; push-back (upload, client-computed runs badged until verified) is the next phase, not started |
 | **13** | **13.1 – 13.5** | **what you see on /policies is what runs: /policies writes overrides and never the item masters, the worker reads the frozen versions, the Validated Model binds both, every cell reaches the engine or says it does not** | — | **13.1 ✅** /policies writes overrides and never the masters (`20261002000008`, `rehearsal/760`; D281 closed — a save replaced a row's whole patch). **13.2 ✅** the worker computes through `run_from_snapshots` from the run's frozen dataset and policy versions; the browser too; D282 closed. **13.3 ✅** a Validated Model binds its evidence run's two versions, a model run replays them, the database refuses a model run on other data (`20261002000009`, `rehearsal/770`). **13.4 ✅** D204 (a)(b) closed (`20261002000010`, `rehearsal/780`), one capacity per row, gate `page-equals-run` (`pageEqualsRun.test.ts`, zero differing cells, mutation-tested). **13.5 ✅** the gate row in CLAUDE.md, the tests wired into `data-contract.yml`, the manual's callout removed, D280 closed. **PHASE COMPLETE.** Nothing reaches production until merge; the after-merge §15 reading is owed (D153)
 | **14** | **14.0 – 14.8** | **demand-driven planning: demand per customer × product row, planned production = min(requirement, capacity) with FG policies, MRP for materials, per-row fulfillment; multi-stage later** | — | **14.0 ✅** the planning baseline pinned, the shared allocation helper (`core/allocation.py`) with P-C.2 delegating, ADR 0002, and frozen golden digests (engine + worker) that make "byte-identical" checkable. Registered 2026-10-02 (§24, D284); prompts in `docs/design/demand-driven-planning-prompts.md`. **14.1 ✅** demand per customer × product row in the engine (engine 0.3.0): row specs and forecasts, a real `normal` clipped at 0 and counted, the plan's projected-demand view, projection-error KPIs. **14.2 ✅** demand per row from the data: per-row specs on `outbound_logistics`, a `demand_forecasts` table spread evenly at promotion, both in the snapshot's simulation scope, the Customer table's demand cells as row overrides, and a pre-run finding per missing parameter. **14.3 ✅** per-row fulfillment (engine 0.4.0): backorder, window, cost and fill rate per customer × product row, one allocation rule per project with per-row priority / price / service target, `revenue_max` real, the customers' contracted floor consumed and uploadable. **14.4 ✅** planned production over a horizon = min(requirement, capacity) with fulfillment's own row step for the carry-forward (engine 0.5.0), base-stock / min-max / days-of-cover FG policies and FG opening stock on `products` (RFC 4 closed), Plant cells as overrides. **14.5 ✅** MRP for materials (engine 0.6.0): `policy_type = "mrp"` orders BOM × planned production over the lead time, net of stock and the pipeline, ≥ MOQ; golden #7 exact; late-receipt and shortage KPIs; the MRP record in inspection runs; ≈ +12–16 % per replication at TRON scale. **14.6 ✅** the CRN-paired MRP-vs-reorder-point study, regenerated and byte-compared in CI (`docs/research/mrp-vs-reorder-point.md`), gate `plan-from-demand` in CLAUDE.md, G20 closed in the blueprint for planning, the manual's "How planning works" page. **PHASE COMPLETE (14.7 excluded by design — multi-stage waits for the owner)**. **14.8 ✅** /policies follow-up: each Plant row's own MTS / MTO is a cell the engine reads and the FG policy shows only behind it, the 13 Plant cells no run read are gone, the Customer card became one project line, P-P.4's buffer has no control (the row's S says how much); demand is authored on the Customer stage only (D286), and its parameters follow the row's distribution (D287) |
+| **15** | **15.0 – 15.6** | **stochastic lead times configured like demand (per supplier × material lane), a production lead time per product (P-P.13), and the FG inventory band laid out like the Supplier inventory band** | — | **15.0 ✅** the plan (§25), §4 D291–D294 registered from a verified reading (the brief's "`inbound_logistics` carries the spread" and "lead time is read-only" were both wrong by the time it ran — D290 had made the lead time an override), blueprint P-S.6 widened, P-P.13 added, §2.4's W^FG boundary made opt-in. **15.1** engine shapes · **15.2** per-lane data + mapper · **15.3** Supplier cells · **15.4** engine production lead time · **15.5** product data + Plant cells · **15.6** FG inventory layout |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -25822,3 +25856,182 @@ frozen digests are unchanged.
 **Follow-up (§4 D288, engine 0.6.1).** The Supplier stage's Replenishment column: a typed s / S
 is the level the run uses (no safety stock on top), T reaches the engine, (R,Q) with a lot has
 S = R + Q, a row applies only what its type shows, and κ is shown only where the run reads it.
+
+## 25. Phase 15 — Stochastic lead times, production lead time, FG inventory
+
+**The ask (product owner, 2026-10-03).** Three things, from /policies:
+1. **Supplier lead time can be stochastic, configured like demand** — per supplier × material
+   row, a distribution and only the parameters it needs, the way the Customer stage does demand.
+2. **A production lead time per product** at the focal plant, in the Plant stage's Production
+   group: a mean plus the same distribution choice.
+3. **"FG stock" becomes "FG inventory"**, laid out like the Supplier stage's inventory band
+   (policy type → one "Replenishment parameters" cell → the remaining cells).
+
+Defects §4 **D291**–**D294**; blueprint **P-S.6** (widened) and **P-P.13** (new), §2.4's fidelity
+boundary amended to "W^FG = 0 by default; a per-product production lead time is opt-in"; gaps
+**G1** (a stored spread no surface reaches) and **G20** (one production stage, completing in the
+week it starts).
+
+### 25.1 What was verified before planning (and what the brief got wrong)
+
+Read against the code on 2026-10-03, base `32aa35b`:
+- **The engine's spread is narrow, and it is per MATERIAL.** `SupplierLink` carries
+  `lead_time_dist` (deterministic · lognormal · gamma · empirical) and `lead_time_cv`; the mapper
+  fills both from the `materials` master only, so two suppliers of one material share one
+  distribution. Variates are pre-drawn per (link, week) from the WORLD `leadtime` stream (audit
+  F-24) for lognormal/gamma only; `empirical` raises a `CompileError` (the blueprint row's
+  "hard-errors" is right; its "sampled at ship time" was stale since F-24 — corrected).
+- **`inbound_logistics` carries NO spread columns** — the brief said it did. The lane has
+  `lead_time` + `lead_time_unit` only. WP 15.2 adds them.
+- **The Supplier row's lead time is already an editable override (§4 D290, after the brief was
+  written)**: `lead_time_weeks`, in WEEKS, master-backed on `inbound_logistics.lead_time`. So
+  the new parameter cells are in weeks beside it, not in days, and the brief's
+  "`lead_time_days` stays" reads as "`lead_time_weeks` stays".
+- **A materials `lead_time_cv` above 1 fails the whole run** (§4 D294): ingestion accepts any
+  CV ≥ 0, `SupplierLink.lead_time_cv` is bounded `le=1.0`, and the mapper passes the value
+  through — a validation error at mapping, not a warning.
+- **No production lead time exists**: `_mech_production_execute` adds MTS output to FG stock in
+  the week it is built and P-C.1 ships MTO output the same week (D292).
+- **The engine reads no per-product FG safety stock or holding cost** — so WP 15.6 adds neither
+  cell (a cell no run reads is a `page-equals-run` breach, D204).
+- Engine **0.6.1** (D288), latest migration `20261003000002`, latest rehearsal `810`, latest
+  D-number D290 — the brief's "0.6.0" and "D289" were one package behind.
+
+### 25.2 The rules each package is held to
+
+| # | Rule |
+|---|---|
+| 1 | **Byte-identity for a project that sets nothing.** Golden digests (`scsim/tests/data/golden_digests.json`, `sim-worker/tests/data/golden_runs.json`) do not move unless a change is declared. The existing lognormal/gamma draws stay bit-identical: they keep their stream and its consumption order. |
+| 2 | **CRN.** Every new variate is pre-drawn before any policy acts, from a NEW world spawn key, keyed per lane (or per product) by a stable digest of its id — never by its position in a sorted list, which a chosen primary can reorder. Two policies on one seed see identical lead-time draws. |
+| 3 | **One planning lead time per link.** Deterministic, normal, lognormal, gamma: the link's lead time (the Lead time cell) IS the mean. Triangular and uniform: the distribution is its bounds, and the planning lead time is the bounds' MEAN, (min + mode + max)/3 or (min + max)/2, rounded like an uploaded lead time; the Lead time cell then shows that derived value and says so. A shipment whose lead time a policy changed (expediting, `po_lt_override`) scales the draw by its own mean over the link's. |
+| 4 | **Bounded by the ring.** A draw longer than the in-transit ring is truncated and counted (F-36's rule, `lead_time_truncations`); normal draws below 1 week are raised to 1 and counted. |
+| 5 | **Resolution order, recorded.** Lane spread: the Supplier row → `inbound_logistics` → the `materials` master (dist + CV only) → deterministic. Production lead time: the Plant row → `products` → 0. Every source lands in `MappingResult.resolved` for `page-equals-run`. |
+| 6 | **Units.** A lane's bounds share the lane's `lead_time_unit` (blank = weeks) and normalize to weeks at promotion; a product's production lead time is uploaded in days and normalizes to weeks at promotion (`normalize-at-promotion`). The grid shows weeks, as D290's lead time cell does. |
+| 7 | **`plan-from-demand` holds with a production lead time.** Planned production is offset by the EXPECTED production lead time only; gross requirements and MRP orders follow the offset plan. No plan value reads a realized lead-time draw. |
+| 8 | **No hidden cost.** Work in progress is traced in units and value and carries NO holding cost in v1 — the page shows no WIP holding rate, so the engine charges none. |
+| 9 | **/policies writes overrides, never masters** (§23 WP 13.1): every new cell saves on its row. |
+
+### WP 15.0 — The plan ✅ *(docs only — done)*
+
+This section, §4 D291–D294, the §17 row, and the blueprint (P-S.6 widened, P-P.13 added to §5.2
+and Appendix A, §2.4's W^FG boundary and §7.2's interaction row amended, §5.6's note).
+
+### WP 15.1 — Engine: supplier lead-time distributions like demand *(D291 · P-S.6 · gates `single-source`, A7 — engine 0.7.0)*
+
+**Preconditions.** Engine 0.6.1; `SupplierLink.lead_time_dist` / `lead_time_cv`; F-24's
+pre-draw in `SimContext.__init__`; F-36's ring bound in `_mech_ship_queue`; golden digests green.
+
+- `LeadTimeDist` gains **normal**, **triangular**, **uniform** (deterministic · lognormal · gamma
+  kept; empirical kept and still a `CompileError`).
+- `SupplierLink` gains `lead_time_min_weeks`, `lead_time_mode_weeks`, `lead_time_max_weeks`
+  (optional floats), validated: triangular needs min ≤ mode ≤ max, uniform min ≤ max, both
+  min ≥ 0 and max ≤ 51, and the link's `lead_time_weeks` must lie in [min, max] (rule 3 — the
+  mapper derives it). Normal reads `lead_time_cv`.
+- **Draws.** A new world spawn key (`seeds.py`), one child stream per lane keyed by a stable
+  digest of `supplier::material` (rule 2), pre-draws standard uniforms per (link, week) — only for
+  links with a new shape. Inverse CDF at use: normal `mean·(1 + cv·Φ⁻¹(u))` raised to 1 and
+  counted; triangular and uniform by their closed-form inverse, scaled by the shipment's mean
+  over the link's (rule 3). Lognormal/gamma untouched (rule 1).
+- Ring bound and truncation count as F-36; a new `lead_time_floor_raises` count for normal.
+- Registry export, engine docs (`gen_docs.py`), the frontend registry snapshot and the browser
+  wheels regenerated; `ENGINE_VERSION` 0.7.0 (new world stream — a declared contract change).
+
+**Exit.** Golden digests unchanged; per-shape sample mean/variance within tolerance; CRN: two
+policy sets on one seed see identical lead-time draws, and a re-ordered primary does not change
+a lane's draws; triangular with min = mode = max equals deterministic, run for run; lognormal and
+gamma draws bit-identical to 0.6.1 (`test_lt_crn.py`).
+
+### WP 15.2 — Data + mapper: per-row lead-time distribution *(D291, D294 · gates `normalize-at-promotion`, `natural-key`, `single-source`, `declared-fallback` — migration)*
+
+**Preconditions.** WP 15.1 merged on this branch; `inbound_logistics` natural key
+`(project_id, plant_name, supplier_id, material_id)`; `ingest_normalize_at_promotion()` and
+`ingestSpecParity.test.ts` as WP 14.2 left them.
+
+- **Migration** on `inbound_logistics`: `lead_time_dist` (CHECK: deterministic · normal ·
+  lognormal · gamma · triangular · uniform), `lead_time_cv` (CHECK 0–1), `lead_time_min`,
+  `lead_time_mode`, `lead_time_max` (≥ 0, in `lead_time_unit`, CHECK min ≤ mode ≤ max where
+  set), each bound normalized to weeks at promotion like `lead_time` (rule 6).
+- **Sidecar** (`unit_column`, `normalize_at_promotion`, `engine`, `substitutions`, `ingest`),
+  `contract:generate`, the ingestion spec and template; the columns join
+  `_build_dataset_snapshot_v2` with `jsonb_strip_nulls`, so a project that sets none hashes as
+  before (`graphHashCoverage.test.ts`, `simulationScopeParity.test.ts`); `datamap.py`'s
+  projection names them.
+- **Mapper.** Rule 5's order, source recorded per lane; a warning (like `demand_distribution`)
+  on an unknown shape or a missing parameter, and the lane runs deterministic. **D294**: a CV
+  above the engine's bound is clamped to 1 with a warning and a declared substitution, not a
+  failed run. Bundle keys `lead_time_distribution`, `lead_time_cv`, `lead_time_min_weeks`,
+  `lead_time_mode_weeks`, `lead_time_max_weeks` — scope `supplier`, family `sourcing`, master
+  on the new lane columns.
+- **Rehearsal** `820`: upload in days → promoted in weeks; a bad ordering refused; idempotent
+  re-promotion; a project that sets none hashes unchanged.
+
+**Exit.** `contract:check`; `contract:rehearse` all three ways; `test_declared_scopes_are_the_
+scopes_the_mapper_reads` probes every new key; mapper tests for the order and both warnings.
+
+### WP 15.3 — /policies Supplier stage: the distribution columns *(D291 · §8.3 · gate `page-equals-run` — no migration)*
+
+**Preconditions.** WP 15.2's keys in `POLICY_BUNDLE_KEYS` and the registry snapshot.
+
+- Beside `lead_time_weeks`: `lead_time_distribution` (select; empty = "material's"), then the
+  parameter cells gated by ONE helper `leadTimeParamFor(...)` mirroring `demandParamFor` — CV
+  for normal / lognormal / gamma, min + max for uniform, min + mode + max for triangular.
+  Master-backed over `inbound_logistics` with `idFrom: "supplier_id::material_id"`; saves are
+  row overrides. On a bounded row the Lead time cell is the derived mean, read-only, and says so.
+- Legend: project data, override, edited, derived fallback, as every master-backed cell.
+- `scripts/example_project/page_equals_run.json` gains a stochastic lane (triangular) and a
+  CV lane; `pageEqualsRun.test.ts` and `test_page_equals_run.py` compare value AND source.
+  Mutation-tested: breaking the mapper's order turns it red.
+
+**Exit.** `page-equals-run` zero differences; `policiesNeverWriteMasters.test.ts` green.
+
+### WP 15.4 — Engine: production lead time per product *(D292 · P-P.13 · gates `plan-from-demand`, A15 — engine 0.8.0)*
+
+**Preconditions.** WP 15.1 (the distribution machinery is reused, one implementation); the
+planning core as §24 left it (`core/planning.plan_ahead`, `ctx.planned_production`).
+
+- `Product.production_lead_time_weeks` (int, default **0 = byte-identical**) + the WP 15.1
+  distribution fields, drawn from a SEPARATE new world spawn key, pre-drawn per (product, week).
+- `_mech_production_execute`: output STARTED in week t completes in t + L (a per-product
+  production pipeline ring, bounded and counted like F-36). Materials consumed at start; MTS
+  completions replenish `fg_on_hand`; MTO completions are what fulfillment ships against the
+  backlog. WIP traced in units and value (rule 8: no holding cost).
+- **`plan-from-demand`** (rule 7): the requirement for a start in week t is the projected
+  requirement at t + E[L], net of the WIP that completes by then; gross requirements and MRP
+  follow. `test_production_lead_time_never_reads_future_draws` beside the four honesty tests;
+  a worked example (L = 2, deterministic demand → starts two weeks earlier, FG on time).
+- Registry export, docs, snapshot, wheels; `ENGINE_VERSION` 0.8.0 (a new state key — ADR line).
+  `docs/research/mrp-vs-reorder-point.md` regenerated only if `--check` requires it.
+
+**Exit.** Golden digests unchanged for projects that set nothing; the worked example exact;
+conservation (started = completed + WIP) per product per week.
+
+### WP 15.5 — Data + /policies Plant stage: production lead time *(D292 · gates `normalize-at-promotion`, `page-equals-run` — migration)*
+
+**Preconditions.** WP 15.4; WP 15.3's `leadTimeParamFor` helper (one helper — `single-source`).
+
+- **Migration**: `products.production_lead_time` (days on upload → weeks at promotion) +
+  `production_lead_time_dist`, `_cv`, `_min`, `_mode`, `_max`, CHECKs, sidecar, snapshot, hash
+  coverage, rehearsal `830`; the upload template and Item Master editor learn the columns.
+- **Mapper**: the Plant row → `products` → 0, source recorded; bundle keys with scope `plant`.
+- **Grid**: Production group — "Production lead time", "Distribution", then the parameters via
+  `leadTimeParamFor`. Override-backed over `products`. Page-equals-run fixture extended.
+
+**Exit.** `page-equals-run` zero differences including the new cells; rehearsal green three ways.
+
+### WP 15.6 — FG INVENTORY, presented like the Supplier stage *(D293 · §8.3 · gate `page-equals-run` — no migration)*
+
+- **Words.** "FG stock" → **"FG inventory"** wherever a user reads it: the band, the switch's
+  label and short label, the MTO empty state, the Plant stage manual page. Field names and
+  columns unchanged.
+- **Layout.** Switch (MTS / MTO) → `fg_policy` as the policy type → one synthetic
+  **"Replenishment parameters"** vector cell (`vectorGroup: "fgInvParams"`) holding
+  `fg_reorder_point`, `fg_base_stock`, `fg_cover_days` gated by `fgPolicyIn(...)` →
+  `fg_initial_on_hand`. No safety-stock or holding-cost cell (the engine reads neither per
+  product — §25.1). `isFgDependentCol` and `fgBufferApplies.test.ts` stay correct.
+- `audit:ui` clean; the grid at phone width and the column-folding line checked.
+
+**Exit.** `page-equals-run` zero differences; the FG band renders like the Supplier band.
+
+**Order.** 15.0 → 15.1 → 15.2 → 15.3 → 15.4 → 15.5 → 15.6 (15.6 is independent and may move).
+**Out of scope:** empirical lead times (wait for the observations tier), lead-time correlation
+across lanes, sub-weekly production, WIP holding cost (rule 8), multi-stage production (WP 14.7).
