@@ -47,9 +47,11 @@ from scsim.entities.enums import (
     RampProfile,
     TransportMode,
 )
-from scsim.entities.network import primary_rank
+from scsim.core.leadtime import draws_uniforms, is_stochastic as is_lt_stochastic
+from scsim.entities.enums import BOUNDED_LEAD_TIME_DISTS
+from scsim.entities.network import lead_time_bounds_cv, primary_rank
 from scsim.entities.scenario import Scenario
-from scsim.stats.seeds import ReplicationStreams
+from scsim.stats.seeds import ReplicationStreams, lane_leadtime_rng
 
 # C^res components — Part V cost_of_resilience.
 COST_COMPONENTS: tuple[str, ...] = (
@@ -190,7 +192,27 @@ class CompiledModel:
         self.link_cost = np.array([l.cost for l in links])
         self.link_moq = np.array([l.moq for l in links])
         self.link_lt_dist = [l.lead_time_dist for l in links]
-        self.link_lt_cv = np.array([l.lead_time_cv for l in links])
+        # The bounded shapes (triangular, uniform; PLAN.md §25 WP 15.1) carry
+        # their bounds, shifted by the lane's transit leg exactly as the planning
+        # lead time is; NaN where a link has none. Their CV is the shape's own
+        # σ/μ, which is what P-P.3's King formula reads for a lognormal or gamma
+        # link — one σ_LT whatever the shape. Every other link keeps its input CV,
+        # so a project with no bounded shape compiles byte-identically.
+        def _bound(l, v):
+            return np.nan if v is None else float(v) + lane_extra.get(l.supplier_id, 0)
+        self.link_lt_min = np.array([_bound(l, l.lead_time_min_weeks) for l in links])
+        self.link_lt_mode = np.array([_bound(l, l.lead_time_mode_weeks) for l in links])
+        self.link_lt_max = np.array([_bound(l, l.lead_time_max_weeks) for l in links])
+        self.link_lt_cv = np.array([
+            lead_time_bounds_cv(l.lead_time_dist, float(l.lead_time_min_weeks),
+                                l.lead_time_mode_weeks, float(l.lead_time_max_weeks))
+            if l.lead_time_dist in BOUNDED_LEAD_TIME_DISTS else l.lead_time_cv
+            for l in links])
+        self.link_lt_stochastic = np.array([
+            is_lt_stochastic(self.link_lt_dist[k], float(self.link_lt_cv[k]),
+                             None if np.isnan(self.link_lt_min[k]) else self.link_lt_min[k],
+                             None if np.isnan(self.link_lt_max[k]) else self.link_lt_max[k])
+            for k in range(len(links))], dtype=bool)
         self.links_of_mat: list[np.ndarray] = [
             np.flatnonzero(self.link_mat == m) for m in range(self.n_mats)
         ]
@@ -806,6 +828,17 @@ class SimContext:
                 self.lt_variates[k] = streams.leadtime.standard_normal(T)
             elif dist == LeadTimeDist.GAMMA:
                 self.lt_variates[k] = streams.leadtime.gamma(1.0 / (cv * cv), 1.0, T)
+        # The demand-style shapes (normal, triangular, uniform — PLAN.md §25 WP
+        # 15.1): standard uniforms from each lane's OWN world stream, so neither
+        # the loop above nor the other lanes nor the chosen primary moves them.
+        # Drawn after the loop above and from different streams, so a project
+        # with none of these shapes consumes exactly what it did before.
+        for k in range(model.n_links):
+            if model.link_lt_stochastic[k] and draws_uniforms(model.link_lt_dist[k]):
+                rng = lane_leadtime_rng(streams.project_seed, streams.model_rep,
+                                        model.sup_ids[model.link_sup[k]],
+                                        model.mat_ids[model.link_mat[k]])
+                self.lt_variates[k] = rng.random(T)
 
         # Persistent state.
         self.on_hand = np.zeros(model.n_mats)
@@ -910,6 +943,9 @@ class SimContext:
         # Draws bounded to the in-transit ring, per link (audit F-36). A draw
         # longer than the ring used to wrap and land EARLY with no symptom.
         self.lt_truncated = np.zeros(model.n_links, dtype=int)
+        # Normal lead-time draws below one week, raised to one (PLAN.md §25 WP
+        # 15.1) — counted like the ring bound, so the shift is stated.
+        self.lt_floor_raised = np.zeros(model.n_links, dtype=int)
         # P-S.4 early_warning_failover: monitored detection lag. None → the
         # scenario's settings.detection_lag_weeks applies unchanged.
         self.detection_lag_override: Optional[int] = None

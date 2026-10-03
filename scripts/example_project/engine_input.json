@@ -1,5 +1,5 @@
 {
- "engine_version": "0.6.1",
+ "engine_version": "0.7.0",
  "scenario": {
   "name": "scenario",
   "network": {
@@ -122,6 +122,9 @@
      "lead_time_weeks": 2,
      "lead_time_dist": "deterministic",
      "lead_time_cv": 0.0,
+     "lead_time_min_weeks": null,
+     "lead_time_mode_weeks": null,
+     "lead_time_max_weeks": null,
      "moq": 5.0,
      "primary": false
     },
@@ -132,6 +135,9 @@
      "lead_time_weeks": 5,
      "lead_time_dist": "deterministic",
      "lead_time_cv": 0.0,
+     "lead_time_min_weeks": null,
+     "lead_time_mode_weeks": null,
+     "lead_time_max_weeks": null,
      "moq": 5.0,
      "primary": false
     },
@@ -142,6 +148,9 @@
      "lead_time_weeks": 2,
      "lead_time_dist": "deterministic",
      "lead_time_cv": 0.0,
+     "lead_time_min_weeks": null,
+     "lead_time_mode_weeks": null,
+     "lead_time_max_weeks": null,
      "moq": 20.0,
      "primary": false
     },
@@ -152,6 +161,9 @@
      "lead_time_weeks": 2,
      "lead_time_dist": "deterministic",
      "lead_time_cv": 0.0,
+     "lead_time_min_weeks": null,
+     "lead_time_mode_weeks": null,
+     "lead_time_max_weeks": null,
      "moq": 0.0,
      "primary": false
     }
@@ -482,7 +494,22 @@
    "lead_time_cv": {
     "label": "Lead time CV",
     "unit": "-",
-    "notes": "CV for lognormal/gamma lead-time dists."
+    "notes": "CV for normal/lognormal/gamma lead-time dists."
+   },
+   "lead_time_min_weeks": {
+    "label": "Lead time min weeks",
+    "unit": "weeks",
+    "notes": "Lower bound (triangular, uniform)."
+   },
+   "lead_time_mode_weeks": {
+    "label": "Lead time mode weeks",
+    "unit": "weeks",
+    "notes": "Most likely value (triangular)."
+   },
+   "lead_time_max_weeks": {
+    "label": "Lead time max weeks",
+    "unit": "weeks",
+    "notes": "Upper bound (triangular, uniform)."
    },
    "moq": {
     "label": "MOQ",

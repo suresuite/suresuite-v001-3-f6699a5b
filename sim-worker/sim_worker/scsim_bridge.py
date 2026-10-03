@@ -133,6 +133,19 @@ def _truncation_warnings(result: Any) -> list[dict]:
             ),
         }
         for t in (getattr(result, "lead_time_truncations", None) or [])
+    ] + [
+        # PLAN.md §25 WP 15.1 — a normal lead-time draw below one week is
+        # raised to one; the realized mean is slightly above the stated one.
+        {
+            "level": "info",
+            "entity": f"supply:{t['supplier_id']}->{t['material_id']}",
+            "field": "lead_time",
+            "reason": (
+                f"{t['draws']} sampled lead time(s) across {t['replications']} "
+                f"replication(s) fell below one week and were raised to 1 wk"
+            ),
+        }
+        for t in (getattr(result, "lead_time_floor_raises", None) or [])
     ]
 
 

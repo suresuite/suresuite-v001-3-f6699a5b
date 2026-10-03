@@ -62,12 +62,14 @@ from scsim.core.phases import (
     PhaseId,
     validate_hooks,
 )
+from scsim.core.leadtime import from_variate as lt_from_variate
 from scsim.core.planning import fg_gap, fg_target_for, plan_ahead
 from scsim.disruption.injector import any_stochastic, resolve_events, validate_events
 from scsim.entities.config import StatisticsReport, WarmupReport
 from scsim.entities.enums import (
     EffectType,
     FulfillmentMode,
+    SHAPED_LEAD_TIME_DISTS,
     LeadTimeDist,
     OverflowRule,
     RunMode,
@@ -382,16 +384,25 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
     L, Q = L[keep], Q[keep]
     ovr = ctx.po_lt_override[L]
     lt = np.where(ovr > 0, ovr, model.link_lt[L]).astype(np.int64)
-    stoch_links = getattr(model, "_link_stochastic", None)
-    if stoch_links is None:
-        stoch_links = model._link_stochastic = np.array(
-            [model.link_lt_dist[l] != LeadTimeDist.DETERMINISTIC and model.link_lt_cv[l] > 0
-             for l in range(model.n_links)], dtype=bool)
-    stoch = np.flatnonzero(stoch_links[L])
+    stoch = np.flatnonzero(model.link_lt_stochastic[L])
     for i in stoch:
         link = int(L[i])
-        lt[i] = _lt_from_variate(model.link_lt_dist[link], int(lt[i]),
-                                 float(model.link_lt_cv[link]), float(ctx.lt_variates[link, t]))
+        dist = model.link_lt_dist[link]
+        if dist in SHAPED_LEAD_TIME_DISTS:
+            lo, mo, hi = (model.link_lt_min[link], model.link_lt_mode[link],
+                          model.link_lt_max[link])
+            raw = lt_from_variate(
+                dist, int(lt[i]), float(model.link_lt_cv[link]), float(ctx.lt_variates[link, t]),
+                lo=None if np.isnan(lo) else lo, mode=None if np.isnan(mo) else mo,
+                hi=None if np.isnan(hi) else hi, nominal=float(model.link_lt[link]))
+            # A normal draw below one week is raised to one (the arrival floor
+            # below) — counted so the shift is stated (PLAN.md §25 WP 15.1).
+            if raw < 1:
+                ctx.lt_floor_raised[link] += 1
+            lt[i] = raw
+        else:
+            lt[i] = _lt_from_variate(dist, int(lt[i]), float(model.link_lt_cv[link]),
+                                     float(ctx.lt_variates[link, t]))
     arrival = t + np.maximum(1, lt)
     block = ctx.lt_block_end[model.link_sup[L]]
     arrival = np.where(block > 0, np.maximum(arrival, block), arrival)
@@ -409,22 +420,10 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
 def _lt_from_variate(dist: LeadTimeDist, mean: float, cv: float, v: float,
                      rounded: bool = True) -> float:
     """A lead time with the link's distribution and the shipment's mean, from a
-    variate pre-drawn for this (link, week) (audit F-24).
-
-    Lognormal: ``exp(μ + σ·z)`` with ``σ² = ln(1+cv²)`` and ``μ = ln(mean) − σ²/2``,
-    so ``E = mean``. Gamma: ``(mean/shape)·g`` with ``g ~ Γ(shape, 1)`` and
-    ``shape = 1/cv²``, the same scale family ``rng.gamma(shape, mean/shape)`` drew
-    from. The distribution is unchanged; only WHEN the stream is consumed moved.
-    """
-    if dist == LeadTimeDist.LOGNORMAL:
-        sigma2 = np.log1p(cv * cv)
-        mu = np.log(max(mean, 1e-9)) - sigma2 / 2.0
-        x = float(np.exp(mu + np.sqrt(sigma2) * v))
-    elif dist == LeadTimeDist.GAMMA:
-        x = float(v * mean * cv * cv)  # (mean / shape) · g, shape = 1/cv²
-    else:
-        x = float(mean)
-    return int(round(x)) if rounded else x
+    variate pre-drawn for this (link, week) (audit F-24). The one implementation
+    is ``core/leadtime.from_variate`` (PLAN.md §25 WP 15.1); this is its CV-shape
+    entry, kept for the callers that have always used it."""
+    return lt_from_variate(dist, mean, cv, v, rounded=rounded)
 
 
 def _mech_land_arrivals(model: CompiledModel, ctx: SimContext) -> None:
@@ -809,6 +808,11 @@ class ScenarioResult:
     # [{"supplier_id", "material_id", "draws", "replications", "bounded_to_weeks"}].
     # Empty when no draw was bounded — the common case.
     lead_time_truncations: list = field(default_factory=list)
+    # Normal (or zero-floored bounded) lead-time draws below one week, raised to
+    # one (PLAN.md §25 WP 15.1): [{"supplier_id", "material_id", "draws",
+    # "replications"}]. Empty when nothing was raised — always, for a project
+    # with no shaped lead time.
+    lead_time_floor_raises: list = field(default_factory=list)
     # Fixed-start events moved from inside warm-up to t_w (audit F-03):
     # [{"event_index", "target_id", "authored_week", "used_week", "replications"}].
     event_shifts: list = field(default_factory=list)
@@ -889,6 +893,7 @@ class _CapacityBindingAccumulator:
         # count summed over replications — so it rides the same observer rather
         # than a second parameter through `_extend_until_ci` (audit F-36).
         self.lt_truncated = np.zeros(model.n_links, dtype=int)
+        self.lt_floor_raised = np.zeros(model.n_links, dtype=int)
         self.ring_width = int(model.ring_width)
         self.link_ids = [(model.sup_ids[model.link_sup[k]], model.mat_ids[model.link_mat[k]])
                          for k in range(model.n_links)]
@@ -924,9 +929,17 @@ class _CapacityBindingAccumulator:
             for k, (sid, mid) in enumerate(self.link_ids) if self.lt_truncated[k] > 0
         ]
 
+    def lead_time_floor_raises(self) -> list[dict]:
+        return [
+            {"supplier_id": sid, "material_id": mid, "draws": int(self.lt_floor_raised[k]),
+             "replications": self.reps}
+            for k, (sid, mid) in enumerate(self.link_ids) if self.lt_floor_raised[k] > 0
+        ]
+
     def observe(self, ctx: SimContext, t_w: int, window_end: int) -> None:
         w = slice(t_w, window_end)
         self.lt_truncated += ctx.lt_truncated
+        self.lt_floor_raised += ctx.lt_floor_raised
         self.demand_clips += ctx.demand_clips
         self.demand_clip_add += ctx.demand_clip_add
         self.prod_bound += ctx.trace.prod_cap_bound[:, w].sum(axis=1)
@@ -1108,6 +1121,7 @@ def run_scenario(
         item_ids=item_ids,
         capacity_binding=cap_acc.summary(compiled.model, t_w, window_end) or None,
         lead_time_truncations=cap_acc.lead_time_truncations(),
+        lead_time_floor_raises=cap_acc.lead_time_floor_raises(),
         event_shifts=[
             {"event_index": i, "target_id": scenario.events[i].target_id,
              "authored_week": a, "used_week": u, "replications": len(grid)}

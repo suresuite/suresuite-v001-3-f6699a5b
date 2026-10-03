@@ -67,6 +67,19 @@ class LeadTimeDist(str, Enum):
     LOGNORMAL = "lognormal"
     GAMMA = "gamma"
     EMPIRICAL = "empirical"
+    # PLAN.md §25 WP 15.1 (P-S.6 widened): the demand-style shapes. Drawn from
+    # their own world stream, keyed per lane (`seeds.lane_leadtime_rng`), so the
+    # lognormal/gamma draws above keep their stream and stay bit-identical.
+    NORMAL = "normal"          # mean + CV, raised to 1 week and counted
+    TRIANGULAR = "triangular"  # min, mode, max — planning lead time = the mean
+    UNIFORM = "uniform"        # min, max — planning lead time = the mean
+
+
+#: The shapes defined by their BOUNDS rather than by the link's mean + CV.
+BOUNDED_LEAD_TIME_DISTS = frozenset({LeadTimeDist.TRIANGULAR, LeadTimeDist.UNIFORM})
+#: The shapes drawn from standard uniforms on the per-lane stream (inverse CDF).
+SHAPED_LEAD_TIME_DISTS = frozenset({LeadTimeDist.NORMAL, LeadTimeDist.TRIANGULAR,
+                                    LeadTimeDist.UNIFORM})
 
 
 class WarmupMethod(str, Enum):

@@ -190,7 +190,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.6.1",
+  "engine_version": "0.7.0",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -1152,7 +1152,10 @@
             "deterministic",
             "lognormal",
             "gamma",
-            "empirical"
+            "empirical",
+            "normal",
+            "triangular",
+            "uniform"
           ],
           "title": "LeadTimeDist",
           "type": "string"
@@ -1172,7 +1175,7 @@
           "default": 0.0,
           "maximum": 1.0,
           "minimum": 0.0,
-          "notes": "CV for lognormal/gamma lead-time dists.",
+          "notes": "CV for normal/lognormal/gamma lead-time dists.",
           "scope": "SM",
           "title": "Lead Time Cv",
           "type": "number",
@@ -1184,6 +1187,57 @@
           "notes": "Stochastic lead times are pre-drawn per (link, week) from the world leadtime stream, so CRN pairing holds across policies (docs/statistics.md).",
           "scope": "SM",
           "unit": "enum"
+        },
+        "lead_time_max_weeks": {
+          "anyOf": [
+            {
+              "maximum": 51,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Upper bound (triangular, uniform).",
+          "scope": "SM",
+          "title": "Lead Time Max Weeks",
+          "unit": "weeks"
+        },
+        "lead_time_min_weeks": {
+          "anyOf": [
+            {
+              "maximum": 51,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Lower bound (triangular, uniform).",
+          "scope": "SM",
+          "title": "Lead Time Min Weeks",
+          "unit": "weeks"
+        },
+        "lead_time_mode_weeks": {
+          "anyOf": [
+            {
+              "maximum": 51,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Most likely value (triangular).",
+          "scope": "SM",
+          "title": "Lead Time Mode Weeks",
+          "unit": "weeks"
         },
         "lead_time_weeks": {
           "maximum": 51,

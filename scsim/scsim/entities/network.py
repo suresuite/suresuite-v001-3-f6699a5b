@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
+import numpy as np
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from scsim.entities.enums import (
@@ -102,7 +104,22 @@ class SupplierLink(BaseModel):
     )
     lead_time_cv: float = Field(
         0.0, ge=0.0, le=1.0,
-        json_schema_extra=_meta("-", "SM", "CV for lognormal/gamma lead-time dists."),
+        json_schema_extra=_meta("-", "SM", "CV for normal/lognormal/gamma lead-time dists."),
+    )
+    # PLAN.md §25 WP 15.1 — the bounded shapes (triangular, uniform). The link's
+    # `lead_time_weeks` stays its PLANNING lead time and must lie inside the
+    # bounds; the mapper sets it to the bounds' mean (§25.2 rule 3).
+    lead_time_min_weeks: Optional[float] = Field(
+        None, ge=0, le=51,
+        json_schema_extra=_meta("weeks", "SM", "Lower bound (triangular, uniform)."),
+    )
+    lead_time_mode_weeks: Optional[float] = Field(
+        None, ge=0, le=51,
+        json_schema_extra=_meta("weeks", "SM", "Most likely value (triangular)."),
+    )
+    lead_time_max_weeks: Optional[float] = Field(
+        None, ge=0, le=51,
+        json_schema_extra=_meta("weeks", "SM", "Upper bound (triangular, uniform)."),
     )
     moq: float = Field(
         0.0, ge=0,
@@ -116,6 +133,61 @@ class SupplierLink(BaseModel):
             "False everywhere → the manuscript rule: min cost, then lead time, then id.",
         ),
     )
+
+    @model_validator(mode="after")
+    def _check_lead_time_shape(self) -> "SupplierLink":
+        lane = f"supply:{self.supplier_id}->{self.material_id}"
+        lo, mo, hi = self.lead_time_min_weeks, self.lead_time_mode_weeks, self.lead_time_max_weeks
+        d = self.lead_time_dist
+        if d == LeadTimeDist.TRIANGULAR:
+            if lo is None or mo is None or hi is None:
+                raise ValueError(f"{lane}: a triangular lead time needs min, mode and max")
+            if not lo <= mo <= hi:
+                raise ValueError(f"{lane}: a triangular lead time needs min ≤ mode ≤ max, got "
+                                 f"{lo:g} / {mo:g} / {hi:g}")
+        elif d == LeadTimeDist.UNIFORM:
+            if lo is None or hi is None:
+                raise ValueError(f"{lane}: a uniform lead time needs min and max")
+            if not lo <= hi:
+                raise ValueError(f"{lane}: a uniform lead time needs min ≤ max, got "
+                                 f"{lo:g} / {hi:g}")
+            if mo is not None:
+                raise ValueError(f"{lane}: a uniform lead time has no mode")
+        elif lo is not None or mo is not None or hi is not None:
+            raise ValueError(f"{lane}: lead-time bounds apply to triangular and uniform only, "
+                             f"not {d.value}")
+        if d in (LeadTimeDist.TRIANGULAR, LeadTimeDist.UNIFORM):
+            # The planning lead time is the bounds' mean (§25.2 rule 3), so it
+            # always lies inside them; a link whose lead_time_weeks does not is a
+            # plan and a draw describing two different lanes.
+            if not (int(lo) <= self.lead_time_weeks <= max(1, int(np.ceil(hi)))):
+                raise ValueError(f"{lane}: lead_time_weeks {self.lead_time_weeks} lies outside "
+                                 f"the lead-time bounds [{lo:g}, {hi:g}]")
+        return self
+
+
+def lead_time_bounds_mean(dist: LeadTimeDist, lo: float, mode: Optional[float],
+                          hi: float) -> float:
+    """The mean of a bounded lead-time shape — its planning lead time (§25.2
+    rule 3): (min + mode + max)/3 for triangular, (min + max)/2 for uniform."""
+    if dist == LeadTimeDist.TRIANGULAR:
+        return (lo + float(mode) + hi) / 3.0
+    return (lo + hi) / 2.0
+
+
+def lead_time_bounds_cv(dist: LeadTimeDist, lo: float, mode: Optional[float],
+                        hi: float) -> float:
+    """The coefficient of variation of a bounded shape — what P-P.3's King
+    formula reads as σ_LT / μ_LT for a lognormal or gamma link's CV."""
+    mean = lead_time_bounds_mean(dist, lo, mode, hi)
+    if mean <= 0:
+        return 0.0
+    if dist == LeadTimeDist.TRIANGULAR:
+        c = float(mode)
+        var = (lo * lo + c * c + hi * hi - lo * c - lo * hi - c * hi) / 18.0
+    else:
+        var = (hi - lo) ** 2 / 12.0
+    return float(np.sqrt(max(var, 0.0)) / mean)
 
 
 def primary_rank(link: SupplierLink) -> tuple:
