@@ -23013,6 +23013,120 @@ baseline (295 / 110).
 the unforecast step, the named honesty and golden tests for the `plan-from-demand` gate row,
 and the performance numbers above.
 
+### WP 14.6 — Validation study, and the gate · 2026-10-03 · no migration
+
+**Promised by WP 14.5**: MRP as `policy_type = "mrp"`, its two KPIs, the forecast-bias framing
+of the unforecast step, the named honesty and golden tests, and the performance numbers.
+**Preconditions held?** Yes: all four tests exist under those names and run in
+`scsim-tests.yml`; `local.project_data_from_snapshots` builds TRON from
+`scripts/tron_ver2/dataset.json`; the engine's TTR and order-CV measurements exist.
+
+**What changed.** No engine change (stays 0.6.0; golden digests unchanged).
+`scsim/scripts/study_demand_driven_planning.py` runs the study and writes
+`docs/research/mrp-vs-reorder-point.md`; `--check` regenerates in memory and byte-compares, and
+`scsim-tests.yml`'s sim-worker job runs it (≈ 28 s). **The reference chain** — one MTO product
+(capacity 220/wk), m1 (L 2) and m2 (L 4, MOQ 200, two per product), one supplier, normal row
+demand CV 0.2, lost sales, 104 weeks measured over 20–99, 20 CRN replications — compares min-max
+(κ = 2, SS 7 d) with MRP **at equal average stock** (MRP's safety stock tuned on a grid to the
+nearest stock: 14 d, 960 vs 979 units) and at equal fill (10.5 d), then holds the tuning fixed
+across five cases: stationary, a forecast step 100 → 150, a forecast surge to 180 for six weeks,
+the ST-1 outage (s1 blocked weeks 50–57) and forecast bias (the world 20 % above the forecast
+the plan reads). Paired at equal stock: stationary Δ lost 0 ± 0; step −19 ± 11; surge
+−145 ± 33; outage −3 ± 32 (no difference — both recover in 8.0 weeks); bias −74 ± 25 with
+91 ± 4 fewer units of stock; order CV ≈ 1.2 → ≈ 0.2 in every case. **Project TRON** (6
+replications, default settings, not stock-matched and saying so): as uploaded MRP carries
+125 k (≈ 7 %) less stock and loses 302 ± 102 more units (Δ fill −0.003 ± 0.001); with
+supplier 965 blocked, 442 ± 136 more at 129 k less stock. CLAUDE.md gains the gate row
+`plan-from-demand`. The blueprint marks G20 closed for planning (§2.3, §2.4, §13 B2 status,
+gap index) and keeps its single-stage half open with package F. `scsim/docs/roadmap.md`: M9
+shipped (multi-stage and golden #8 not started); ADR 0002 gains its WP 14.6 line. The manual
+gains **How planning works** (section 5): demand per row, planned production, the FG
+policies, MRP, per-row fulfillment, what the plan never reads, and where the study lives.
+
+**Discovered.**
+- **"Equal stock" cannot be reached by tuning min-max.** On the reference chain κ's grid moved
+  min-max's stock in steps too coarse to land on MRP's, so the first draft compared runs
+  whose stocks differed materially and called them equal. The study tunes MRP's safety stock instead (the policy under
+  test), prints the matched stocks beside each other, and reports an equal-fill variant too.
+  → none.
+- **TRON cannot be stock-matched in a CI budget.** 17 × 560 at six replications per cell is
+  what fits; a grid search over safety stock on top is not. The section's opening line says "not
+  stock-matched", and the negative result (MRP loses more at less stock)
+  is published as measured rather than tuned away. → none; a tuned TRON comparison is
+  experimentation-surface work (blueprint Phase C), not this phase's.
+- **A forecast step and an unforecast step are different experiments** (as WP 14.5 found):
+  the step and surge cases change the forecast; the bias case is the honest home of a change
+  only the world knows, and the page says so. → none.
+
+**Gate results.** `scsim` 449 passed, golden digests unchanged; `gen_docs`,
+`gen_frontend_registry`, `check_registry_bridge`, wheels `--check` green; the study `--check`
+green from the repository root and from `sim-worker/` (CI's working directory); `sim-worker`
+167 passed; grading `deno test` 35 passed; vitest 1 674 passed (+2 from the new manual page;
+the registry's section 5 now holds ten pages); `contract:check` holds with `main`'s two warnings;
+`contract:rehearse` green three ways; `typecheck` 15 held, `check:docs`, `audit:ui` green;
+eslint at baseline (295 / 110).
+
+**Handoff.** None inside Phase 14 — WP 14.7 is excluded until the owner decides. See the phase
+boundary below for what it inherits.
+
+### PHASE BOUNDARY — Phase 14 reviewed · 2026-10-03
+
+Not a work package. Phase 14's seven packages 14.0–14.6, read against the code before the
+phase is called done. WP 14.7 is excluded by design.
+
+#### What landed
+
+| WP | Commit | Engine | Migration |
+|---|---|---|---|
+| 14.0 baseline, allocation helper, frozen digests | `18448ca` | 0.2.9 | — |
+| 14.1 demand per row (engine) | `019222b` | 0.3.0 | — |
+| 14.2 demand per row (data) | `f4c9bb4` | — | `20261003000001` |
+| 14.3 per-row fulfillment | `88733c4` | 0.4.0 | — |
+| 14.4 planned production, FG policies | `b1a0d9e` | 0.5.0 | `20261003000002` |
+| 14.5 MRP for materials | `9492d9b` | 0.6.0 | — |
+| 14.6 validation study, gate | this commit | 0.6.0 | — |
+
+§4 D284 is CLOSED in all four parts: (b) by 14.1 + 14.2, (c) by 14.3, (d) by 14.4, (a) by 14.5.
+
+#### What is true (enforced by a named test in CI)
+
+- **The plan never reads a realized future draw** — gate `plan-from-demand`: three honesty
+  tests (projection 14.1, planned production 14.4, gross requirements and orders 14.5).
+- **Golden #7** reproduces the worked MRP example week by week.
+- **Byte-identity for a project that sets no new field** — the frozen digests, engine and
+  worker, unchanged across all seven packages except where a change was declared (below).
+- **Every new /policies cell reaches the engine or says it does not** — `page-equals-run`
+  over the Customer and Plant cells, with the scope probe that found and closed the FG keys'
+  Customer-row reach in WP 14.4.
+- **Every newly read table is in the snapshot's simulation scope** (`demand_forecasts`, the
+  per-row `outbound_logistics` columns, the FG columns on `products`, `customers`'s floor) —
+  `simulationScopeParity.test.ts`; and each migration has a rehearsal (`790`, `800`, `810`).
+- **The study is regenerable** — `--check` byte-compares it on every scsim change.
+
+#### What is only claimed
+
+- **Production has not seen either migration.** `20261003000001` and `20261003000002` deploy on
+  merge, so no §15 reading of them exists; the after-reading belongs to the push after the
+  merge (D153).
+- **Declared behaviour changes**, each with an engine bump and an ADR 0002 line: `normal` is a
+  real normal (0.3.0); Customer rows' per-row fulfillment is applied instead of warned about
+  (0.4.0); P-P.4 is not added on top of a typed `fg_base_stock` (0.5.0, engine-API only).
+- **The study is one chain and one dataset.** It shows the order rule's effect with the world
+  held equal; it is not a general ranking, and on TRON (not stock-matched) MRP lost more.
+- **D285 is open**: a product cannot be given `normal` through either door it has.
+
+#### What WP 14.7 inherits
+
+- `ctx.planned_production` `[products × H]` with H set at compile by `configure_model`;
+  `core/rowbacklog.step_rows` shared by fulfillment and the plan; `gross_requirements`
+  `[materials × H]` and P-P.1's MRP per material — the level-by-level MRP extends these
+  rather than adding a second planner.
+- The preconditions §24 names: D191's single "which BOM table" rule, D174's exclusion and
+  D136's flatten — none of which Phase 14 touched.
+- Golden #8 (multi-level ≡ flattened at zero stage lead time), not written.
+- The study script, to extend with a multi-stage case.
+- The performance budget: MRP costs ≈ +12–16 % per replication at TRON scale already.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -23031,7 +23145,7 @@ and the performance numbers above.
 | **11** | **11.0 – 11.5** | **one graph, three levels: a version per level, and every consumer bound to the level it reads** | — | **11.0 ✅** the plan (§21), §4 D258–D264 registered from a verified reading, the blueprint refined (§8.4, §9.2, §9.5, §11.4). The reading changed the design: the simulation's read set already HAS a hash — `hash_inputs`, the snapshot's `inputs` domain, whose eight tables are exactly the worker's eight reads — so the `simulation` scope is named and gated rather than minted, and `level_spec` stays 1. **11.1 ✅** a version per level: `graph_level_versions` numbers product, process and firm per project, deduplicated against any earlier version of the level; every snapshot names its tuple; history is backfilled in order; the state returns each level's version (D258's store half). It also closed **D265**: `anon` could insert a snapshot row directly, which from this package would have minted level versions. **11.2 ✅** the simulation scope NAMED (`simulation → hash_inputs`, one mapping, no new digest) and gated against the worker's reads; a Validated Model binds it, RunKey v2 hashes it, an analysis run names its level version; the agent's own copy of the badge rule follows (D260, D264 closed). **11.3 ✅** the surfaces: each network page names its level's version ("Product graph v3"), the Validated Model reads "simulation inputs v4" with a deep-tier change as a note and never re-validate, the snapshot list shows its tuple, the Reproducibility Record and Trust Report carry the levels (D258, D259, D263 closed; one read migration, `dataset_version_tuple`, because the browser cannot read the level table). **11.4 ✅** lineage: the training set groups and counts KPIs by simulation-input version and keeps the composite as lineage; the features name their product version; a run names its inputs whoever wrote it (D261, D262 closed). **11.5 ✅** the reading is §15 run `36903620736` (fence unmoved at `20261001000022`): every project with snapshots has all four levels, all 4 Validated Models bind the simulation scope, the doors D265 closed are closed. One firm-level `prominence` run met D240's condition, so `20261001000023` drops `network_topology_hash`. Two things are named, not met: RunKey v2 is unexercised (no simulation dispatched since WP 10.4), and the reading after the drop deploys is WP 10.9's. **PHASE COMPLETE.** |
 | **12** | **12.1 – 12.7** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2 ✅** the snapshot read API (largest production snapshot 592 KB — one gzipped response, no cap). **12.3 ✅** personal keys (`20261002000001`, `rehearsal/700`). **12.4 ✅** the engine through `GET /v1/engine`, private bucket, content-addressed (D274 recorded). **12.5 ✅** the `suresuite` package (a local run equals the platform's, in a clean venv). **12.6 ✅** notebook 05 — simulate on your own machine (renumbered **03** when the series was trimmed to four, §16 · 2026-10-02). **12.7 ✅** every user may mint a personal, read-only key (`20261002000005`, `rehearsal/730`). **PHASE COMPLETE**; push-back (upload, client-computed runs badged until verified) is the next phase, not started |
 | **13** | **13.1 – 13.5** | **what you see on /policies is what runs: /policies writes overrides and never the item masters, the worker reads the frozen versions, the Validated Model binds both, every cell reaches the engine or says it does not** | — | **13.1 ✅** /policies writes overrides and never the masters (`20261002000008`, `rehearsal/760`; D281 closed — a save replaced a row's whole patch). **13.2 ✅** the worker computes through `run_from_snapshots` from the run's frozen dataset and policy versions; the browser too; D282 closed. **13.3 ✅** a Validated Model binds its evidence run's two versions, a model run replays them, the database refuses a model run on other data (`20261002000009`, `rehearsal/770`). **13.4 ✅** D204 (a)(b) closed (`20261002000010`, `rehearsal/780`), one capacity per row, gate `page-equals-run` (`pageEqualsRun.test.ts`, zero differing cells, mutation-tested). **13.5 ✅** the gate row in CLAUDE.md, the tests wired into `data-contract.yml`, the manual's callout removed, D280 closed. **PHASE COMPLETE.** Nothing reaches production until merge; the after-merge §15 reading is owed (D153)
-| **14** | **14.0 – 14.7** | **demand-driven planning: demand per customer × product row, planned production = min(requirement, capacity) with FG policies, MRP for materials, per-row fulfillment; multi-stage later** | — | **14.0 ✅** the planning baseline pinned, the shared allocation helper (`core/allocation.py`) with P-C.2 delegating, ADR 0002, and frozen golden digests (engine + worker) that make "byte-identical" checkable. Registered 2026-10-02 (§24, D284); prompts in `docs/design/demand-driven-planning-prompts.md`. **14.1 ✅** demand per customer × product row in the engine (engine 0.3.0): row specs and forecasts, a real `normal` clipped at 0 and counted, the plan's projected-demand view, projection-error KPIs. **14.2 ✅** demand per row from the data: per-row specs on `outbound_logistics`, a `demand_forecasts` table spread evenly at promotion, both in the snapshot's simulation scope, the Customer table's demand cells as row overrides, and a pre-run finding per missing parameter. **14.3 ✅** per-row fulfillment (engine 0.4.0): backorder, window, cost and fill rate per customer × product row, one allocation rule per project with per-row priority / price / service target, `revenue_max` real, the customers' contracted floor consumed and uploadable. **14.4 ✅** planned production over a horizon = min(requirement, capacity) with fulfillment's own row step for the carry-forward (engine 0.5.0), base-stock / min-max / days-of-cover FG policies and FG opening stock on `products` (RFC 4 closed), Plant cells as overrides. **14.5 ✅** MRP for materials (engine 0.6.0): `policy_type = "mrp"` orders BOM × planned production over the lead time, net of stock and the pipeline, ≥ MOQ; golden #7 exact; late-receipt and shortage KPIs; the MRP record in inspection runs; ≈ +12–16 % per replication at TRON scale. **WP 14.6 is next** |
+| **14** | **14.0 – 14.7** | **demand-driven planning: demand per customer × product row, planned production = min(requirement, capacity) with FG policies, MRP for materials, per-row fulfillment; multi-stage later** | — | **14.0 ✅** the planning baseline pinned, the shared allocation helper (`core/allocation.py`) with P-C.2 delegating, ADR 0002, and frozen golden digests (engine + worker) that make "byte-identical" checkable. Registered 2026-10-02 (§24, D284); prompts in `docs/design/demand-driven-planning-prompts.md`. **14.1 ✅** demand per customer × product row in the engine (engine 0.3.0): row specs and forecasts, a real `normal` clipped at 0 and counted, the plan's projected-demand view, projection-error KPIs. **14.2 ✅** demand per row from the data: per-row specs on `outbound_logistics`, a `demand_forecasts` table spread evenly at promotion, both in the snapshot's simulation scope, the Customer table's demand cells as row overrides, and a pre-run finding per missing parameter. **14.3 ✅** per-row fulfillment (engine 0.4.0): backorder, window, cost and fill rate per customer × product row, one allocation rule per project with per-row priority / price / service target, `revenue_max` real, the customers' contracted floor consumed and uploadable. **14.4 ✅** planned production over a horizon = min(requirement, capacity) with fulfillment's own row step for the carry-forward (engine 0.5.0), base-stock / min-max / days-of-cover FG policies and FG opening stock on `products` (RFC 4 closed), Plant cells as overrides. **14.5 ✅** MRP for materials (engine 0.6.0): `policy_type = "mrp"` orders BOM × planned production over the lead time, net of stock and the pipeline, ≥ MOQ; golden #7 exact; late-receipt and shortage KPIs; the MRP record in inspection runs; ≈ +12–16 % per replication at TRON scale. **14.6 ✅** the CRN-paired MRP-vs-reorder-point study, regenerated and byte-compared in CI (`docs/research/mrp-vs-reorder-point.md`), gate `plan-from-demand` in CLAUDE.md, G20 closed in the blueprint for planning, the manual's "How planning works" page. **PHASE COMPLETE (14.7 excluded by design — multi-stage waits for the owner)** |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -25440,7 +25554,7 @@ projects are byte-identical.
 - `scsim/scripts/benchmark.py` at TRON scale: ≤ +20 % time per replication.
 - `page-equals-run`: zero diffs.
 
-### WP 14.6 — Validation study, and the gate *(G20 close · T3, T5)*
+### WP 14.6 — Validation study, and the gate ✅ *(G20 close · T3, T5 — done, no migration; engine stays 0.6.0)*
 
 - **Inherited from WP 14.5 (§16).** MRP is `inventory_control.policy_type = "mrp"` (or a
   per-material override); its KPIs `mrp_late_receipt_weeks` and `material_shortage_weeks`

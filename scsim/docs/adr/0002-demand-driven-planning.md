@@ -127,3 +127,9 @@ demand**, and **the plan never reads the realized future demand draws** (gate
   places arrivals vectorized — the same arithmetic, element by element. Golden
   #7 reproduces the design's worked example exactly. Golden digests (engine and
   worker) unchanged.
+* **WP 14.6** (no engine change; stays **0.6.0**) — validation. The CRN-paired
+  study `scripts/study_demand_driven_planning.py` regenerates
+  `docs/research/mrp-vs-reorder-point.md` (reference chain at equal stock and
+  equal fill, five cases; Project TRON, not stock-matched); CI byte-compares it
+  with `--check`. Gate `plan-from-demand` named in CLAUDE.md. Golden digests
+  unchanged.

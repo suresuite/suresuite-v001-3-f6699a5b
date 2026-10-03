@@ -106,7 +106,8 @@ describe("pages and their bodies", () => {
     // Thirteen since PLAN.md §24 WP 14.2 added the Demand Forecast table page.
     { section: 3, wp: "5.2b", pages: 13 },
     { section: 4, wp: "5.2f", pages: 4 },
-    { section: 5, wp: "5.2c", pages: 9 },
+    // Ten since PLAN.md §24 WP 14.6 added "How planning works".
+    { section: 5, wp: "5.2c", pages: 10 },
     { section: 6, wp: "5.2c", pages: 3 },
     { section: 7, wp: "5.2d", pages: 7 },
     { section: 8, wp: "5.2e", pages: 5 },

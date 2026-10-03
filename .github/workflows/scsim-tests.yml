@@ -10,6 +10,8 @@ on:
       - "scripts/check_registry_bridge.mjs"
       - "scripts/build_engine_wheels.sh"
       - "public/engine/**"
+      - "docs/research/mrp-vs-reorder-point.md"
+      - "scripts/tron_ver2/**"
       - ".github/workflows/scsim-tests.yml"
   workflow_dispatch:
 
@@ -142,4 +144,14 @@ jobs:
 
       - name: Worker test suite (legacy engine + scsim bridge + validation parity)
         run: python -m pytest tests -q
+        working-directory: sim-worker
+
+      # PLAN.md §24 WP 14.6 — the MRP-vs-reorder-point study page is GENERATED
+      # (docs/research/mrp-vs-reorder-point.md); this reruns the study and fails
+      # when the committed page no longer matches the engine. Here, not in the
+      # `scsim` job, because its Project TRON half maps the committed dataset
+      # through `sim_worker`. Measured ~30 s.
+      - name: Phase 14 validation study page matches the engine
+        if: ${{ !cancelled() }}
+        run: python ../scsim/scripts/study_demand_driven_planning.py --check
         working-directory: sim-worker
