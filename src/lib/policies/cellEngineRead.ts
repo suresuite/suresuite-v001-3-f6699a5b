@@ -7,7 +7,7 @@
  *
  * The answer is per STAGE, not per field: `service_level_target` is read as the
  * project-wide default and NOT from a Supplier-stage row; every inventory field of
- * a Plant-stage row is dropped; `basis` and `review_period_days` are read nowhere.
+ * a Plant-stage row is dropped; `basis` is read nowhere.
  * A per-family list (`SCSIM_VISIBLE_FIELDS`) answered "yes" for all of them, so the
  * grid offered edits that were stored, versioned, hashed into the policy version —
  * and changed no result.

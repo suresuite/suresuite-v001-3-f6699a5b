@@ -459,6 +459,6 @@ A triangular row's upper bound — a rate in the row's `time_unit`, weekly after
 
 ---
 
-*Generated from data contract `536785eb966f`, engine `0.6.0`,
+*Generated from data contract `7c04cbb07bdd`, engine `0.6.1`,
 sidecar `supabase/contract/outbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

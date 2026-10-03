@@ -299,6 +299,6 @@ When the row last changed. Server-set.
 
 ---
 
-*Generated from data contract `536785eb966f`, engine `0.6.0`,
+*Generated from data contract `7c04cbb07bdd`, engine `0.6.1`,
 sidecar `supabase/contract/demand_forecasts.contract.yaml`, table created by `20261003000001_demand_per_row.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

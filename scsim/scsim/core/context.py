@@ -247,6 +247,16 @@ class CompiledModel:
         # which also raises `plan_horizon` to the longest MRP lead time + 1.
         self.mrp_mask = np.zeros(self.n_mats, dtype=bool)
         self.has_mrp = False
+        # Replenishment levels the planner STATED on a /policies row, set at
+        # compile by P-P.1 (`configure_model`). A stated level IS the level:
+        # P-P.3 adds no buffer on top of it and nothing raises it. An (R,Q)
+        # material with a lot orders Q, so its S is R + Q and follows R.
+        self.stated_s_mask = np.zeros(self.n_mats, dtype=bool)
+        self.stated_S_mask = np.zeros(self.n_mats, dtype=bool)
+        self.lot_S_mask = np.zeros(self.n_mats, dtype=bool)
+        # A row's κ (NaN = the project's). P-P.3's Eq. 21 reads the same κ the
+        # level formula does.
+        self.kappa_override = np.full(self.n_mats, np.nan)
         # Full COGS per FG unit (P-P.4 holding basis): Σ_m r_{p,m} · c_m.
         self.fg_unit_cogs = np.asarray(self.bom @ self.mat_cost).ravel()
 

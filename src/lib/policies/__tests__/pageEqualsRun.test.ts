@@ -169,7 +169,6 @@ describe("gate page-equals-run — zero differing cells", () => {
       return cellEngineRead(stage, col).reaches === false;
     };
     expect(badge("supplier", "basis")).toBe(true);
-    expect(badge("supplier", "review_period_days")).toBe(true);
     // The Plant stage no longer carries the inventory family at all: every one
     // of those cells was badged "not simulated", because the engine reads none
     // of them from a Plant row. P-P.4 is the project line above the grid.
@@ -184,7 +183,9 @@ describe("gate page-equals-run — zero differing cells", () => {
       if (c.readOnly) continue;
       expect(cellEngineRead("plant", c).reaches, `plant.${c.field}`).toBe(true);
     }
-    for (const f of ["type", "reorder_point", "order_up_to", "rop_q_quantity", "coverage_weeks", "safety_stock_days", "holding_cost_pct", "primary_source"]) {
+    // review_period_days left the badged list when the periodic type's T began
+    // reaching inventory_control.periodic_review_weeks.
+    for (const f of ["type", "reorder_point", "order_up_to", "rop_q_quantity", "coverage_weeks", "review_period_days", "safety_stock_days", "holding_cost_pct", "primary_source"]) {
       expect(badge("supplier", f), `supplier.${f}`).toBe(false);
     }
   });

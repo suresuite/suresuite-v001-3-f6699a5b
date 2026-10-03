@@ -12,6 +12,7 @@
 // spec-defined (§III / §IV) and declared here; the param *schemas* still come
 // from the registry.
 
+import { enginePolicyTypeFor } from "./engineBridge";
 import {
   paramProp,
   policyById,
@@ -179,6 +180,22 @@ export function policyTypeOption(categoryKey: string, storedValue: string): Poli
 export function inventoryParamsForType(storedType: string): RegistryParam[] {
   const opt = policyTypeOption("inventory", storedType) ?? policyTypeOption("inventory", "min_max");
   return opt ? [...opt.headline, ...opt.rest] : [];
+}
+
+/**
+ * Whether the run reads κ for a row of this stored type, given which of the
+ * row's parameters carry a value. κ only sizes the FORMULA order-up-to level
+ * S = E[D]·(T_s+κ) (and its safety-stock term), so it is unread when:
+ *   - the row states S itself (min-max, base stock, periodic review);
+ *   - an (R,Q) row has a lot Q — it orders Q, and its S is R + Q;
+ *   - the row is MRP, which orders from the plan and has no level.
+ * The grid shows κ only where this is true (scsim P-P.1 `_set_levels`).
+ */
+export function kappaIsRead(storedType: string, hasValue: (field: string) => boolean): boolean {
+  const engineType = enginePolicyTypeFor(storedType) ?? "min_max";
+  if (engineType === "mrp") return false;
+  if (engineType === "rop_q") return !hasValue("rop_q_quantity");
+  return !hasValue("order_up_to");
 }
 
 /** Human label for a stored policy-type value, from the registry library. */

@@ -546,15 +546,16 @@ export const CHAINS: PolicyChain[] = [
         "kind": "substitution",
         "detail": "`defaultWhenMissing: 1` — shown when nothing above resolves",
         "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.periodic_review_weeks (P-P.1). Transform: days → whole weeks (nearest, at least 1, at most 13; a T that is not a whole number of weeks is stated). At default scope the project's T; on a Supplier-stage row that material's T. Read only for a periodic material",
+        "evidence": null
       }
     ],
-    "breaks": [
-      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/engine.py:323."
-    ],
-    "breakClass": "legacy-only",
-    "breakEvidence": [
-      "sim-worker/sim_worker/engine.py:323"
-    ]
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   },
   {
     "stage": "supplier",
@@ -1587,9 +1588,6 @@ export const CHAINS: PolicyChain[] = [
 
 /** How many chains break, by shape. A page renders the number, never types it. */
 export const BREAKS_BY_CLASS: Record<string, string[]> = {
-  "legacy-only": [
-    "supplier.review_period_days"
-  ],
   "unread": [
     "customer.primary_source"
   ],
@@ -4195,4 +4193,4 @@ export const READ_EXPOSURE: ReadExposure = {
 };
 
 export const CHAIN_COUNT = 46;
-export const BROKEN_COUNT = 3;
+export const BROKEN_COUNT = 2;
