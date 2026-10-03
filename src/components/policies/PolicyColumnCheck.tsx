@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   CUSTOMER_RULE_CHECK,
   FG_BUFFER_CHECK,
+  PROJECT_BACKORDER_CHECK,
   GRID_STAGES,
   KEY_COLUMNS,
   MEASURED,
@@ -161,8 +162,8 @@ export function PolicyColumnCheck() {
           />
           {stage === "customer" && (
             <CheckTable
-              title="Customer rules line (above the Customer grid) — project scope, saves the whole family"
-              rows={Object.entries(CUSTOMER_RULE_CHECK).map(([field, check]) => ({
+              title="Allocation line (above the Customer grid, 2+ customers) and the backorder values an empty row inherits"
+              rows={Object.entries({ ...CUSTOMER_RULE_CHECK, ...PROJECT_BACKORDER_CHECK }).map(([field, check]) => ({
                 key: `fulfillment:${field}`,
                 label: field,
                 field: `fulfillment.${field}`,

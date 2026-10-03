@@ -6,8 +6,7 @@
 // Each is a key the engine reads at the PROJECT default only — no row carries
 // it — which is why it is not a grid column:
 // - P-C.2 `fulfillment.allocation`, applied only between two or more customers;
-// - P-C.1's backorder trio, which an EMPTY Customer-row cell inherits (a row's
-//   own cell wins, WP 14.3);
+// (P-C.1's backorder is per row, WP 14.3 — not a project line.)
 //
 // P-P.4's FG safety buffer is NOT here, by owner decision (§24 WP 14.8): it was
 // a second way to say "keep more FG" beside the row's own S. How much FG to keep
@@ -45,35 +44,32 @@ const ALLOCATION_LABEL: Record<string, string> = {
   sla_tier: "SLA tier (row targets)",
 };
 
-const backorders = (d: Record<string, unknown>) => d.backorder_allowed === true;
-
 /** P-C.2 — the one rule that shares short stock between customers. */
 export const ALLOCATION_FIELD: RuleField = {
   field: "allocation",
-  label: "When stock is short, allocate by",
+  label: "When stock is short, share it between customers by",
   optionLabel: (t) => ALLOCATION_LABEL[t] ?? t,
 };
 
-/** P-C.1 — what an empty Customer-row backorder cell inherits. */
-export const BACKORDER_DEFAULT_FIELDS: RuleField[] = [
-  { field: "backorder_allowed", label: "Empty backorder cells: backorder" },
-  { field: "max_backorder_days", label: "up to", unit: "days", when: backorders, w: 52 },
-  { field: "backorder_cost_per_day", label: "at", unit: "€ / unit / day", when: backorders, w: 56 },
-];
-
+/**
+ * The Customer stage's ONE project setting: the allocation rule. Backorder is
+ * not here — it is a column on every row (WP 14.3), and an empty row cell shows
+ * the value it inherits (owner decision, §24 WP 14.8: a project line of
+ * "defaults for empty cells" read as a second backorder setting).
+ */
 export const CUSTOMER_RULE: ProjectRule = {
   family: "fulfillment",
-  title: "Customer rules",
+  title: "Allocation",
   hint:
-    "Project-wide: the allocation rule the engine applies between customers (P-C.2), and the backorder " +
-    "settings a Customer row inherits while its own backorder cells are empty (P-C.1).",
-  fields: [ALLOCATION_FIELD, ...BACKORDER_DEFAULT_FIELDS],
+    "Project-wide (P-C.2): how the engine shares a product's short stock between its customers. " +
+    "Applied only when two or more customers want the same product.",
+  fields: [ALLOCATION_FIELD],
 };
 
-/** The Customer bar's fields for a grid naming `customerCount` customers: the
- *  engine applies the allocation rule only between two or more. */
+/** The line's fields for a grid naming `customerCount` customers: the engine
+ *  applies the rule only between two or more, so with one there is no line. */
 export function customerRuleFields(customerCount: number): RuleField[] {
-  return customerCount >= 2 ? CUSTOMER_RULE.fields : BACKORDER_DEFAULT_FIELDS;
+  return customerCount >= 2 ? CUSTOMER_RULE.fields : [];
 }
 
 const FG_SIZING_LABEL: Record<string, string> = {

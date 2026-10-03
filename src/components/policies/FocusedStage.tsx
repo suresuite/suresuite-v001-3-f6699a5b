@@ -177,17 +177,19 @@ export function FocusedStage({
   }
 
   // The stage's project-level settings, one line above its grid
-  // (`projectRules.ts`): the Customer stage's allocation rule and the backorder
-  // an empty row inherits. The Plant stage has no project control — only a
+  // (`projectRules.ts`): the Customer stage's allocation rule, with 2+
+  // customers only. The Plant stage has no project control — only a
   // notice for an FG buffer an older version saved, while it still acts.
   const ruleBar = ({ fgBufferRows, customerCount }: { fgBufferRows: number; customerCount: number }) => {
     if (stageKey === "customer") {
+      const fields = customerRuleFields(customerCount);
+      if (fields.length === 0) return null;
       return (
         <ProjectRuleBar
           family="fulfillment"
           title={CUSTOMER_RULE.title}
           hint={CUSTOMER_RULE.hint}
-          fields={customerRuleFields(customerCount)}
+          fields={fields}
           value={defaults.fulfillment}
           onSave={(v) => saveDefault("fulfillment", v)}
           readOnly={!canImport}

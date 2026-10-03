@@ -55,8 +55,11 @@ export default function CustomerStage() {
             sourcing_firm: <>The same kind of decision, recorded per row.</>,
             row_demand_mode: (
               <>
-                Empty follows the data: a row with an uploaded forecast plans on it, any other on
-                its mean. <Term>model</Term> sets an uploaded forecast aside.
+                <Term>forecast</Term> — the row plans week by week on an uploaded series (a{" "}
+                <DocLink to="demand-forecasts">Demand Forecast</DocLink>: a quantity per period for this
+                customer × product, spread evenly to weeks); the distribution only adds spread around
+                it. <Term>model</Term> — a constant mean per week, drawn from the distribution. Forecast
+                is offered only on a row that has a series; empty follows the data.
               </>
             ),
             row_forecast: <>The uploaded series, summarized — buckets, first date, first weekly values. Read-only here.</>,
@@ -66,7 +69,15 @@ export default function CustomerStage() {
                 scaled by the row's share. The edit is saved as an override; the upload is never changed.
               </>
             ),
-            row_demand_mean: <>Units per week; the mode for a triangular row.</>,
+            row_demand_mean: (
+              <>
+                Units per week; the mode for a triangular row. Each parameter appears only for a
+                distribution that reads it: deterministic and poisson — mean; normal — mean and CV;
+                triangularAV — mean and ±; triangular — min, mode, max. Under a forecast the series is
+                the mean, so only the spread is asked for (triangular keeps min / mode / max as its
+                shape). An empty distribution runs the product's, scaled by the row's share.
+              </>
+            ),
             row_demand_variation: (
               <>
                 Read by the distribution: the CV for normal, the ± fraction for triangularAV. The
@@ -76,7 +87,7 @@ export default function CustomerStage() {
             backorder_allowed: (
               <>
                 Whether this row waits for supply (backorder) or loses what cannot be shipped this
-                week. Empty is the project's setting.
+                week. An empty cell shows, greyed, the project value it inherits.
               </>
             ),
             max_backorder_days: (
@@ -117,7 +128,8 @@ export default function CustomerStage() {
         </Key>
         <P>
           The <strong>allocation rule</strong> — priority, fair share, proportional, revenue
-          maximising or SLA tiers — is set once, on the <Term>Customer rules</Term> line above the grid at{" "}
+          maximising or SLA tiers — is set once, on the <Term>Allocation</Term> line above the grid — shown only when two or
+          more customers want the same product, because only then is there anything to share — at{" "}
           <AppLink to="/policies">/policies</AppLink>. Allocating between customers is a rule the
           chain applies <em>across</em> rows, so a per-row version would be several rules competing
           to be the rule; the engine reads one.

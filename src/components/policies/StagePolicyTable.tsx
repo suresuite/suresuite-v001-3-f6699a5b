@@ -42,7 +42,9 @@ import {
   fgBufferAppliesToRow,
   isFgDependentCol,
   projectFulfillmentModeOf,
+  rowDemandMode,
   rowFulfillmentMode,
+  rowHasForecast,
   type ColSpec,
   type ColSpecCtx,
 } from "@/lib/policies/columnSpecs";
@@ -839,6 +841,15 @@ export function StagePolicyTable({
         value: o,
         label: POLICY_TYPE_SHORT[o] ?? o,
         title: policyTypeLabel("inventory", o),
+      }));
+    }
+    if (col.field === "row_demand_mode") {
+      return opts.map((o) => ({
+        value: o,
+        label: o,
+        title: o === "forecast"
+          ? "Forecast — the row plans week by week on its uploaded series; the distribution adds spread around it"
+          : "Model — a constant mean per week, drawn from the distribution below",
       }));
     }
     if (col.field === "fulfillment_mode") {
@@ -1955,12 +1966,20 @@ export function StagePolicyTable({
                     // chain (master → the project → MTO), never the first option.
                     col.field === "fulfillment_mode"
                       ? rowFulfillmentMode(rowCtx)
-                      : cellValue ?? liveDefault ?? (col.field === "sourcing_firm" ? firms?.[0] : opts?.[0]?.value) ?? "",
+                      : col.field === "row_demand_mode"
+                        // The mode the ENGINE runs: forecast only with a series.
+                        ? rowDemandMode(rowCtx)
+                        : cellValue ?? liveDefault ?? (col.field === "sourcing_firm" ? firms?.[0] : opts?.[0]?.value) ?? "",
                   )}
                   options={
                     col.field === "sourcing_firm" && firms
                       ? firms.map((f) => ({ value: f, label: f }))
-                      : opts!
+                      : col.field === "row_demand_mode"
+                        ? opts!.map((o) =>
+                            o.value === "forecast" && !rowHasForecast(rowCtx)
+                              ? { ...o, disabled: true, title: "No forecast uploaded for this row — upload a demand forecast (demand_forecasts: quantity per period for this customer × product) in Project manager" }
+                              : o)
+                        : opts!
                   }
                   onChange={commit}
                 />
@@ -1969,7 +1988,8 @@ export function StagePolicyTable({
               {kind === "select" && (
                 <Select value={String(cellValue ?? liveDefault ?? "")} onValueChange={commit}>
                   <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
-                    <SelectValue placeholder="—" />
+                    {/* An empty distribution runs the PRODUCT's, × the row's share. */}
+                    <SelectValue placeholder={col.field === "row_demand_distribution" ? "product's" : "—"} />
                   </SelectTrigger>
                   <SelectContent>
                     {(col.field === "sourcing_firm" && firms
