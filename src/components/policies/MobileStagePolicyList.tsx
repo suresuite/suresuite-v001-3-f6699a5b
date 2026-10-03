@@ -19,6 +19,7 @@ import {
   specFor,
   familiesForStage,
   flattenBundle,
+  projectFulfillmentModeOf,
   type ColSpec,
   type ColSpecCtx,
 } from "@/lib/policies/columnSpecs";
@@ -30,8 +31,10 @@ import {
   resolveCell,
   substitutionNote,
   getEffectiveValue,
+  rowGateCtx,
   type MasterRowMaps,
 } from "@/lib/policies/resolveEffective";
+import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { customerRowMasters, demandCellNote, fulfillmentCellNote } from "@/lib/policies/customerRows";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
@@ -96,6 +99,7 @@ export function MobileStagePolicyList({
 }: Props) {
   const spec = specFor(stageKey);
   const families = useMemo(() => familiesForStage(stageKey), [stageKey]);
+  const { selectedProject } = useGlobalProject();
   const { rows: dataRows, loading } = stageRows;
   const {
     materials, products, suppliers, derived: derivedEconomics, lanes,
@@ -297,12 +301,12 @@ export function MobileStagePolicyList({
         {openRow && (
           <div className="flex flex-col gap-3 p-3.5">
             {FAMILY_ORDER.filter((fam) => families.includes(fam)).map((fam) => {
-              const rowCtx: ColSpecCtx = {
-                fulfillmentStrategy,
-                row: openRow,
-                draft: undefined,
+              const rowCtx: ColSpecCtx = rowGateCtx({
+                rowKey: String(openRow.key), row: openRow, fulfillmentStrategy,
                 effective: rowEffective.get(String(openRow.key)),
-              };
+                projectFulfillmentMode: projectFulfillmentModeOf(selectedProject?.supply_chain_model),
+                families, masterColByField, masterRowById, derived, defaults, overrides, scope: spec.scope,
+              });
               const cols = spec.cols.filter(
                 (c) => c.family === fam && !c.synthetic && (!c.visibleWhen || c.visibleWhen(rowCtx)),
               );

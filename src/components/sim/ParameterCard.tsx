@@ -11,7 +11,7 @@ import {
 
 /**
  * One parameter group = one titled card holding a Parameter | Value | Unit table.
- * Same shape as components/policies/PolicyDefaultsCard.tsx so the two pages read
+ * Same shape as the /policies defaults card had (now `ProjectRuleBar`) so the two pages read
  * as siblings. No prose, no helper sentences — the unit column carries the units
  * and provenance rides on a chip.
  */

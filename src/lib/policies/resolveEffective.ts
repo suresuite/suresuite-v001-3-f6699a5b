@@ -1,6 +1,6 @@
 import { effectivePolicy, type OverrideRow } from "./resolve";
 import type { PolicyBundle, PolicyFamily } from "./schemas";
-import type { ColSpec } from "./columnSpecs";
+import { GATE_FIELDS, type ColSpec, type ColSpecCtx } from "./columnSpecs";
 import { reducerLabel, type DerivedValue } from "./effectiveEconomics";
 import { shadowedBy } from "./registryAccess";
 import { entityOverride, masterOverrideRule, type ResolvedOverride } from "./masterOverrides";
@@ -419,6 +419,48 @@ export function supersededNote(shadowingField: string, label: string): string {
  * intermediates its renderer needs and nothing else — deliberately not a second
  * return shape, because that is how the copy started.
  */
+/**
+ * The per-row context every `visibleWhen` gate is asked with — ONE builder for
+ * the grid and the phone, so the two cannot disagree about whether a row's FG
+ * cells apply. `resolved` holds each `GATE_FIELDS` value as the cell shows it
+ * (draft → the row's override → the item master).
+ */
+export function rowGateCtx(args: {
+  rowKey: string;
+  row: Record<string, unknown>;
+  draft?: Record<string, unknown>;
+  fulfillmentStrategy?: string;
+  effective?: Record<string, unknown>;
+  projectFulfillmentMode: "mts" | "mto";
+  families: readonly PolicyFamily[];
+  masterColByField: Map<string, ColSpec>;
+  masterRowById: MasterRowMaps;
+  derived: DerivedMaps;
+  defaults: PolicyBundle;
+  overrides: OverrideRow[];
+  scope: "node" | "edge";
+}): ColSpecCtx {
+  const { rowKey, row, draft, masterColByField } = args;
+  const resolved: Record<string, unknown> = {};
+  for (const field of GATE_FIELDS) {
+    const col = masterColByField.get(field);
+    if (!col) continue;
+    resolved[field] = getEffectiveValue({
+      rowKey, dataRow: row, field, family: col.family, families: args.families, draft: draft?.[field],
+      masterColByField, masterRowById: args.masterRowById, derived: args.derived,
+      defaults: args.defaults, overrides: args.overrides, scope: args.scope,
+    });
+  }
+  return {
+    fulfillmentStrategy: args.fulfillmentStrategy,
+    row,
+    draft,
+    effective: args.effective,
+    resolved,
+    projectFulfillmentMode: args.projectFulfillmentMode,
+  };
+}
+
 export function resolveCell(args: {
   rowKey: string;
   row: Record<string, unknown>;

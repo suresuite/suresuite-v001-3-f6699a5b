@@ -238,7 +238,8 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
     "customer.sourcing_firm",
     // plant.initial_on_hand left this list in WP 14.4 (§4 D89's remainder, RFC
     // 4): the cell is `fg_initial_on_hand` now, master-backed and read.
-    "plant.review_period_days",
+    // plant.review_period_days left with the Plant stage's whole inventory
+    // family — no Plant row's inventory key was ever read (D204 b).
     // supplier.primary_source left this list when a saved Supplier-stage primary
     // became the engine's primary link (`SupplierLink.primary`, §4 D188). The
     // CUSTOMER stage's primary stays: same name, other family, no reader.
@@ -330,12 +331,18 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     // TWENTY-ONE since WP 14.3: the Customer row's backorder setting, window and
     // cost resolve by declaration too (read at the project default AND on the
     // row); its priority, price and target are master overrides.
-    expect(byDeclaration.length).toBe(21);
+    // THIRTEEN since the Plant stage dropped its inventory family: its type,
+    // s, S, safety days, service level and the three P-P.4 cells were eight
+    // chains declared to reach nothing from a Plant row (D204 b) — the FG
+    // policy that replaced them resolves as master overrides.
+    expect(byDeclaration.length).toBe(13);
     // 17 rendered fields resolve by declaration (14 until WP 14.3 added the
     // three backorder cells; rop_q_quantity, coverage_weeks
     // and holding_cost_pct resolve through their own doors on some stages, so
     // the field count trails the 16 keys project_map declares).
-    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(17);
+    // 13 fields too: with the Plant copies of `type`, `safety_stock_days`, s
+    // and S gone, no declared field is rendered on two stages any more.
+    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(13);
     for (const c of byDeclaration) {
       const detail = c.hops.find((h) => h.kind === "engine")!.detail;
       // The TARGET is what makes the chain followable; the TRANSFORM is what makes
@@ -361,8 +368,8 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     // Three of the nine are read only under another key's value. A chain that
     // claimed the cell always reaches the engine would be wrong in the direction
     // §4 D18 is — a control whose effect depends on a setting elsewhere.
-    expect(doorDetail("plant", "fg_safety_stock_days")).toMatch(/only when/i);
-    expect(doorDetail("plant", "service_level_target")).toMatch(/only when/i);
+    // (The Plant stage's P-P.4 and service-level cells were the other two; they
+    // left the grid with the Plant inventory family — P-P.4 is the project line.)
     expect(doorDetail("supplier", "safety_stock_days")).toMatch(/Only when/i);
   });
 });

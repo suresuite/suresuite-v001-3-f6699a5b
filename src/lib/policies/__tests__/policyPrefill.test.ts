@@ -196,9 +196,10 @@ describe("D1 — the three copies of the safety-stock default agree", () => {
     // disagrees is a silent override waiting to be persisted.
     const schemaDefault = (DEFAULT_BUNDLE.inventory as Record<string, unknown>).safety_stock_days;
     expect(schemaDefault).toBe(7);
-    for (const stage of ["supplier", "plant"] as const) {
-      const col = specFor(stage).cols.find((c) => c.field === "safety_stock_days");
-      expect(col?.defaultWhenMissing, `${stage} stage`).toBe(schemaDefault);
-    }
+    // The Supplier stage is the one copy left: the Plant stage dropped its
+    // safety-days column, which no Plant row could reach (D204 b).
+    const col = specFor("supplier").cols.find((c) => c.field === "safety_stock_days");
+    expect(col?.defaultWhenMissing, "supplier stage").toBe(schemaDefault);
+    expect(specFor("plant").cols.some((c) => c.field === "safety_stock_days")).toBe(false);
   });
 });

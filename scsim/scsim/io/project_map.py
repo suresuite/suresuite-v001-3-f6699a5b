@@ -871,6 +871,25 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "transform": "units, >= 0: FG opening stock (engine RFC 4). Order: the Plant-stage row "
                      "-> products.fg_initial_on_hand -> the target. MTS only",
     },
+    # Whether the product holds finished-goods stock at all — the switch every
+    # FG key above depends on, so /policies can show the FG policy only where it
+    # is read. Same chain as the master's: the Plant-stage row -> the product ->
+    # the project's supply_chain_model -> MTO (`_fulfillment_mode`).
+    {
+        "key": "fulfillment_mode",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.fulfillment_mode",
+        "catalog_ref": None,
+        "master": "products.fulfillment_mode",
+        "rows": "plant",
+        "domain": "fulfillment_mode",
+        "empty_default": None,
+        "empty_note": "the project's supply chain model, else make-to-order",
+        "transform": "enum — mts (holds FG stock, the FG policy applies) · mto (built to order, "
+                     "no FG stock). Order: the Plant-stage row -> products.fulfillment_mode -> "
+                     "projects.supply_chain_model -> mto",
+    },
     # ── Per-row fulfillment (PLAN.md §24 WP 14.3, D284 c) ───────────────────
     # Backorder, its window and cost are read at the project default AND on a
     # Customer row (`node:<customer>::<product>`, an existing row only); a row
@@ -1334,6 +1353,38 @@ def _fulfillment_mode(
             "warn", f"product:{product_id or '?'}", "fulfillment_mode",
             f"fulfillment mode {token!r} is not modeled by the engine — treated as make_to_order (MTO)"))
     return FulfillmentMode.MTO
+
+
+# The two values a Plant row may set — mirrored by `entityOverrides.ts`'s
+# `fulfillment_mode` domain, so the page and the run accept the same tokens.
+_MODE_OVERRIDE_TOKENS = ("mts", "mto")
+
+
+def _resolve_mode(
+    master: ProductRow, prod_row: dict, project_model: Optional[str],
+    tally: "_SourceTally", w: list[MappingWarning],
+) -> FulfillmentMode:
+    """Whether the product holds FG stock: the Plant-stage row's override → the
+    products master → the project's model → MTO. Only an override is counted in
+    the run log, so a project that sets none logs exactly as before."""
+    pid = master.id
+    raw = prod_row.get("fulfillment_mode")
+    token = None
+    if raw not in (None, ""):
+        token = str(raw).strip().lower()
+        if token not in _MODE_OVERRIDE_TOKENS:
+            token = None
+            w.append(MappingWarning("warn", f"product:{pid}", "fulfillment_mode",
+                                    f"/policies override {raw!r} is not mts or mto — ignored, "
+                                    f"the item master decides"))
+    if token is not None:
+        mode, src = FulfillmentMode(token), "override"
+    else:
+        mode = _fulfillment_mode(master.fulfillment_mode, project_model, w, pid)
+        src = "master" if master.fulfillment_mode not in (None, "") else "default"
+    tally.add("products.fulfillment_mode", src, pid, count=src == "override")
+    tally.value("products.fulfillment_mode", pid, mode.value)
+    return mode
 
 
 def _resolve_demand_kind(product_dist: Optional[str], scenario_model: Optional[dict]) -> str:
@@ -2117,7 +2168,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
             tally.add("products.production_capacity", "default", p.id)
             w.append(MappingWarning("warn", f"product:{p.id}", "production_capacity",
                                     "no capacity source → defaulted (capacity will not bind)"))
-        mode = _fulfillment_mode(p.fulfillment_mode, data.project_model, w, p.id)
+        mode = _resolve_mode(p, prod_row, data.project_model, tally, w)
         product_modes.add(mode)
         cv_ov = _ovr(prod_row, "demand_cv", ent, "demand_cv")
         if cv_ov is not None:

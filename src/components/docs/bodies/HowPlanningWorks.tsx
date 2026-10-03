@@ -66,7 +66,7 @@ export default function HowPlanningWorks() {
         <P>
           Demand and fulfillment per row: the Customer stage. The FG policy and opening stock per
           product: the Plant stage. MRP per material: the Supplier stage's policy type. The
-          allocation rule and the backorder defaults: the Customer allocation card. All on{" "}
+          allocation rule and the backorder defaults: the Customer rules line above the Customer grid; the FG safety buffer: the line above the Plant grid. All on{" "}
           <AppLink to="/policies">/policies</AppLink>; the uploads are the base each cell overrides.
         </P>
       </Section>

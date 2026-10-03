@@ -13,7 +13,7 @@ import * as XLSX from "xlsx";
 import { StagePolicyTable } from "./StagePolicyTable";
 import { MobileStagePolicyList } from "./MobileStagePolicyList";
 import { MobileGroup, MobileNote, MobilePanel, MobileRow } from "@/components/mobile";
-import { PolicyDefaultsCard } from "./PolicyDefaultsCard";
+import { ProjectRuleBar } from "./ProjectRuleBar";
 import { PresetDiffBanner } from "./PresetDiffBanner";
 import { LaneTruncationNotice } from "@/components/policies/LaneTruncationNotice";
 import { RunValidateStage } from "./RunValidateStage";
@@ -22,7 +22,7 @@ import type { StageRowsQuery } from "@/hooks/useStageGuards";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/policies/schemas";
 import type { ProjectContext } from "@/lib/policies/resolvePreset";
-import { FIELD_LABELS, visibleFieldGroups } from "@/lib/policies/schemas";
+import { CUSTOMER_RULE, FG_BUFFER_RULE, customerRuleFields, type RuleField } from "@/lib/policies/projectRules";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import {
@@ -30,6 +30,22 @@ import {
   exportStageWorkbook,
   importStageWorkbook,
 } from "@/lib/policies/excel";
+
+/** A project rule's fields as read-only phone rows. */
+function ruleRows(fields: RuleField[], value: Record<string, unknown>) {
+  return fields
+    .filter((f) => !f.when || f.when(value))
+    .map((f) => {
+      const v = value[f.field];
+      const shown =
+        typeof v === "boolean"
+          ? v ? "Yes" : "No"
+          : v === undefined || v === null || v === ""
+            ? "—"
+            : `${f.optionLabel ? f.optionLabel(String(v)) : String(v)}${f.unit ? ` ${f.unit}` : ""}`;
+      return <MobileRow key={f.field} chevron={false} label={f.label} value={shown} />;
+    });
+}
 
 interface Props {
   projectId: string | null | undefined;
@@ -153,6 +169,40 @@ export function FocusedStage({
     );
   }
 
+  // The stage's project-level settings, one line above its grid
+  // (`projectRules.ts`): the Customer stage's allocation rule and the backorder
+  // an empty row inherits; the Plant stage's FG buffer, only while some product
+  // holds FG stock — for an all-MTO project it is read by nothing.
+  const ruleBar = ({ anyFgStock, customerCount }: { anyFgStock: boolean; customerCount: number }) => {
+    if (stageKey === "customer") {
+      return (
+        <ProjectRuleBar
+          family="fulfillment"
+          title={CUSTOMER_RULE.title}
+          hint={CUSTOMER_RULE.hint}
+          fields={customerRuleFields(customerCount)}
+          value={defaults.fulfillment}
+          onSave={(v) => saveDefault("fulfillment", v)}
+          readOnly={!canImport}
+        />
+      );
+    }
+    if (stageKey === "plant" && anyFgStock) {
+      return (
+        <ProjectRuleBar
+          family="inventory"
+          title={FG_BUFFER_RULE.title}
+          hint={FG_BUFFER_RULE.hint}
+          fields={FG_BUFFER_RULE.fields}
+          value={defaults.inventory}
+          onSave={(v) => saveDefault("inventory", v)}
+          readOnly={!canImport}
+        />
+      );
+    }
+    return null;
+  };
+
   const tableLeftActions = (
     <>
       <input
@@ -208,8 +258,8 @@ export function FocusedStage({
   // Mobile: check/verify, not configure (spec — see MobileStagePolicyList's own
   // header comment). No filter/sort/bulk-edit toolbar, no preset-applied
   // banner (the banner exists to explain a bulk
-  // change that can't happen from here), and the fulfillment defaults render
-  // as a plain read-only summary instead of PolicyDefaultsCard's form.
+  // change that can't happen from here), and the Customer rules render as a
+  // plain read-only summary instead of the desktop's one-line form.
   if (isMobile) {
     return (
       <div className="flex flex-col gap-[var(--m-gap)]">
@@ -225,25 +275,9 @@ export function FocusedStage({
         />
         {stageKey === "customer" && (
           <MobileGroup label="Project-wide">
-          <MobilePanel label="Fulfillment defaults" counter="project-wide">
-            {Object.values(visibleFieldGroups("fulfillment")).flat().map((field) => {
-              const value = (defaults.fulfillment as Record<string, unknown>)[field];
-              const shown =
-                typeof value === "boolean"
-                  ? value ? "Yes" : "No"
-                  : value === undefined || value === null || value === ""
-                    ? "—"
-                    : String(value);
-              return (
-                <MobileRow
-                  key={field}
-                  chevron={false}
-                  label={FIELD_LABELS[field] ?? field}
-                  value={shown}
-                />
-              );
-            })}
-          </MobilePanel>
+            <MobilePanel label={CUSTOMER_RULE.title} counter="project-wide">
+              {ruleRows(CUSTOMER_RULE.fields, defaults.fulfillment as Record<string, unknown>)}
+            </MobilePanel>
           </MobileGroup>
         )}
       </div>
@@ -281,20 +315,8 @@ export function FocusedStage({
         leftActions={tableLeftActions}
         stageRows={rowsByStage[stageKey]}
         onDraftsChange={onDraftsChange}
+        ruleBar={ruleBar}
       />
-
-      {/* Fulfillment (allocation, backorder, service level) is consumed by the
-          engine at the PROJECT scope only (P-C.1/P-C.2), never per customer×product.
-          So it is edited here as a project-wide default rather than a grid column —
-          which is why the customer grid above no longer carries backorder/price cells. */}
-      {stageKey === "customer" && (
-        <PolicyDefaultsCard
-          family="fulfillment"
-          value={defaults.fulfillment}
-          onSave={(v) => saveDefault("fulfillment", v as PolicyBundle["fulfillment"])}
-        />
-      )}
-
     </div>
   );
 }

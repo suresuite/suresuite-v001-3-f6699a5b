@@ -28,7 +28,10 @@ export type FitKind =
 
 export interface FitCol {
   key: string;
+  /** The header band (and collapse unit) — the column's family, or its `band`. */
   family: PolicyFamily;
+  /** The band's display name when it is not the family's own (`ColSpec.band`). */
+  bandLabel?: string;
   label: string;
   /** Second header line: unit, range, provenance note. Never part of `label`. */
   sub: string;

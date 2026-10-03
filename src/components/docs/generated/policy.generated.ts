@@ -928,6 +928,76 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "plant",
+    "field": "allocation_priority_weight",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `allocation_priority_weight` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "substitution",
+        "detail": "`defaultWhenMissing: 1` — shown when nothing above resolves",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → material_allocation.priority_weights (P-X.3). Transform: per-product weight, collected from composite `node:<node>::<product>` override keys. Read only when the scenario asks for `allocate_materials`, and its presence switches the objective to priority_weighted",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
+    "field": "fulfillment_mode",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fulfillment_mode` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fulfillment_mode` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_fulfillment_mode -> Product fulfillment mode",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
     "field": "fg_policy",
     "family": "production",
     "hops": [
@@ -949,41 +1019,6 @@ export const CHAINS: PolicyChain[] = [
       {
         "kind": "engine",
         "detail": "project_map.py::_resolve_fg -> Product.fg_policy (MTS)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "fg_base_stock",
-    "family": "production",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `fg_base_stock` (family `production`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`products.fg_base_stock` (item master, keyed from `product_id`)",
-        "evidence": null
-      },
-      {
-        "kind": "unit",
-        "detail": "`units of product`, fixed by `fixed`",
-        "evidence": null
-      },
-      {
-        "kind": "engine",
-        "detail": "project_map.py::_resolve_fg -> Product.fg_base_stock (MTS)",
         "evidence": null
       },
       {
@@ -1033,6 +1068,41 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "plant",
+    "field": "fg_base_stock",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `fg_base_stock` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.fg_base_stock` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`units of product`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_resolve_fg -> Product.fg_base_stock (MTS)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
     "field": "fg_cover_days",
     "family": "production",
     "hops": [
@@ -1068,205 +1138,6 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "plant",
-    "field": "type",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `type` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic, mrp -> mrp (WP 14.5: ordered from the plan); anything unrecognised falls back to min_max",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "basis",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `basis` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy parameter (`params_schema`) — the registry export is the single source for policy schemas (§6.2)",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "reorder_point",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `reorder_point` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 50` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.material_overrides[*].reorder_point (P-P.1). Transform: absolute units replacing s = E[D]·T_s for that material only; read from supplier-row overrides, not at default scope (the default s stays the formula)",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "order_up_to",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `order_up_to` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 200` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.material_overrides[*].order_up_to (P-P.1). Transform: absolute units replacing S = E[D]·(T_s+κ) for that material only; dropped with a warning when it does not exceed the row's reorder point. Not read at default scope",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "rop_q_quantity",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `rop_q_quantity` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 0` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy parameter (`params_schema`) — the registry export is the single source for policy schemas (§6.2)",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "review_period_days",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `review_period_days` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 1` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      }
-    ],
-    "breaks": [
-      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/engine.py:323."
-    ],
-    "breakClass": "legacy-only",
-    "breakEvidence": [
-      "sim-worker/sim_worker/engine.py:323"
-    ]
-  },
-  {
-    "stage": "plant",
     "field": "fg_initial_on_hand",
     "family": "production",
     "hops": [
@@ -1293,246 +1164,6 @@ export const CHAINS: PolicyChain[] = [
       {
         "kind": "rpc",
         "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "safety_stock_days",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `safety_stock_days` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 7` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.fixed_days_cover (P-X.2). Transform: days, clamped 0-84. At default scope only when `safety_stock_method` is neither service_level/demand_variability nor king_method. On a Supplier-stage row (`node:<supplier>::<material>`) it is that material's cover in `fixed_days_by_material`, whatever the method — the /policies value beats the project default (§4 D204)",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "holding_cost_pct",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `holding_cost_pct` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 0.2` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "engine",
-        "detail": "registry data_requirements: materials.holding_cost_pct (defaulted)",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "service_level_target",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `service_level_target` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 0.95` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.uniform_service_level (P-X.2). Transform: fraction x 100, clamped 80.0-99.9. Read only when `safety_stock_method` is service_level or demand_variability",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "fg_safety_stock",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `fg_safety_stock` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → fg_safety_stock.sizing (P-P.4). Transform: enum — 'none' skips the policy; 'service_level' selects service-level sizing; anything else selects fixed_days. Gated on the engine's own `has_mts`, not on the policy's fulfillment_strategy string",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "fg_service_level_target",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `fg_service_level_target` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 0.95` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → fg_safety_stock.service_level_pct (P-P.4). Transform: fraction x 100, clamped 80.0-99.9. Read only when `fg_safety_stock` is service_level",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "fg_safety_stock_days",
-    "family": "inventory",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `fg_safety_stock_days` (family `inventory`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 2` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → fg_safety_stock.fixed_days_cover (P-P.4). Transform: days, clamped 0-12. Read only when `fg_safety_stock` selects fixed_days sizing",
-        "evidence": null
-      }
-    ],
-    "breaks": [],
-    "breakClass": null,
-    "breakEvidence": []
-  },
-  {
-    "stage": "plant",
-    "field": "allocation_priority_weight",
-    "family": "production",
-    "hops": [
-      {
-        "kind": "hook",
-        "detail": "rendered by the plant grid as `allocation_priority_weight` (family `production`)",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "db",
-        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
-        "evidence": null
-      },
-      {
-        "kind": "rpc",
-        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
-        "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 1` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
-      },
-      {
-        "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → material_allocation.priority_weights (P-X.3). Transform: per-product weight, collected from composite `node:<node>::<product>` override keys. Read only when the scenario asks for `allocate_materials`, and its presence switches the objective to priority_weighted",
         "evidence": null
       }
     ],
@@ -2027,8 +1658,7 @@ export const CHAINS: PolicyChain[] = [
 /** How many chains break, by shape. A page renders the number, never types it. */
 export const BREAKS_BY_CLASS: Record<string, string[]> = {
   "legacy-only": [
-    "supplier.review_period_days",
-    "plant.review_period_days"
+    "supplier.review_period_days"
   ],
   "unread": [
     "customer.primary_source"
@@ -4634,5 +4264,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 59;
-export const BROKEN_COUNT = 4;
+export const CHAIN_COUNT = 48;
+export const BROKEN_COUNT = 3;

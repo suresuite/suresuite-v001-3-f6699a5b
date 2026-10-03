@@ -4004,6 +4004,21 @@
       "transform": "units, >= 0: FG opening stock (engine RFC 4). Order: the Plant-stage row -> products.fg_initial_on_hand -> the target. MTS only"
     },
     {
+      "catalog_ref": null,
+      "domain": "fulfillment_mode",
+      "empty_default": null,
+      "empty_note": "the project's supply chain model, else make-to-order",
+      "family": "production",
+      "key": "fulfillment_mode",
+      "master": "products.fulfillment_mode",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.fulfillment_mode",
+      "transform": "enum \u2014 mts (holds FG stock, the FG policy applies) \u00b7 mto (built to order, no FG stock). Order: the Plant-stage row -> products.fulfillment_mode -> projects.supply_chain_model -> mto"
+    },
+    {
       "catalog_ref": "P-C.1",
       "family": "fulfillment",
       "key": "backorder_allowed",

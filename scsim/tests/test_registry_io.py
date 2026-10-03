@@ -494,13 +494,15 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         "fg_reorder_point": ("products.fg_reorder_point", "plant"),
         "fg_cover_days": ("products.fg_cover_days", "plant"),
         "fg_initial_on_hand": ("products.fg_initial_on_hand", "plant"),
+        # Whether the product holds FG stock at all — the Plant row's MTS / MTO.
+        "fulfillment_mode": ("products.fulfillment_mode", "plant"),
     }
     for k in POLICY_BUNDLE_KEYS:
         assert bool(k.get("master")) == bool(k.get("rows")) == bool(k.get("domain")), k
         # One ENUM domain joined in WP 14.2 for the Customer row's
         # distribution; the numeric three are the mapper's `_override_num`.
         assert k.get("domain") in (None, "positive", "nonnegative", "fraction", "percent",
-                                   "distribution", "fg_policy"), k
+                                   "distribution", "fg_policy", "fulfillment_mode"), k
         assert k["catalog_ref"] is None or not k.get("master"), k
 
 
@@ -573,7 +575,7 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "backorder_allowed": True, "max_backorder_days": 21, "backorder_cost_per_day": 3,
         "row_priority": 4, "price": 55, "sla_fill_floor_pct": 70,
         "fg_policy": "min_max", "fg_base_stock": 500, "fg_reorder_point": 50, "fg_cover_days": 21,
-        "fg_initial_on_hand": 250,
+        "fg_initial_on_hand": 250, "fulfillment_mode": "mto",
     }
     keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1",
             "customer": "node:C1::P1"}

@@ -170,9 +170,19 @@ describe("gate page-equals-run — zero differing cells", () => {
     };
     expect(badge("supplier", "basis")).toBe(true);
     expect(badge("supplier", "review_period_days")).toBe(true);
-    expect(badge("plant", "service_level_target")).toBe(true);
-    for (const f of ["type", "reorder_point", "order_up_to", "safety_stock_days", "holding_cost_pct", "fg_safety_stock"]) {
-      expect(badge("plant", f), `plant.${f}`).toBe(true);
+    // The Plant stage no longer carries the inventory family at all: every one
+    // of those cells was badged "not simulated", because the engine reads none
+    // of them from a Plant row. P-P.4 is the project line above the grid.
+    const plantFields = new Set(STAGE_TABLE_SPEC.plant.cols.map((c) => c.field));
+    for (const f of ["type", "__inv_params", "basis", "reorder_point", "order_up_to", "rop_q_quantity",
+      "review_period_days", "safety_stock_days", "holding_cost_pct", "service_level_target",
+      "fg_safety_stock", "fg_service_level_target", "fg_safety_stock_days"]) {
+      expect(plantFields.has(f), `plant.${f} is back on the Plant grid`).toBe(false);
+    }
+    // Every Plant cell that is left reaches the engine on a Plant row.
+    for (const c of STAGE_TABLE_SPEC.plant.cols) {
+      if (c.readOnly) continue;
+      expect(cellEngineRead("plant", c).reaches, `plant.${c.field}`).toBe(true);
     }
     for (const f of ["type", "reorder_point", "order_up_to", "rop_q_quantity", "coverage_weeks", "safety_stock_days", "holding_cost_pct", "primary_source"]) {
       expect(badge("supplier", f), `supplier.${f}`).toBe(false);

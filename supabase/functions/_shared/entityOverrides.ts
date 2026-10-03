@@ -19,7 +19,8 @@
 
 export type Row = Record<string, unknown>;
 export type OverrideDomain =
-  | "positive" | "nonnegative" | "fraction" | "percent" | "distribution" | "demand_mode" | "fg_policy";
+  | "positive" | "nonnegative" | "fraction" | "percent" | "distribution" | "demand_mode" | "fg_policy"
+  | "fulfillment_mode";
 /** `row` (PLAN.md §24 WP 14.2) is a customer × product row of
  *  `outbound_logistics`, keyed exactly as the Customer stage keys it,
  *  `<customer>::<product>`. */
@@ -27,14 +28,17 @@ export type OverrideEntity = "material" | "supplier" | "product" | "row";
 
 /** The values an ENUM domain accepts — the mapper's `_ROW_KIND` targets and the
  *  row's two modes. */
-export const ENUM_DOMAIN_VALUES: Record<"distribution" | "demand_mode" | "fg_policy", readonly string[]> = {
+type EnumDomain = "distribution" | "demand_mode" | "fg_policy" | "fulfillment_mode";
+export const ENUM_DOMAIN_VALUES: Record<EnumDomain, readonly string[]> = {
   distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
   demand_mode: ["forecast", "model"],
   // WP 14.4 — `project_map._FG_POLICIES`.
   fg_policy: ["base_stock", "min_max", "days_of_cover"],
+  // Whether the product holds FG stock — `project_map._MODE_OVERRIDE_TOKENS`.
+  fulfillment_mode: ["mts", "mto"],
 };
-export const isEnumDomain = (d: OverrideDomain): d is "distribution" | "demand_mode" | "fg_policy" =>
-  d === "distribution" || d === "demand_mode" || d === "fg_policy";
+export const isEnumDomain = (d: OverrideDomain): d is EnumDomain =>
+  d === "distribution" || d === "demand_mode" || d === "fg_policy" || d === "fulfillment_mode";
 
 export interface OverrideDecl {
   /** The bundle key — the grid column's `field`. */
