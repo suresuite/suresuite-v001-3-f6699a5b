@@ -72,6 +72,20 @@ def plan_ahead(model, ctx, want0: np.ndarray, plan0: np.ndarray) -> None:
     alloc = ctx.row_allocation or {
         "rule": "fair_share", "priority": model.row_cust_priority,
         "price": model.row_price, "floor_pct": np.zeros(R)}
+    cap = model.capacity
+    # Every projected week's demand in one read: [rows × (H − 1)] and per product.
+    d_rows_all = ctx.projected_demand_rows(t + 1, H - 1)
+    d_all = np.asarray(model.row_to_prod @ d_rows_all)
+    # Nothing can carry when no row backorders and nothing waits now: the
+    # projected backlog is 0 in every later week, so the row step is skipped —
+    # and an all-MTO network plans the whole horizon in one vector operation.
+    carries = bool(np.any(rf["accept"] > 0)) or bool(np.any(ctx.backlog_rows > 0))
+    if not carries and not mts.any():
+        ctx.plan_projected_demand[:, 1:] = d_all
+        ctx.plan_requirement[:, 1:] = d_all
+        ctx.planned_production[:, 1:] = np.minimum(d_all, cap[:, None])
+        return
+
     # Start from the ACTUAL per-row backlog (its ages are unknown off the
     # per-row path, so it enters as age 0 — conservative: it can only expire later).
     buckets = np.zeros((R, rf["max_horizon"] + 1))
@@ -79,20 +93,20 @@ def plan_ahead(model, ctx, want0: np.ndarray, plan0: np.ndarray) -> None:
 
     def carry(supply, d_rows):
         nonlocal buckets
-        buckets = step_rows(supply, buckets, d_rows, model.row_ptr, alloc,
-                            rf["accept"], rf["horizon"]).buckets
+        if carries:
+            buckets = step_rows(supply, buckets, d_rows, model.row_ptr, alloc,
+                                rf["accept"], rf["horizon"]).buckets
 
     # Week t, as it will happen: MTO ships this week's plan; MTS shipped from
     # stock at PH-30 and this week's build goes to stock.
     carry(np.where(mts, ctx.fg_served_backlog + ctx.fg_served_new, plan0), ctx.demand_rows)
     stock = ctx.fg_on_hand + np.where(mts, plan0, 0.0)
-    cap = model.capacity
     fg_target_now = ctx.fg_target
     for k in range(1, H):
-        tau = t + k
-        d_rows = ctx.projected_demand_rows(tau, 1)[:, 0]
-        d = np.asarray(model.row_to_prod @ d_rows).ravel()
-        B = np.asarray(model.row_to_prod @ buckets.sum(axis=1)).ravel()
+        d_rows = d_rows_all[:, k - 1]
+        d = d_all[:, k - 1]
+        B = (np.asarray(model.row_to_prod @ buckets.sum(axis=1)).ravel()
+             if carries else np.zeros(model.n_prods))
         req_mto = d + B
         # MTS: the start-of-week stock serves backlog first, then demand; the
         # policy then asks for the gap from what is left.

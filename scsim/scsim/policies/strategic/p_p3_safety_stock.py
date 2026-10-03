@@ -165,6 +165,13 @@ class SafetyStockMaterials(PolicyPlugin):
                 if i is not None:
                     ss_s[i] = ss_S[i] = exp_d[i] * days / 7.0
         ctx.policy_state[self.id] = {"ss_s": ss_s, "ss_S": ss_S}
+        # WP 14.5 — the same buffer as DAYS of cover per material, published at
+        # setup for MRP (design doc §3.4: SS = days/7 × average weekly need over
+        # the horizon). One buffer, counted once: MRP does not read the levels
+        # this policy raises at PH-70.
+        exp = np.asarray(exp_d, dtype=float)
+        ctx.material_ss_days = np.where(exp > 0, 7.0 * np.asarray(ss_s, dtype=float)
+                                        / np.where(exp > 0, exp, 1.0), 0.0)
 
     def _kappa_hint(self, ctx: SimContext) -> float:
         """κ for Eq. 21 — taken from inventory_control's nominal cover."""

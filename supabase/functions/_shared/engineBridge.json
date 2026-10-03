@@ -15,7 +15,8 @@
     "continuous_review": "min_max",
     "base_stock": "base_stock",
     "rop": "rop_q",
-    "periodic_review": "periodic"
+    "periodic_review": "periodic",
+    "mrp": "mrp"
   },
   "safety_stock_method_to_classification": {
     "fixed_days": "fixed_days",

@@ -63,6 +63,7 @@ SUBSTITUTIONS = "substitutions"
 PRODUCTION_OUTPUT = "production_output"
 FULFILLMENT = "fulfillment"
 MATERIAL_DEMAND = "material_demand"
+GROSS_REQUIREMENTS = "gross_requirements"  # WP 14.5 / ADR 0002: [materials × H] = BOMᵀ × planned_production
 INVENTORY_LEVELS = "inventory_levels"
 PURCHASE_ORDERS = "purchase_orders"
 ARRIVALS = "arrivals"
@@ -103,7 +104,7 @@ PIPELINE: tuple[PhaseSpec, ...] = (
               "Pure mechanics (Eqs. 8/9): produce Q_p, consume materials."),
     PhaseSpec(PhaseId.PH60, "fulfillment", (FULFILLMENT,),
               "F_p, B_p, L_p — P-C.1/P-C.2/P-C.3 resident."),
-    PhaseSpec(PhaseId.PH70, "material_planning", (MATERIAL_DEMAND, INVENTORY_LEVELS),
+    PhaseSpec(PhaseId.PH70, "material_planning", (MATERIAL_DEMAND, INVENTORY_LEVELS, GROSS_REQUIREMENTS),
               "D_m projection (Eq. 1); s_m/S_m levels (Eqs. 2–3) + safety stock."),
     PhaseSpec(PhaseId.PH80, "procurement", (PURCHASE_ORDERS,),
               "Order release (Eqs. 4–6) and sourcing decisions; orders enter the supplier queue."),

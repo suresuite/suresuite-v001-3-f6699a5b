@@ -670,6 +670,6 @@ for one you did.
 
 ---
 
-*Generated from data contract `7c907a6018f7`, engine `0.5.0`,
+*Generated from data contract `d0d4a59f9d20`, engine `0.6.0`,
 sidecar `supabase/contract/products.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

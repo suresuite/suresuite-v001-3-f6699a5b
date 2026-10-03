@@ -190,7 +190,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.5.0",
+  "engine_version": "0.6.0",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -1413,7 +1413,8 @@
         "name": "material_planning",
         "owns": [
           "material_demand",
-          "inventory_levels"
+          "inventory_levels",
+          "gross_requirements"
         ]
       },
       {
@@ -1855,7 +1856,10 @@
           "phase": "PH-80",
           "priority": 50,
           "reads": [
+            "gross_requirements",
             "inventory_levels",
+            "planned_production",
+            "production_output",
             "state.on_hand",
             "state.pipeline",
             "state.queue"
@@ -1864,6 +1868,15 @@
           "writes": [
             "purchase_orders"
           ]
+        },
+        {
+          "phase": "PH-90",
+          "priority": 95,
+          "reads": [
+            "arrivals"
+          ],
+          "resolution": null,
+          "writes": []
         }
       ],
       "id": "inventory_control",
@@ -1914,7 +1927,8 @@
                       "min_max",
                       "base_stock",
                       "rop_q",
-                      "periodic"
+                      "periodic",
+                      "mrp"
                     ],
                     "type": "string"
                   },
@@ -1923,7 +1937,7 @@
                   }
                 ],
                 "default": null,
-                "notes": "Row-level policy type; absent \u2192 project default.",
+                "notes": "Row-level policy type; absent \u2192 project default. mrp orders from the plan (WP 14.5).",
                 "scope": "M",
                 "title": "Policy Type",
                 "unit": "enum"
@@ -2036,9 +2050,10 @@
               "min_max",
               "base_stock",
               "rop_q",
-              "periodic"
+              "periodic",
+              "mrp"
             ],
-            "notes": "min_max \u2705 (manuscript).",
+            "notes": "min_max \u2705 (manuscript). mrp: BOM \u00d7 planned production over the lead time, net of stock and the pipeline (WP 14.5).",
             "scope": "M",
             "title": "Policy Type",
             "type": "string",
@@ -3548,7 +3563,7 @@
         "supplier"
       ],
       "target": "inventory_control.policy_type",
-      "transform": "enum map \u2014 min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max"
+      "transform": "enum map \u2014 min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic, mrp -> mrp (WP 14.5: ordered from the plan); anything unrecognised falls back to min_max"
     },
     {
       "catalog_ref": "P-X.2",

@@ -28,6 +28,7 @@ from scipy import sparse
 from scsim.core.phases import (
     FG_FULFILLMENT,
     FULFILLMENT,
+    GROSS_REQUIREMENTS,
     INVENTORY_LEVELS,
     OVERTIME_CAPACITY,
     PRODUCTION_PLAN,
@@ -242,6 +243,10 @@ class CompiledModel:
         # Planning horizon H (weeks of planned production, week t first). 1 until
         # MRP sets it (WP 14.5): with H = 1 the plan IS this week's production plan.
         self.plan_horizon = 1
+        # MRP materials (WP 14.5), set at compile by P-P.1 (`configure_model`),
+        # which also raises `plan_horizon` to the longest MRP lead time + 1.
+        self.mrp_mask = np.zeros(self.n_mats, dtype=bool)
+        self.has_mrp = False
         # Full COGS per FG unit (P-P.4 holding basis): Σ_m r_{p,m} · c_m.
         self.fg_unit_cogs = np.asarray(self.bom @ self.mat_cost).ravel()
 
@@ -708,6 +713,13 @@ class WeeklyTrace:
     sup_cap_bound: np.ndarray = field(init=False)
     D: Optional[np.ndarray] = None
     PD: Optional[np.ndarray] = None
+    # WP 14.5 — the MRP record per material (need over the lead time, on hand
+    # after production, on the way, net), allocated by P-P.1 when a run has MRP
+    # materials and keeps matrices.
+    MRP_NEED: Optional[np.ndarray] = None
+    MRP_ON_HAND: Optional[np.ndarray] = None
+    MRP_ON_WAY: Optional[np.ndarray] = None
+    MRP_NET: Optional[np.ndarray] = None
     REQ: Optional[np.ndarray] = None
     PLAN: Optional[np.ndarray] = None
     Q: Optional[np.ndarray] = None
@@ -851,6 +863,9 @@ class SimContext:
         # Every row's backorder settings (share that waits, horizon, penalty),
         # published by P-C.1 at setup (WP 14.4); None = no P-C.1 (lost sales).
         self.row_fulfillment: Optional[dict] = None
+        # Safety-stock days of cover per material, published by P-P.3 at setup
+        # (WP 14.5); None = no P-P.3, so MRP holds no buffer.
+        self.material_ss_days: Optional[np.ndarray] = None
         self.forecast = model.mean_demand_p.copy()
         self.fg_served_backlog = np.zeros(model.n_prods)  # PH-30 (MTS)
         self.fg_served_new = np.zeros(model.n_prods)
@@ -862,6 +877,8 @@ class SimContext:
         self.planned_production = np.zeros((model.n_prods, H))
         self.plan_requirement = np.zeros((model.n_prods, H))
         self.plan_projected_demand = np.zeros((model.n_prods, H))
+        # PH-70 (WP 14.5): BOMᵀ × planned production, [materials × H].
+        self.gross_requirements = np.zeros((model.n_mats, H))
         self.overtime_extra = np.zeros(model.n_prods)
         self.production_output = np.zeros(model.n_prods)
         self.fulfillment = np.zeros(model.n_prods)
@@ -927,6 +944,10 @@ class SimContext:
             if e.lt_active_at(self.week) or e.cap_factor_at(self.week) < 1.0:
                 mask[e.supplier_idx] = True
         return mask
+
+    def write_gross_requirements(self, gr: np.ndarray) -> None:
+        self._check_write(GROSS_REQUIREMENTS)
+        self.gross_requirements = gr
 
     def pipeline_on_order(self) -> np.ndarray:
         """Per-material in-transit + supplier-queue quantities (position input)."""

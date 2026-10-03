@@ -503,6 +503,12 @@ Phase 14 rule a named, CI-enforced gate.
 
 PRECONDITIONS — verify: WP 14.1–14.5 merged; D284 (a)–(d) closed.
 
+Inherited from WP 14.5: MRP is inventory_control.policy_type "mrp" (or a per-material
+override); mrp_late_receipt_weeks / material_shortage_weeks appear only with MRP
+materials. Phase 14's MRP plans from the customer-table forecast, so the appendix's
+"unforecast step" is a forecast-bias case (design doc §9 point 15). Golden #7 and the two
+honesty tests are named in PLAN.md §24 WP 14.6.
+
 DO:
 1. A study script (for example scsim/scripts/study_demand_driven_planning.py) that runs
    CRN-paired comparisons (blueprint A7; sequential-CI stopping where available) on the

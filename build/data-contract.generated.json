@@ -1,7 +1,7 @@
 {
   "$generator": "scripts/data-contract/generate.mjs",
   "$doc": "The data contract: the introspected schema merged with the authored sidecars and the engine registry snapshot. Generated — do not edit; `npm run contract:check` fails on drift.",
-  "engine_version": "0.5.0",
+  "engine_version": "0.6.0",
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
@@ -11,7 +11,7 @@
     },
     "sidecars": 76,
     "registry": {
-      "engine_version": "0.5.0",
+      "engine_version": "0.6.0",
       "policies": 23
     }
   },
@@ -31673,7 +31673,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "component ItemSeriesExplorer (mounted by RunValidateStage) → select kind,item_id from run_item_series",
           "grain": "table",
-          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
+          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
           "confirmed": true,
           "note": "Run & Validate is where an inspection run is STARTED, and the explorer sits under it: it first reads the run's item index (ids only), then fetches one item's `series` on demand — the payload is a few MB for a large project, so it is never read whole."
         },
@@ -31681,7 +31681,7 @@
           "page": "SimulationLab.tsx",
           "via": "component ItemSeriesExplorer (mounted by ResultsDashboard) → select kind,item_id from run_item_series",
           "grain": "table",
-          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
+          "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
           "confirmed": true,
           "note": "Simulation Lab dispatches no inspection run, so this panel shows rows only for a run started from Run & Validate, and says so rather than rendering empty without a reason (§4 D113's shape)."
         }
@@ -31913,14 +31913,14 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
               "confirmed": true
             },
             {
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
               "confirmed": true
             }
           ],
@@ -31960,14 +31960,14 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
               "confirmed": true
             },
             {
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88",
               "confirmed": true
             }
           ],
@@ -32007,14 +32007,14 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:113",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:118",
               "confirmed": true
             },
             {
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:113",
+              "evidence": "src/components/sim/ItemSeriesExplorer.tsx:118",
               "confirmed": true
             }
           ],
@@ -43779,5 +43779,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "7c907a6018f7"
+  "contract_version": "d0d4a59f9d20"
 }

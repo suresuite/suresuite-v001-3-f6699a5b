@@ -400,8 +400,8 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "target": "inventory_control.policy_type",
         "catalog_ref": "P-X.1",
         "transform": "enum map — min_max/s_S/continuous_review -> min_max, base_stock -> "
-                     "base_stock, rop -> rop_q, periodic_review -> periodic; anything "
-                     "unrecognised falls back to min_max",
+                     "base_stock, rop -> rop_q, periodic_review -> periodic, mrp -> mrp (WP "
+                     "14.5: ordered from the plan); anything unrecognised falls back to min_max",
     },
     {
         "key": "safety_stock_days",
@@ -2610,6 +2610,7 @@ def _map_policies(
     type_map = {
         "min_max": "min_max", "s_S": "min_max", "continuous_review": "min_max",
         "base_stock": "base_stock", "rop": "rop_q", "periodic_review": "periodic",
+        "mrp": "mrp",  # WP 14.5 — ordered from the plan (design doc §3.4)
     }
 
     # Per-material replenishment overrides from the supplier grid. Its rows key

@@ -1,5 +1,5 @@
 {
-  "engine_version": "0.5.0",
+  "engine_version": "0.6.0",
   "phases": [
     {
       "id": "PH-00",
@@ -67,7 +67,8 @@
       "name": "material_planning",
       "owns": [
         "material_demand",
-        "inventory_levels"
+        "inventory_levels",
+        "gross_requirements"
       ],
       "description": "D_m projection (Eq. 1); s_m/S_m levels (Eqs. 2\u20133) + safety stock."
     },

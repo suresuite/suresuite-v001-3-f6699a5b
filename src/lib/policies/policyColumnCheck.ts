@@ -226,7 +226,7 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   "supplier:type": {
     shows: "override → project default → min_max",
     savedTo: "override inventory.type",
-    engine: "per-material policy type (inventory_control.material_overrides); s_S / continuous_review run as min_max",
+    engine: "per-material policy type (inventory_control.material_overrides); s_S / continuous_review run as min_max; mrp orders from the plan (WP 14.5)",
     verdict: "works",
     note: "853 stored.",
   },

@@ -145,7 +145,7 @@ export const FAMILY_FIELDS: Record<PolicyFamily, Record<string, PolicyFieldSpec>
   },
   inventory: {
     // Policy Type → dynamic params (§II.1–II.4; registry-driven picker)
-    type: en(["min_max", "base_stock", "rop", "periodic_review"], true),
+    type: en(["min_max", "base_stock", "rop", "periodic_review", "mrp"], true),
     basis: {
       kind: "enum",
       enum: ["days_of_supply", "forward_visible"],

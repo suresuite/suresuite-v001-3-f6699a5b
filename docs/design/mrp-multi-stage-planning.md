@@ -396,6 +396,23 @@ Found by WP 14.4 (defaults shipped; the owner may overrule):
     without D) runs as base-stock with whatever S it has, and the run says so. FG fields
     on an MTO product are ignored with an info line.
 
+Found by WP 14.5 (defaults shipped; the owner may overrule):
+
+15. **MRP plans from the forecast, not from realized demand.** The appendix's probe 2 fed its
+    MRP a 4-week moving average of REALIZED demand; Phase 14's MRP nets BOM × planned
+    production, and the plan reads the customer table's forecast (or mean). So a demand step
+    that is in the forecast is ordered for before it arrives (0 units lost in the test), and
+    a step nobody forecast is met only by what is on hand — the plan never learns a realized
+    future. That second case is a forecast-error case and belongs to WP 14.6's forecast-bias
+    study, not to the order rule.
+16. **What counts as late.** An MRP order is due usable at release week + lead time. A
+    material is late in a week when what MRP had due by then exceeds what it has received by
+    then; the warm start's primed pipeline is not an MRP receipt. Material shortage weeks
+    are weeks the plant built less than it planned.
+17. **The safety stock's days** are P-P.3's own buffer expressed as days of cover per
+    material (its units ÷ the stationary weekly need × 7), so every P-P.3 classification
+    feeds MRP and none is counted twice.
+
 
 ---
 

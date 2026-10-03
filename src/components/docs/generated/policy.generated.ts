@@ -364,7 +364,7 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic, mrp -> mrp (WP 14.5: ordered from the plan); anything unrecognised falls back to min_max",
         "evidence": null
       }
     ],
@@ -1088,7 +1088,7 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic, mrp -> mrp (WP 14.5: ordered from the plan); anything unrecognised falls back to min_max",
         "evidence": null
       }
     ],
@@ -2946,6 +2946,26 @@ export const ITEM_SERIES: ItemSeries[] = [
     "kind": "product",
     "key": "lost_units",
     "label": "Lost units"
+  },
+  {
+    "kind": "material",
+    "key": "mrp_need",
+    "label": "MRP need (next lead time)"
+  },
+  {
+    "kind": "material",
+    "key": "mrp_on_hand",
+    "label": "MRP on hand (after production)"
+  },
+  {
+    "kind": "material",
+    "key": "mrp_on_the_way",
+    "label": "MRP on the way"
+  },
+  {
+    "kind": "material",
+    "key": "mrp_net",
+    "label": "MRP net"
   }
 ];
 

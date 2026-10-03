@@ -91,6 +91,9 @@ export const InventoryPolicyType = z.enum([
   "rop",
   "periodic_review",
   "continuous_review",
+  // PLAN.md §24 WP 14.5 — ordered from the plan: BOM × planned production over the
+  // lead time, net of stock and the pipeline, ≥ MOQ.
+  "mrp",
 ]);
 export const SafetyStockMethod = z.enum([
   "fixed_days",
@@ -503,7 +506,7 @@ export function visibleFieldGroups(family: PolicyFamily): Record<string, string[
 /** Enum options narrowed to the values the scsim conversion maps. */
 export const SCSIM_ENUM_OPTIONS: Record<string, readonly string[]> = {
   // s_S / continuous_review collapse to min_max in scsim; offer the four real types.
-  type: ["min_max", "base_stock", "rop", "periodic_review"],
+  type: ["min_max", "base_stock", "rop", "periodic_review", "mrp"],
   // demand_variability is approximated as uniform in scsim; not offered.
   safety_stock_method: ["fixed_days", "service_level", "king_method"],
 };

@@ -625,6 +625,14 @@ export function deriveItemSeries(root) {
   const row = /"(material|product)\.(\w+)":/g;
   let m;
   while ((m = row.exec(block[1]))) pairs.push({ kind: m[1], key: m[2] });
+  // …and the series the engine adds CONDITIONALLY (PLAN.md §24 WP 14.5: the MRP
+  // record exists only in a run with MRP materials) — `item_series.update({…})`.
+  const extra = /item_series\.update\(\{([\s\S]*?)\}\)/g;
+  let u;
+  while ((u = extra.exec(engine))) {
+    while ((m = row.exec(u[1]))) pairs.push({ kind: m[1], key: m[2] });
+    row.lastIndex = 0;
+  }
 
   const ui = readFileSync(join(root, "src", "components", "sim", "ItemSeriesExplorer.tsx"), "utf8");
   const labelBlock = /const SERIES_LABEL: Record<string, string> = \{([\s\S]*?)\n\};/.exec(ui);

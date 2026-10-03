@@ -113,3 +113,17 @@ demand**, and **the plan never reads the realized future demand draws** (gate
   P-P.4 is no longer added on top of a TYPED `fg_base_stock` (one source per
   number) — reachable only through the engine API, the mapper never set it.
   Golden digests (engine and worker) unchanged.
+* **WP 14.5** (engine 0.5.0 → **0.6.0**, Tier 3: a new transient key) — MRP for
+  materials. New key **`gross_requirements`** (`[materials × H]` = BOMᵀ ×
+  planned production, owned by **PH-70**; `pipeline_schema.json` re-frozen).
+  P-P.1 gains `policy_type = "mrp"` (project default and per material): order =
+  need over the primary lead time + SS − on hand − on the way, ≥ MOQ when
+  positive, on the primary link (P-S.2 / P-S.1 still act on it). `configure_model`
+  (a new optional plugin hook, called at compile) sets the MRP mask and H = the
+  longest MRP lead time + 1. P-P.3 publishes its buffer as days of cover
+  (`ctx.material_ss_days`). KPIs `mrp_late_receipt_weeks` and
+  `material_shortage_weeks`, and the per-material MRP record in inspection runs,
+  only when MRP materials exist. `_mech_ship_queue` ships unlimited suppliers and
+  places arrivals vectorized — the same arithmetic, element by element. Golden
+  #7 reproduces the design's worked example exactly. Golden digests (engine and
+  worker) unchanged.

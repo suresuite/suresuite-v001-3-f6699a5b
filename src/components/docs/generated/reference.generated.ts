@@ -20636,12 +20636,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "component ItemSeriesExplorer (mounted by RunValidateStage) → select kind,item_id from run_item_series",
-        "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83"
+        "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "component ItemSeriesExplorer (mounted by ResultsDashboard) → select kind,item_id from run_item_series",
-        "evidence": "src/components/sim/ItemSeriesExplorer.tsx:83"
+        "evidence": "src/components/sim/ItemSeriesExplorer.tsx:88"
       }
     ],
     "governance": {

@@ -108,7 +108,7 @@ function toParam(policyId: string, field: string): RegistryParam {
 
 // ── Inventory / replenishment (§III) ────────────────────────────────────────
 // inventory_control (P-P.1) exposes policy_type ∈ {min_max, base_stock, rop_q,
-// periodic}. Which params each type uses is spec-structure (§III.1–III.5). The
+// periodic, mrp}. Which params each type uses is spec-structure (§III.1–III.5). The
 // grid stores absolute level/lot fields (reorder_point s, order_up_to S,
 // rop_q_quantity Q, review_period_days T) ahead of the engine's coverage-based κ
 // (§II.4); `basis` and `rop_q_quantity` schemas come from the registry, the
@@ -129,6 +129,10 @@ const INVENTORY_TYPES: Array<{
   { registryValue: "base_stock", storedValue: "base_stock", label: "Base stock (S)", headline: ["order_up_to"], rest: ["coverage_weeks", "basis"] },
   { registryValue: "rop_q", storedValue: "rop", label: "(R, Q)", headline: ["rop_q_quantity", "reorder_point"], rest: ["coverage_weeks", "basis"] },
   { registryValue: "periodic", storedValue: "periodic_review", label: "Periodic review (T, S)", headline: ["review_period_days", "order_up_to"], rest: ["coverage_weeks", "basis"] },
+  // WP 14.5 — MRP has no level of its own: it orders the plan's need over the
+  // lead time, net of stock and the pipeline. Its buffer is the row's
+  // safety-stock days (a column of its own), counted once.
+  { registryValue: "mrp", storedValue: "mrp", label: "MRP (from the plan)", headline: [], rest: [] },
 ];
 
 function buildInventoryCategory(): PolicyCategory {

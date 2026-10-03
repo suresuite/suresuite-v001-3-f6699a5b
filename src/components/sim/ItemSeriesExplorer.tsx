@@ -39,6 +39,11 @@ const SERIES_LABEL: Record<string, string> = {
   projected_demand: "Projected demand (plan)",
   requirement: "Requirement (plan)",
   planned: "Planned production",
+  // PLAN.md §24 WP 14.5 — the MRP record per material (orders placed are `orders`).
+  mrp_need: "MRP need (next lead time)",
+  mrp_on_hand: "MRP on hand (after production)",
+  mrp_on_the_way: "MRP on the way",
+  mrp_net: "MRP net",
 };
 
 const SERIES_COLORS = [

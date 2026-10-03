@@ -50,19 +50,26 @@ def _step_100_to_150(ctx):
 
 
 def test_baseline_a_mto_material_demand_ignores_a_demand_step():
-    """(a) PH-70's `material_demand` is a compile-time constant for MTO.
+    """(a) — FLIPPED BY WP 14.5 (§4 D284 (a) closed).
 
-    Demand steps 100 → 150 at week 25 and material demand reads 100 in EVERY
-    week (§4 D284 (a)). WP 14.5 FLIPS THIS: an `mrp` material's gross
-    requirement becomes BOM × planned production, which follows the step.
+    Before Phase 14, PH-70's `material_demand` was a compile-time constant for
+    MTO: demand stepped 100 → 150 at week 25 and material demand read 100 in
+    EVERY week, and every material was ordered from it. It still is for a
+    reorder-point material — its levels are sized from the stationary mean, as
+    designed. An `mrp` material is ordered from the GROSS REQUIREMENT instead,
+    BOMᵀ × planned production, which follows the step from the week it happens.
     """
     sc = Scenario(name="step", network=single_chain_network(),
-                  settings=make_settings(horizon=60))
+                  settings=make_settings(horizon=60),
+                  policies={"inventory_control": {"policy_type": "mrp"}})
     compiled = compile_scenario(sc)
-    ctx, md = _run_with_schedule(compiled, _step_100_to_150,
-                                 lambda c: float(c.material_demand[0]))
+    ctx, rec = _run_with_schedule(
+        compiled, _step_100_to_150,
+        lambda c: (float(c.material_demand[0]), float(c.gross_requirements[0, 0])))
     assert np.all(ctx.trace.D[0, 25:] == 150.0)       # the step did happen
-    assert np.all(md == 100.0)                         # … and planning never saw it
+    assert np.all(rec[:, 0] == 100.0)                  # the reorder-point basis stays stationary
+    assert np.all(rec[25:, 1] == 150.0)                # … and MRP's requirement follows the step
+    assert np.all(rec[1:25, 1] == 100.0)
 
 
 def test_baseline_b_backlog_is_per_product():

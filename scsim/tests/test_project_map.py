@@ -1078,3 +1078,15 @@ def test_a_customer_row_no_longer_reaches_the_product():
     d = _base()
     d.policies = {"node:c1::p1": {"production": {"sell_price": 999.0}}}
     assert from_project_data(d).scenario.network.products[0].unit_price == 20.0
+
+
+# ── MRP (PLAN.md §24 WP 14.5, D284 a) ───────────────────────────────────────
+
+def test_mrp_reaches_the_engine_as_the_project_type_and_per_material():
+    d = _base()
+    d.policies = {"default": {"inventory": {"type": "mrp"}}}
+    assert from_project_data(d).scenario.policies["inventory_control"]["policy_type"] == "mrp"
+    d.policies = {"node:s1::m1": {"inventory": {"type": "mrp"}}}
+    pol = from_project_data(d).scenario.policies["inventory_control"]
+    assert pol["policy_type"] == "min_max"
+    assert pol["material_overrides"]["m1"]["policy_type"] == "mrp"
