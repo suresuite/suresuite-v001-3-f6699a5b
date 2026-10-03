@@ -1,0 +1,3 @@
+material_id,name,cost,holding_cost_pct,moq,initial_on_hand,lead_time_dist,lead_time_cv
+M-BOARD,Control board,20,0.2,1,200,deterministic,0
+M-CASE,Housing,5,0.2,1,400,deterministic,0

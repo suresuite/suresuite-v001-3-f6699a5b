@@ -1,75 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 536" aria-hidden="true" focusable="false" font-family="inherit">
-  <!-- The five layers a capability is resolved through, narrowest first, and
-       the two DIFFERENT kinds of answer a layer can give. The layers and their
-       glosses are the roles-and-capabilities page's own list; the rule that a
-       missing row asks the next layer while an explicit false stops there is
-       the resolver's. The project layer sits between you and your
-       organization, and is consulted when the question is about a project. -->
-
-  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">Narrowest first. The first layer with a row</text>
-  <text x="4" y="28" font-size="12" fill="hsl(var(--foreground))">about you decides.</text>
-
-  <!-- ══ layer 1 ══════════════════════════════════════════════════════ -->
-  <rect x="4" y="42" width="200" height="44" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
-  <text x="14" y="60" font-size="12" fill="hsl(var(--foreground))">you</text>
-  <text x="14" y="76" font-size="12" fill="hsl(var(--muted-foreground))">set on your own account</text>
-
-  <!-- the two exits -->
-  <path d="M204 56 L256 56" stroke="hsl(var(--destructive))" stroke-width="1.8" fill="none"/>
-  <polygon points="260,56 253,52.5 253,59.5" fill="hsl(var(--destructive))"/>
-  <text x="264" y="60" font-size="12" fill="hsl(var(--destructive))">stop</text>
-  <path d="M30 86 L30 108" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" stroke-dasharray="4 3" fill="none"/>
-  <polygon points="30,112 26.5,105 33.5,105" fill="hsl(var(--muted-foreground))"/>
-
-  <!-- ══ layer 2 — the project layer ══════════════════════════════════ -->
-  <rect x="4" y="116" width="200" height="44" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
-  <text x="14" y="134" font-size="12" fill="hsl(var(--foreground))">your role on this project</text>
-  <text x="14" y="150" font-size="12" fill="hsl(var(--muted-foreground))">when the question is about one</text>
-  <path d="M204 130 L256 130" stroke="hsl(var(--destructive))" stroke-width="1.8" fill="none"/>
-  <polygon points="260,130 253,126.5 253,133.5" fill="hsl(var(--destructive))"/>
-  <text x="264" y="134" font-size="12" fill="hsl(var(--destructive))">stop</text>
-  <path d="M30 160 L30 182" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" stroke-dasharray="4 3" fill="none"/>
-  <polygon points="30,186 26.5,179 33.5,179" fill="hsl(var(--muted-foreground))"/>
-
-  <!-- ══ layer 3 ══════════════════════════════════════════════════════ -->
-  <rect x="4" y="190" width="200" height="44" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
-  <text x="14" y="208" font-size="12" fill="hsl(var(--foreground))">your organization</text>
-  <text x="14" y="224" font-size="12" fill="hsl(var(--muted-foreground))">set for everyone in it</text>
-  <path d="M204 204 L256 204" stroke="hsl(var(--destructive))" stroke-width="1.8" fill="none"/>
-  <polygon points="260,204 253,200.5 253,207.5" fill="hsl(var(--destructive))"/>
-  <text x="264" y="208" font-size="12" fill="hsl(var(--destructive))">stop</text>
-  <path d="M30 234 L30 256" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" stroke-dasharray="4 3" fill="none"/>
-  <polygon points="30,260 26.5,253 33.5,253" fill="hsl(var(--muted-foreground))"/>
-
-  <!-- ══ layer 4 ══════════════════════════════════════════════════════ -->
-  <rect x="4" y="264" width="200" height="44" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
-  <text x="14" y="282" font-size="12" fill="hsl(var(--foreground))">your platform role</text>
-  <text x="14" y="298" font-size="12" fill="hsl(var(--muted-foreground))">what the role carries</text>
-  <path d="M204 278 L256 278" stroke="hsl(var(--destructive))" stroke-width="1.8" fill="none"/>
-  <polygon points="260,278 253,274.5 253,281.5" fill="hsl(var(--destructive))"/>
-  <text x="264" y="282" font-size="12" fill="hsl(var(--destructive))">stop</text>
-  <path d="M30 308 L30 330" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" stroke-dasharray="4 3" fill="none"/>
-  <polygon points="30,334 26.5,327 33.5,327" fill="hsl(var(--muted-foreground))"/>
-
-  <!-- ══ layer 5 ══════════════════════════════════════════════════════ -->
-  <rect x="4" y="338" width="200" height="44" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
-  <text x="14" y="356" font-size="12" fill="hsl(var(--foreground))">nobody</text>
-  <text x="14" y="372" font-size="12" fill="hsl(var(--muted-foreground))">no row anywhere — the answer is no</text>
-
-  <!-- ══ the two arrows are not the same arrow ════════════════════════ -->
-  <line x1="4" y1="398" x2="316" y2="398" stroke="hsl(var(--border))" stroke-width="1"/>
-  <path d="M8 416 L40 416" stroke="hsl(var(--destructive))" stroke-width="1.8" fill="none"/>
-  <polygon points="44,416 37,412.5 37,419.5" fill="hsl(var(--destructive))"/>
-  <text x="52" y="420" font-size="12" fill="hsl(var(--foreground))">a row says true OR false</text>
-  <text x="52" y="432" font-size="12" fill="hsl(var(--muted-foreground))">Either way, that is the answer.</text>
-
-  <path d="M8 452 L40 452" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" stroke-dasharray="4 3" fill="none"/>
-  <polygon points="44,452 37,448.5 37,455.5" fill="hsl(var(--muted-foreground))"/>
-  <text x="52" y="456" font-size="12" fill="hsl(var(--foreground))">no row at all</text>
-  <text x="52" y="468" font-size="12" fill="hsl(var(--muted-foreground))">Ask the next layer down.</text>
-
-  <text x="4" y="490" font-size="12" fill="hsl(var(--foreground))">This is the one administrators get wrong: a</text>
-  <text x="4" y="502" font-size="12" fill="hsl(var(--foreground))">denial is not a missing grant. Removing a grant</text>
-  <text x="4" y="514" font-size="12" fill="hsl(var(--foreground))">hands the decision back down; setting false</text>
-  <text x="4" y="526" font-size="12" fill="hsl(var(--foreground))">takes it away outright.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 324" aria-hidden="true">
+<text x="12" y="18" font-size="13" fill="hsl(var(--foreground))">Different roles, different questions</text>
+<rect x="8" y="32" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="47" font-size="12" fill="hsl(var(--foreground))">Account and organization</text>
+<text x="18" y="62" font-size="11" fill="hsl(var(--foreground))">Application access and organization context</text>
+<text x="18" y="77" font-size="11" fill="hsl(var(--foreground))">These do not name one project role.</text>
+<path d="M160 84v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="101" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="116" font-size="12" fill="hsl(var(--foreground))">Project role</text>
+<text x="18" y="131" font-size="11" fill="hsl(var(--foreground))">Viewer · analyst · editor · owner</text>
+<text x="18" y="146" font-size="11" fill="hsl(var(--foreground))">Check effective rights for this project.</text>
+<path d="M160 153v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="170" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="185" font-size="12" fill="hsl(var(--foreground))">Request authorization</text>
+<text x="18" y="200" font-size="11" fill="hsl(var(--foreground))">Browser RPC or API gateway → server</text>
+<text x="18" y="215" font-size="11" fill="hsl(var(--foreground))">UI visibility alone is not enforcement.</text>
+<path d="M160 222v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="239" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="254" font-size="12" fill="hsl(var(--foreground))">Known boundary gap</text>
+<text x="18" y="269" font-size="11" fill="hsl(var(--foreground))">Browser simulation dispatch needs review</text>
+<text x="18" y="284" font-size="11" fill="hsl(var(--foreground))">Do not infer complete server enforcement.</text>
 </svg>

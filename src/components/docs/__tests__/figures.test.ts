@@ -102,6 +102,7 @@ describe("the figure files", () => {
         `${open.length} open — ${open.map((s) => s.id).join(", ") || "none"}`,
     );
     expect(FIGURE_SLOTS.length).toBeGreaterThan(0);
+    expect(open, "Published figure slots must have real files").toEqual([]);
   });
 
   it("names a file with an extension the component can actually load", () => {

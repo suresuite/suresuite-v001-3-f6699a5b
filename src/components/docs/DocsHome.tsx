@@ -34,24 +34,24 @@ const KICKER = "font-mono text-[10px] uppercase tracking-[0.2em] text-muted-fore
 /** The three questions §6.5 says every first-time reader arrives with. */
 const START_HERE = [
   {
-    slug: "what-suresuite-is",
+    slug: "reading-your-results",
     icon: Compass,
-    question: "What is this?",
+    question: "Manager or researcher: assess the model",
   },
   {
     slug: "how-suresuite-is-designed",
     icon: BookText,
-    question: "How is it put together?",
+    question: "Engineer: understand and run the project",
   },
   {
     slug: "your-first-project",
     icon: Rocket,
-    question: "How do I start?",
+    question: "Analyst: build your first comparison",
   },
   {
-    slug: "known-limits",
+    slug: "getting-an-api-key",
     icon: ShieldCheck,
-    question: "What does it not do?",
+    question: "API developer: make your first request",
   },
 ] as const;
 
@@ -125,8 +125,8 @@ export default function DocsHome() {
       <div className="grid grid-cols-2 divide-x divide-y divide-[--hair-rule] border border-[--hair-rule] sm:grid-cols-4 sm:divide-y-0">
         <Stat value={groups.length} label="Sections" />
         <Stat value={pages.length} label="Pages mapped" />
-        <Stat value={liveCount} label="Written so far" />
-        <Stat value={pages.length - liveCount} label="Owed, and named" />
+        <Stat value={liveCount} label="Available guides" />
+        <Stat value={pages.length - liveCount} label="Planned guides" />
       </div>
 
       {/* Start here */}
@@ -134,7 +134,7 @@ export default function DocsHome() {
         <div className="space-y-2">
           <span className={KICKER}>Start here</span>
           <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
-            {startHere.length === START_HERE.length ? "Four pages, four questions" : "Where to begin"}
+            {startHere.length === START_HERE.length ? "Choose your starting point" : "Where to begin"}
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -169,9 +169,7 @@ export default function DocsHome() {
             {groups.length} {groups.length === 1 ? "section" : "sections"}, and what each one answers
           </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Every page the manual will ever have is listed — including the ones not yet written,
-            each naming the work package that owes it. So you can always tell the difference
-            between something this product does not do and something we have not explained yet.
+            Browse the sections available to your account. Start with a task guide, then use the concepts and reference pages to understand the values you encounter.
           </p>
         </div>
 

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 324" aria-hidden="true">
+<text x="12" y="18" font-size="13" fill="hsl(var(--foreground))">Start with a scoped read</text>
+<rect x="8" y="32" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="47" font-size="12" fill="hsl(var(--foreground))">Client · Bearer API key</text>
+<text x="18" y="62" font-size="11" fill="hsl(var(--foreground))">GET /projects with read:data</text>
+<text x="18" y="77" font-size="11" fill="hsl(var(--foreground))">Use the deployment gateway base URL.</text>
+<path d="M160 84v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="101" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="116" font-size="12" fill="hsl(var(--foreground))">Gateway</text>
+<text x="18" y="131" font-size="11" fill="hsl(var(--foreground))">Key → scope → tenancy → limits</text>
+<text x="18" y="146" font-size="11" fill="hsl(var(--foreground))">An organization key may be project-limited.</text>
+<path d="M160 153v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="170" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="185" font-size="12" fill="hsl(var(--foreground))">Response</text>
+<text x="18" y="200" font-size="11" fill="hsl(var(--foreground))">data array + next_cursor</text>
+<text x="18" y="215" font-size="11" fill="hsl(var(--foreground))">An empty page can be a valid result.</text>
+<path d="M160 222v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="239" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="254" font-size="12" fill="hsl(var(--foreground))">Then submit work</text>
+<text x="18" y="269" font-size="11" fill="hsl(var(--foreground))">write:runs submits; read:runs retrieves</text>
+<text x="18" y="284" font-size="11" fill="hsl(var(--foreground))">202 acceptance is not completion.</text>
+</svg>

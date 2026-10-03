@@ -1,0 +1,2 @@
+customer_id,product_id,volume,time_unit,expected_lead_time,unit_price
+C-ASSEMBLY,P-CONTROL,100,week,1,60

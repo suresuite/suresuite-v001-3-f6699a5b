@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 255" aria-hidden="true">
+<text x="12" y="18" font-size="13" fill="hsl(var(--foreground))">One model, two controlled questions</text>
+<rect x="8" y="32" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="47" font-size="12" fill="hsl(var(--foreground))">A · Baseline</text>
+<text x="18" y="62" font-size="11" fill="hsl(var(--foreground))">No disruption; original stock policy</text>
+<text x="18" y="77" font-size="11" fill="hsl(var(--foreground))">Check normal service first.</text>
+<path d="M160 84v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="101" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="116" font-size="12" fill="hsl(var(--foreground))">B · Board disruption</text>
+<text x="18" y="131" font-size="11" fill="hsl(var(--foreground))">Same inputs and policies; S-BOARD at 20%</text>
+<text x="18" y="146" font-size="11" fill="hsl(var(--foreground))">Compare B with A: event impact.</text>
+<path d="M160 153v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="170" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="185" font-size="12" fill="hsl(var(--foreground))">C · Same disruption + buffer</text>
+<text x="18" y="200" font-size="11" fill="hsl(var(--foreground))">Change only material safety stock</text>
+<text x="18" y="215" font-size="11" fill="hsl(var(--foreground))">Compare C with B: policy effect.</text>
+</svg>

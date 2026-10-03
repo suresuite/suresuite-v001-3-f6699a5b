@@ -218,15 +218,9 @@ export function AppLink({ to, children }: { to: string; children: ReactNode }) {
  * is the gate people route around. (Corrected in WP 1.4; the rule used to say
  * "generated on date Z".)
  */
-export function Provenance({ from }: { from: string }) {
-  return (
-    <div className="mt-10 border-t border-border pt-4 text-xs text-muted-foreground">
-      <p>
-        Generated from {from}. Data contract <Term>{CONTRACT_VERSION}</Term>, engine{" "}
-        <Term>{ENGINE_VERSION}</Term>. This page is rebuilt by{" "}
-        <Term>npm run contract:generate</Term> and a difference between it and its sources
-        fails CI, so what you are reading cannot drift from what the software does.
-      </p>
-    </div>
-  );
+export function Provenance({ from: _from }: { from: string }) {
+  return <div className="mt-10 border-t border-border pt-4 text-xs text-muted-foreground">
+    Reference data: contract <Term>{CONTRACT_VERSION}</Term>, engine <Term>{ENGINE_VERSION}</Term>.
+    Generated definitions are checked separately from this page’s explanatory guidance.
+  </div>;
 }

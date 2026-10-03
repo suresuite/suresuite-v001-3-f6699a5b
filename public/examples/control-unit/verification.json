@@ -1,0 +1,896 @@
+{
+  "baseline": {
+    "engine_version": "0.6.1",
+    "replications": 3,
+    "run_update": {
+      "status": "done",
+      "aggregate_kpis": {
+        "fill_rate": 1.0,
+        "revenue": 312000.0,
+        "lost_sales_value": 0.0,
+        "cost_of_resilience": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 4500.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 450.0,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.6667,
+        "supplier_capacity_utilization": 0.6731,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "_range": {
+          "fill_rate": {
+            "min": 1.0,
+            "max": 1.0
+          },
+          "revenue": {
+            "min": 312000.0,
+            "max": 312000.0
+          },
+          "lost_sales_value": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "cost_of_resilience": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "max_backlog": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "lost_inbound_units": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "avg_on_hand_value": {
+            "min": 4500.0,
+            "max": 4500.0
+          },
+          "avg_fg_value": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "avg_on_hand_units": {
+            "min": 450.0,
+            "max": 450.0
+          },
+          "avg_fg_units": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "capacity_utilization": {
+            "min": 0.6667,
+            "max": 0.6667
+          },
+          "supplier_capacity_utilization": {
+            "min": 0.6731,
+            "max": 0.6731
+          },
+          "products_capacity_bound": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "suppliers_capacity_bound": {
+            "min": 2.0,
+            "max": 2.0
+          }
+        },
+        "_meta": {
+          "engine": "scsim",
+          "capacity_binding": {
+            "window_weeks": 52,
+            "replications": 3,
+            "products": [],
+            "suppliers": [
+              {
+                "id": "S-BOARD",
+                "bound_weeks": 18.0,
+                "capacity": 150.0
+              },
+              {
+                "id": "S-CASE",
+                "bound_weeks": 18.0,
+                "capacity": 300.0
+              }
+            ],
+            "unlimited_suppliers": 0,
+            "finite_supplier_capacity": 450.0,
+            "plant_capacity": 150.0
+          },
+          "stopping_rule": "fixed"
+        }
+      },
+      "ci_half_widths": {
+        "fill_rate": 0.0,
+        "revenue": 0.0,
+        "lost_sales_value": 0.0,
+        "cost_of_resilience": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 0.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 0.0,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.0,
+        "supplier_capacity_utilization": 0.0,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 0.0
+      },
+      "code_version": "scsim-0.6.1",
+      "rep_count_done": 3,
+      "mapping_warnings": [
+        {
+          "level": "info",
+          "entity": "policy:inventory_control",
+          "field": "order_up_to",
+          "reason": "project-wide s/S are the formulas s = E[D]\u00b7T_s, S = E[D]\u00b7(T_s+\u03ba); a supplier-grid row's absolute s/S IS that material's level, with no safety stock added on top"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.cost",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.initial_on_hand",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.moq",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_cv",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_mean",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.production_capacity",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.sell_price",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.capacity_per_week",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.reliability_score",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        }
+      ],
+      "warmup_detected_at": 8
+    },
+    "replication_kpis": [
+      {
+        "fill_rate": 1.0,
+        "demand_value": 312000.0,
+        "produced_value": 312000.0,
+        "revenue": 312000.0,
+        "lost_sales_value": 0.0,
+        "lost_units": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 4500.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 450.0,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.666667,
+        "supplier_capacity_utilization": 0.673077,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "cost_of_resilience": 0.0,
+        "cost_ss_holding": 0.0,
+        "cost_backup_premium": 0.0,
+        "cost_multi_sourcing_premium": 0.0,
+        "cost_expediting": 0.0,
+        "cost_overtime": 0.0,
+        "cost_lost_sales": 0.0,
+        "cost_allocation_labor": 0.0,
+        "cost_fg_ss_holding": 0.0,
+        "cost_backorder_penalty": 0.0,
+        "cost_monitoring": 0.0,
+        "model_rep": 0.0,
+        "event_rep": 0.0
+      },
+      {
+        "fill_rate": 1.0,
+        "demand_value": 312000.0,
+        "produced_value": 312000.0,
+        "revenue": 312000.0,
+        "lost_sales_value": 0.0,
+        "lost_units": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 4500.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 450.0,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.666667,
+        "supplier_capacity_utilization": 0.673077,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "cost_of_resilience": 0.0,
+        "cost_ss_holding": 0.0,
+        "cost_backup_premium": 0.0,
+        "cost_multi_sourcing_premium": 0.0,
+        "cost_expediting": 0.0,
+        "cost_overtime": 0.0,
+        "cost_lost_sales": 0.0,
+        "cost_allocation_labor": 0.0,
+        "cost_fg_ss_holding": 0.0,
+        "cost_backorder_penalty": 0.0,
+        "cost_monitoring": 0.0,
+        "model_rep": 1.0,
+        "event_rep": 0.0
+      },
+      {
+        "fill_rate": 1.0,
+        "demand_value": 312000.0,
+        "produced_value": 312000.0,
+        "revenue": 312000.0,
+        "lost_sales_value": 0.0,
+        "lost_units": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 4500.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 450.0,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.666667,
+        "supplier_capacity_utilization": 0.673077,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "cost_of_resilience": 0.0,
+        "cost_ss_holding": 0.0,
+        "cost_backup_premium": 0.0,
+        "cost_multi_sourcing_premium": 0.0,
+        "cost_expediting": 0.0,
+        "cost_overtime": 0.0,
+        "cost_lost_sales": 0.0,
+        "cost_allocation_labor": 0.0,
+        "cost_fg_ss_holding": 0.0,
+        "cost_backorder_penalty": 0.0,
+        "cost_monitoring": 0.0,
+        "model_rep": 2.0,
+        "event_rep": 0.0
+      }
+    ]
+  },
+  "disruption": {
+    "engine_version": "0.6.1",
+    "replications": 3,
+    "run_update": {
+      "status": "done",
+      "aggregate_kpis": {
+        "fill_rate": 0.9596,
+        "revenue": 299400.0,
+        "lost_sales_value": 12600.0,
+        "cost_of_resilience": 12600.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "ttr_weeks": 5.0,
+        "tts_weeks": 2.0,
+        "avg_on_hand_value": 4425.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 454.6154,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.6397,
+        "supplier_capacity_utilization": 0.6662,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "_range": {
+          "fill_rate": {
+            "min": 0.9596,
+            "max": 0.9596
+          },
+          "revenue": {
+            "min": 299400.0,
+            "max": 299400.0
+          },
+          "lost_sales_value": {
+            "min": 12600.0,
+            "max": 12600.0
+          },
+          "cost_of_resilience": {
+            "min": 12600.0,
+            "max": 12600.0
+          },
+          "max_backlog": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "lost_inbound_units": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "ttr_weeks": {
+            "min": 5.0,
+            "max": 5.0
+          },
+          "tts_weeks": {
+            "min": 2.0,
+            "max": 2.0
+          },
+          "avg_on_hand_value": {
+            "min": 4425.0,
+            "max": 4425.0
+          },
+          "avg_fg_value": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "avg_on_hand_units": {
+            "min": 454.6154,
+            "max": 454.6154
+          },
+          "avg_fg_units": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "capacity_utilization": {
+            "min": 0.6397,
+            "max": 0.6397
+          },
+          "supplier_capacity_utilization": {
+            "min": 0.6662,
+            "max": 0.6662
+          },
+          "products_capacity_bound": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "suppliers_capacity_bound": {
+            "min": 2.0,
+            "max": 2.0
+          }
+        },
+        "_meta": {
+          "engine": "scsim",
+          "capacity_binding": {
+            "window_weeks": 52,
+            "replications": 3,
+            "products": [],
+            "suppliers": [
+              {
+                "id": "S-BOARD",
+                "bound_weeks": 20.0,
+                "capacity": 150.0
+              },
+              {
+                "id": "S-CASE",
+                "bound_weeks": 17.0,
+                "capacity": 300.0
+              }
+            ],
+            "unlimited_suppliers": 0,
+            "finite_supplier_capacity": 450.0,
+            "plant_capacity": 150.0
+          },
+          "stopping_rule": "fixed"
+        }
+      },
+      "ci_half_widths": {
+        "fill_rate": 0.0,
+        "revenue": 0.0,
+        "lost_sales_value": 0.0,
+        "cost_of_resilience": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "ttr_weeks": 0.0,
+        "tts_weeks": 0.0,
+        "avg_on_hand_value": 0.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 0.0,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.0,
+        "supplier_capacity_utilization": 0.0,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 0.0
+      },
+      "code_version": "scsim-0.6.1",
+      "rep_count_done": 3,
+      "mapping_warnings": [
+        {
+          "level": "info",
+          "entity": "policy:inventory_control",
+          "field": "order_up_to",
+          "reason": "project-wide s/S are the formulas s = E[D]\u00b7T_s, S = E[D]\u00b7(T_s+\u03ba); a supplier-grid row's absolute s/S IS that material's level, with no safety stock added on top"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.cost",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.initial_on_hand",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.moq",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_cv",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_mean",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.production_capacity",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.sell_price",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.capacity_per_week",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.reliability_score",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        }
+      ],
+      "warmup_detected_at": 8
+    },
+    "replication_kpis": [
+      {
+        "fill_rate": 0.959615,
+        "demand_value": 312000.0,
+        "produced_value": 299400.0,
+        "revenue": 299400.0,
+        "lost_sales_value": 12600.0,
+        "lost_units": 210.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 4425.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 454.615385,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.639744,
+        "supplier_capacity_utilization": 0.66623,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "cost_of_resilience": 12600.0,
+        "cost_ss_holding": 0.0,
+        "cost_backup_premium": 0.0,
+        "cost_multi_sourcing_premium": 0.0,
+        "cost_expediting": 0.0,
+        "cost_overtime": 0.0,
+        "cost_lost_sales": 12600.0,
+        "cost_allocation_labor": 0.0,
+        "cost_fg_ss_holding": 0.0,
+        "cost_backorder_penalty": 0.0,
+        "cost_monitoring": 0.0,
+        "recovery_measurable": 1.0,
+        "pre_disruption_fill_rate": 1.0,
+        "ttr_censored": 0.0,
+        "tts_censored": 0.0,
+        "ttr_weeks": 5.0,
+        "tts_weeks": 2.0,
+        "model_rep": 0.0,
+        "event_rep": 0.0
+      },
+      {
+        "fill_rate": 0.959615,
+        "demand_value": 312000.0,
+        "produced_value": 299400.0,
+        "revenue": 299400.0,
+        "lost_sales_value": 12600.0,
+        "lost_units": 210.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 4425.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 454.615385,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.639744,
+        "supplier_capacity_utilization": 0.66623,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "cost_of_resilience": 12600.0,
+        "cost_ss_holding": 0.0,
+        "cost_backup_premium": 0.0,
+        "cost_multi_sourcing_premium": 0.0,
+        "cost_expediting": 0.0,
+        "cost_overtime": 0.0,
+        "cost_lost_sales": 12600.0,
+        "cost_allocation_labor": 0.0,
+        "cost_fg_ss_holding": 0.0,
+        "cost_backorder_penalty": 0.0,
+        "cost_monitoring": 0.0,
+        "recovery_measurable": 1.0,
+        "pre_disruption_fill_rate": 1.0,
+        "ttr_censored": 0.0,
+        "tts_censored": 0.0,
+        "ttr_weeks": 5.0,
+        "tts_weeks": 2.0,
+        "model_rep": 1.0,
+        "event_rep": 0.0
+      },
+      {
+        "fill_rate": 0.959615,
+        "demand_value": 312000.0,
+        "produced_value": 299400.0,
+        "revenue": 299400.0,
+        "lost_sales_value": 12600.0,
+        "lost_units": 210.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 4425.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 454.615385,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.639744,
+        "supplier_capacity_utilization": 0.66623,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "cost_of_resilience": 12600.0,
+        "cost_ss_holding": 0.0,
+        "cost_backup_premium": 0.0,
+        "cost_multi_sourcing_premium": 0.0,
+        "cost_expediting": 0.0,
+        "cost_overtime": 0.0,
+        "cost_lost_sales": 12600.0,
+        "cost_allocation_labor": 0.0,
+        "cost_fg_ss_holding": 0.0,
+        "cost_backorder_penalty": 0.0,
+        "cost_monitoring": 0.0,
+        "recovery_measurable": 1.0,
+        "pre_disruption_fill_rate": 1.0,
+        "ttr_censored": 0.0,
+        "tts_censored": 0.0,
+        "ttr_weeks": 5.0,
+        "tts_weeks": 2.0,
+        "model_rep": 2.0,
+        "event_rep": 0.0
+      }
+    ]
+  },
+  "safety-stock": {
+    "engine_version": "0.6.1",
+    "replications": 3,
+    "run_update": {
+      "status": "done",
+      "aggregate_kpis": {
+        "fill_rate": 1.0,
+        "revenue": 312000.0,
+        "lost_sales_value": 0.0,
+        "cost_of_resilience": 2400.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "ttr_weeks": 0.0,
+        "avg_on_hand_value": 15940.3846,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 1620.5769,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.6667,
+        "supplier_capacity_utilization": 0.6675,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "_range": {
+          "fill_rate": {
+            "min": 1.0,
+            "max": 1.0
+          },
+          "revenue": {
+            "min": 312000.0,
+            "max": 312000.0
+          },
+          "lost_sales_value": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "cost_of_resilience": {
+            "min": 2400.0,
+            "max": 2400.0
+          },
+          "max_backlog": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "lost_inbound_units": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "ttr_weeks": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "avg_on_hand_value": {
+            "min": 15940.3846,
+            "max": 15940.3846
+          },
+          "avg_fg_value": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "avg_on_hand_units": {
+            "min": 1620.5769,
+            "max": 1620.5769
+          },
+          "avg_fg_units": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "capacity_utilization": {
+            "min": 0.6667,
+            "max": 0.6667
+          },
+          "supplier_capacity_utilization": {
+            "min": 0.6675,
+            "max": 0.6675
+          },
+          "products_capacity_bound": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "suppliers_capacity_bound": {
+            "min": 2.0,
+            "max": 2.0
+          }
+        },
+        "_meta": {
+          "engine": "scsim",
+          "capacity_binding": {
+            "window_weeks": 52,
+            "replications": 3,
+            "products": [],
+            "suppliers": [
+              {
+                "id": "S-BOARD",
+                "bound_weeks": 24.0,
+                "capacity": 150.0
+              },
+              {
+                "id": "S-CASE",
+                "bound_weeks": 17.0,
+                "capacity": 300.0
+              }
+            ],
+            "unlimited_suppliers": 0,
+            "finite_supplier_capacity": 450.0,
+            "plant_capacity": 150.0
+          },
+          "stopping_rule": "fixed"
+        }
+      },
+      "ci_half_widths": {
+        "fill_rate": 0.0,
+        "revenue": 0.0,
+        "lost_sales_value": 0.0,
+        "cost_of_resilience": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "ttr_weeks": 0.0,
+        "avg_on_hand_value": 0.0,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 0.0,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.0,
+        "supplier_capacity_utilization": 0.0,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 0.0
+      },
+      "code_version": "scsim-0.6.1",
+      "rep_count_done": 3,
+      "mapping_warnings": [
+        {
+          "level": "info",
+          "entity": "policy:inventory_control",
+          "field": "order_up_to",
+          "reason": "project-wide s/S are the formulas s = E[D]\u00b7T_s, S = E[D]\u00b7(T_s+\u03ba); a supplier-grid row's absolute s/S IS that material's level, with no safety stock added on top"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.cost",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.initial_on_hand",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.moq",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_cv",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_mean",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.production_capacity",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.sell_price",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.capacity_per_week",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.reliability_score",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        }
+      ],
+      "warmup_detected_at": 8
+    },
+    "replication_kpis": [
+      {
+        "fill_rate": 1.0,
+        "demand_value": 312000.0,
+        "produced_value": 312000.0,
+        "revenue": 312000.0,
+        "lost_sales_value": 0.0,
+        "lost_units": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 15940.384615,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 1620.576923,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.666667,
+        "supplier_capacity_utilization": 0.667539,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "cost_of_resilience": 2400.0,
+        "cost_ss_holding": 2400.0,
+        "cost_backup_premium": 0.0,
+        "cost_multi_sourcing_premium": 0.0,
+        "cost_expediting": 0.0,
+        "cost_overtime": 0.0,
+        "cost_lost_sales": 0.0,
+        "cost_allocation_labor": 0.0,
+        "cost_fg_ss_holding": 0.0,
+        "cost_backorder_penalty": 0.0,
+        "cost_monitoring": 0.0,
+        "recovery_measurable": 1.0,
+        "pre_disruption_fill_rate": 1.0,
+        "ttr_censored": 0.0,
+        "tts_censored": 1.0,
+        "ttr_weeks": 0.0,
+        "model_rep": 0.0,
+        "event_rep": 0.0
+      },
+      {
+        "fill_rate": 1.0,
+        "demand_value": 312000.0,
+        "produced_value": 312000.0,
+        "revenue": 312000.0,
+        "lost_sales_value": 0.0,
+        "lost_units": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 15940.384615,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 1620.576923,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.666667,
+        "supplier_capacity_utilization": 0.667539,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "cost_of_resilience": 2400.0,
+        "cost_ss_holding": 2400.0,
+        "cost_backup_premium": 0.0,
+        "cost_multi_sourcing_premium": 0.0,
+        "cost_expediting": 0.0,
+        "cost_overtime": 0.0,
+        "cost_lost_sales": 0.0,
+        "cost_allocation_labor": 0.0,
+        "cost_fg_ss_holding": 0.0,
+        "cost_backorder_penalty": 0.0,
+        "cost_monitoring": 0.0,
+        "recovery_measurable": 1.0,
+        "pre_disruption_fill_rate": 1.0,
+        "ttr_censored": 0.0,
+        "tts_censored": 1.0,
+        "ttr_weeks": 0.0,
+        "model_rep": 1.0,
+        "event_rep": 0.0
+      },
+      {
+        "fill_rate": 1.0,
+        "demand_value": 312000.0,
+        "produced_value": 312000.0,
+        "revenue": 312000.0,
+        "lost_sales_value": 0.0,
+        "lost_units": 0.0,
+        "max_backlog": 0.0,
+        "lost_inbound_units": 0.0,
+        "avg_on_hand_value": 15940.384615,
+        "avg_fg_value": 0.0,
+        "avg_on_hand_units": 1620.576923,
+        "avg_fg_units": 0.0,
+        "capacity_utilization": 0.666667,
+        "supplier_capacity_utilization": 0.667539,
+        "products_capacity_bound": 0.0,
+        "suppliers_capacity_bound": 2.0,
+        "cost_of_resilience": 2400.0,
+        "cost_ss_holding": 2400.0,
+        "cost_backup_premium": 0.0,
+        "cost_multi_sourcing_premium": 0.0,
+        "cost_expediting": 0.0,
+        "cost_overtime": 0.0,
+        "cost_lost_sales": 0.0,
+        "cost_allocation_labor": 0.0,
+        "cost_fg_ss_holding": 0.0,
+        "cost_backorder_penalty": 0.0,
+        "cost_monitoring": 0.0,
+        "recovery_measurable": 1.0,
+        "pre_disruption_fill_rate": 1.0,
+        "ttr_censored": 0.0,
+        "tts_censored": 1.0,
+        "ttr_weeks": 0.0,
+        "model_rep": 2.0,
+        "event_rep": 0.0
+      }
+    ]
+  }
+}

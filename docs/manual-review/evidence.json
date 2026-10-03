@@ -1,0 +1,121 @@
+{
+  "inspected_commit": "21cc4a4aed1ac11b9de4b60fa464f0596b0bd21a",
+  "scope": "Source review and isolated local execution; not a deployment audit.",
+  "sources": [
+    {
+      "path": "src/components/UploadWizard.tsx",
+      "symbols": "UploadWizard, IngestRunPanel",
+      "manual_page": "uploading-data",
+      "sha256": "d1a9aefc1a11770bb7c0cf9b319179cbabf843aa8223bce13bcb4149abb36b6c"
+    },
+    {
+      "path": "supabase/functions/_shared/ingestValidate.ts",
+      "symbols": "validateRows",
+      "manual_page": "uploading-data",
+      "sha256": "850f70533b99d2da3b907d3a07e737c771431a932980b97199df5dcba05ec94c"
+    },
+    {
+      "path": "supabase/functions/_shared/ingestSpec.generated.ts",
+      "symbols": "INGEST_DATASETS",
+      "manual_page": "uploading-data",
+      "sha256": "520974077ce40306a2306b24f8e9f2d2230c4571e50b63f7de794ae2dafd9671"
+    },
+    {
+      "path": "src/lib/policies/resolveEffective.ts",
+      "symbols": "getEffectiveValue, resolveCell",
+      "manual_page": "how-policies-work",
+      "sha256": "4757e73766d9de2f25c1ff44f67f38f9f9dbc2a69bcdd8f8cf81d402823f6c9b"
+    },
+    {
+      "path": "src/lib/policies/projectRules.ts",
+      "symbols": "CUSTOMER_RULE, FG_BUFFER_RULE",
+      "manual_page": "how-policies-work",
+      "sha256": "0003fc2bed48ab04af3a2013d4b171b1a1ec173f496115ed6b8e1db5de4b697d"
+    },
+    {
+      "path": "scsim/scsim/io/project_map.py",
+      "symbols": "_build_settings, _map_policies, from_project_data",
+      "manual_page": "how-policies-work",
+      "sha256": "9a1493f57270b8c9a6196a34db9f038f53116f9fb0d6600addccc31ea409c976"
+    },
+    {
+      "path": "sim-worker/sim_worker/local.py",
+      "symbols": "run_from_snapshots",
+      "manual_page": "your-first-project",
+      "sha256": "92a2eb64f6da22eb4beb85e023ada2c7fcb30a7989ff1f06cb37d4cef030e19c"
+    },
+    {
+      "path": "scsim/scsim/kpi/compute.py",
+      "symbols": "replication_kpis, resilience_index",
+      "manual_page": "kpis-and-resilience-index",
+      "sha256": "645b721b37e27b5732db8c62d840c63aa3442ad271450de288c950c331825355"
+    },
+    {
+      "path": "src/lib/sim/kpiDisplay.ts",
+      "symbols": "KPI_DISPLAY",
+      "manual_page": "reading-your-results",
+      "sha256": "8215e43ee220797ea0e6092461761a5793c2e7f86664ca978cb77b9919fc109f"
+    },
+    {
+      "path": "src/lib/sim/comparability.ts",
+      "symbols": "comparabilityFailures",
+      "manual_page": "experiments-and-comparison",
+      "sha256": "bf51939b9b91240ba63e81963fac2ac092606cab6b389593e6db2a65d76d05d3"
+    },
+    {
+      "path": "supabase/functions/api/index.ts",
+      "symbols": "listProjects, RunCreateSchema, routes, authenticate",
+      "manual_page": "getting-an-api-key",
+      "sha256": "1c52c6f5c554adf20e1e90a5fdf05039e172f28892a2eb8846ffbf4eda76cfc6"
+    },
+    {
+      "path": "supabase/functions/sim-command/index.ts",
+      "symbols": "Deno.serve authorization and project check",
+      "manual_page": "roles-and-capabilities",
+      "sha256": "9eeaf77106f6c34814de0346b76af532ef883b56ccd4331a991ed157117ae4be"
+    },
+    {
+      "path": "supabase/functions/_shared/dispatch.ts",
+      "symbols": "dispatchExperimentRun",
+      "manual_page": "roles-and-capabilities",
+      "sha256": "ab355628adac0125571a5cccdccbd4cb5291412ebefe735a5d7d5cffe6d2537a"
+    },
+    {
+      "path": "supabase/migrations/20261002000007_project_role_decides.sql",
+      "symbols": "project rights resolution",
+      "manual_page": "roles-and-capabilities",
+      "sha256": "1c191ed743bf4400ba89f349a8068f8574bad71f392570c206beced1d45e0383"
+    },
+    {
+      "path": "supabase/migrations/20261001000005_analyst_runs_only.sql",
+      "symbols": "project_role_capabilities",
+      "manual_page": "roles-and-capabilities",
+      "sha256": "5438edb2f9732cd9fee7b4189f308aba8a08775bdebd3ff3772b3d47fbd705ba"
+    },
+    {
+      "path": "src/components/sim/CompareScenariosPanel.tsx",
+      "symbols": "CompareScenariosPanel",
+      "manual_page": "experiments-and-comparison",
+      "sha256": "ec7ca945bb538942781c222b573311273c8e8becd56ea013fd32032f725f8cfa"
+    },
+    {
+      "path": "src/lib/sim/multiCompare.ts",
+      "symbols": "rankChallengers, bestPerKpi",
+      "manual_page": "experiments-and-comparison",
+      "sha256": "7839900d7cafc09355b7547205485cd1d59414c4ab76655a70e3ae24f20da967"
+    },
+    {
+      "path": "src/lib/policies/engineInputExport.ts",
+      "symbols": "engineInputExport",
+      "manual_page": "how-policies-work",
+      "sha256": "a0318390d116c7f8a7845cf3a33067643965888862dd1f4f5e7d982c1d695dd1"
+    },
+    {
+      "path": "scsim/scsim/policies/strategic/p_p3_safety_stock.py",
+      "symbols": "apply",
+      "manual_page": "how-policies-work",
+      "sha256": "d060c6ec8675249bdc53d4e128fcd62c944f2e1a5a1b7a46f454c25a6fa01fce"
+    }
+  ],
+  "initial_commit": "7698ac2d541242de35383d488cfa3cc1ab5a31c2"
+}

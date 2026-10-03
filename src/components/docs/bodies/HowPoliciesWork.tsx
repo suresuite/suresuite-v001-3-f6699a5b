@@ -1,141 +1,18 @@
-// §6.3 section 5 — How policies work. Written once; the resolver's order is
-// read from the generated module rather than described, because ORDER IS THE
-// WHOLE MEANING and a prose ordering drifts the first time a branch moves.
-
-import { PageTitle, Section, P, Key, Callout, Prose, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Callout, Bullets, Steps, Defs, DocLink, AppLink, Term } from "@/components/docs/prose";
 import { DocFigure } from "@/components/docs/DocFigure";
-import { RESOLUTION_ORDER, RESOLUTION_ORDER_SOURCE, CHAIN_COUNT, BROKEN_COUNT } from "@/components/docs/generated/policy.generated";
-import { STAGES } from "@/lib/policies/stages";
+import { ExampleDownloads } from "@/components/docs/ExampleDownloads";
 
-export default function HowPoliciesWork() {
-  const stages = STAGES.filter((s) => s.key !== "run_validate");
-
-  return (
-    <>
-      <PageTitle lead="Stages, scope, and what wins when two things say different numbers.">
-        How policies work
-      </PageTitle>
-
-      <Section id="what-a-policy-is" title="What a policy is">
-        <P>
-          A policy is a decision about how the chain should behave — how much stock to hold, who to
-          buy from when the first choice fails, how to treat an order you cannot fill. Your{" "}
-          <DocLink to="inbound-logistics">uploads</DocLink> describe the chain as it is; policies
-          describe how you want it run.
-        </P>
-        <Key>
-          They are kept apart on purpose. Re-uploading your data does not change your decisions, and
-          changing a decision does not touch your data.
-        </Key>
-              <DocFigure id="resolution-order" />
-      </Section>
-
-      <Section id="stages" title="The three stages">
-        <P>
-          The grid at <AppLink to="/policies">/policies</AppLink> is split into stages, each a
-          different grain of decision.
-        </P>
-        <div className="space-y-3">
-          {stages.map((s) => (
-            <div key={s.key} className="rounded-sm border border-border bg-card p-4 shadow-xs">
-              <div className="text-sm font-semibold text-foreground">{s.title}</div>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{s.role}</p>
-              <p className="mt-1.5 text-[12px] text-muted-foreground">
-                Families:{" "}
-                {s.families.map((f, i) => (
-                  <span key={f}>
-                    {i > 0 && ", "}
-                    <Term>{f}</Term>
-                  </span>
-                ))}
-              </p>
-            </div>
-          ))}
-        </div>
-        <P>
-          Each has its own page:{" "}
-          <DocLink to="supplier-stage">Supplier stage</DocLink> ·{" "}
-          <DocLink to="plant-stage">Plant stage</DocLink> ·{" "}
-          <DocLink to="customer-stage">Customer stage</DocLink>.
-        </P>
-      </Section>
-
-      <Section id="defaults-and-overrides" title="Defaults and overrides">
-        <P>
-          Every project starts with a <em>bundle</em> of defaults — one per policy family, filled in
-          for you so a new project can be simulated immediately. You never have to set anything to
-          get a result.
-        </P>
-        <P>
-          When you change a cell, that change is saved as an <em>override</em>: a patch on top of
-          the bundle, remembered for that one row. The bundle is not edited. So an override can be
-          removed and the default comes back, and two rows can disagree without either one changing
-          the project's baseline.
-        </P>
-      </Section>
-
-      <Section id="precedence" title="What wins — the order, exactly">
-        <Key>
-          The first rule below that has an answer wins. Nothing further down is consulted.
-        </Key>
-        <P>
-          This order is the whole meaning of the grid: a number reachable two ways is decided here
-          and nowhere else. It is read from the resolver rather than described, so this page cannot
-          fall behind the code.
-        </P>
-        <ol className="space-y-2">
-          {RESOLUTION_ORDER.map((r, i) => (
-            <li key={r.step} className="flex gap-3 rounded-sm border border-border bg-card p-3 shadow-xs">
-              <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                {i + 1}
-              </span>
-              <div className="min-w-0">
-                <span className="font-mono text-[12px] font-semibold text-foreground">{r.step}</span>
-                <p className="text-[13px] leading-relaxed text-muted-foreground">
-                  <Prose text={r.meaning} />
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <P className="text-[12px]">
-          Transcribed from <Term>{RESOLUTION_ORDER_SOURCE}</Term>, and checked against it by a test
-          that fails if a branch moves.
-        </P>
-      </Section>
-
-      <Callout title="The surprising one: your row beats the bundle">
-        <p>
-          A value that lives on the stage <em>row</em> is consulted before the policy bundle. That
-          means re-uploading your data refreshes a row-level value and does <em>not</em> refresh one
-          that only exists in the bundle — which is why a policy set on old data can quietly survive
-          a new upload. <DocLink to="data-trust-report">Data Trust Report</DocLink> is where that
-          shows up.
-        </p>
-      </Callout>
-
-      <Section id="what-reaches-the-engine" title="Not every cell changes a run">
-        <P>
-          The grid has {CHAIN_COUNT} editable fields and {BROKEN_COUNT} of them do not reach the
-          simulation. They are stored, versioned and shown back to you, and the run ignores them.
-        </P>
-        <P>
-          Each is marked on its stage page with what is actually happening — read only by a frozen
-          engine, recomputed by the engine and ignored, an application routing hint, or read by
-          nothing at all. We would rather tell you than have you find out by changing one.
-        </P>
-      </Section>
-
-      <Section id="related" title="Related">
-        <P>
-          <DocLink to="where-a-number-came-from">Where a number came from</DocLink> ·{" "}
-          <DocLink to="when-a-value-is-missing">When a value is missing</DocLink> ·{" "}
-          <DocLink to="policy-types">Policy types</DocLink> ·{" "}
-          <DocLink to="policy-versions-and-presets">Policy versions &amp; presets</DocLink>
-        </P>
-      </Section>
-
-      <Provenance from="the resolver's own branch order and the derived resolution chains" />
-    </>
-  );
-}
+export default function Guide() { return <>
+<PageTitle lead="Understand a displayed value, save a decision, and check the value that reaches the engine.">How policies work</PageTitle>
+<Section id="what-a-policy-is" title="What a policy changes"><P>Inputs describe demand, BOM, lanes and capacities. Policies decide replenishment, sourcing, production and treatment of unmet demand. The same input network can produce different outcomes under different policies, but only when the chosen field reaches the engine.</P><P>On <AppLink to="/policies">Policies</AppLink>, work through Supplier, Plant and Customer stages, then Run &amp; Validate. Read each value's source marker and field details. Unsaved drafts, saved row overrides, project defaults and uploaded values are different states.</P><DocFigure id="resolution-order" /></Section>
+<Section id="precedence" title="There is no universal precedence ladder"><P>Resolve each field separately. For master-backed economics such as material cost, a saved policy override can replace the uploaded master value; without either, a lane-based derivation or explicit default may apply. Demand, lead time and finished-goods policy fields use different chains. The stage references show the field-specific chains and engine-read status.</P><Defs items={[
+{term:"Material cost example",def:"M-BOARD costs 20 in the tutorial master. A policy override of 25 changes the simulated material valuation while leaving the uploaded master at 20. Removing the override restores the next applicable source; re-uploading the master does not remove the override."},
+{term:"Missing versus zero",def:"A blank can mean no override, derive a value or use a default. Zero is not automatically missing. For example, zero opening material stock starts empty, while zero safety-stock days requests no fixed-days buffer. Check the field's bounds and engine chain before entering zero."},
+{term:"Finished-goods target",def:"For MTS products, an explicit base-stock target S is the target; the FG safety buffer is not added again. When S is missing, a target can be derived. There is no new FG safety-buffer control; an applicable value saved by an older policy appears as a legacy notice with Remove. MTO products do not use FG-stock policy controls."},
+{term:"Lead time",def:"The supplier-stage lead-time display comes from the inbound lane. Change the lane through the data workflow; a display in days does not change the engine's weekly time step."}
+]} /></Section>
+<Section id="replenishment" title="Read the parameters for the selected type"><P>A typed material reorder point s or target S is an absolute level; the engine does not add safety stock on top. Leave those levels empty to use the formula and its buffer. Periodic replenishment reads its review period T. An (R,Q) row requires a positive lot Q, either on the row or inherited from the project; it has no coverage κ control. MRP takes replenishment from the plan. If a stored parameter belongs to a previous type, the mapper drops it and records a warning.</P></Section>
+<Section id="worked-response" title="Use the control-unit example"><P>At 100 products/week the BOM implies 100 boards and 200 housings/week. The tutorial starts with min-max replenishment and two weeks of coverage, zero days of material safety stock, and explicit opening quantities. To test a buffer, change only Safety stock to 28 days on the material rows, save a new policy version, and rerun the same supplier disruption.</P><P>Do not also change demand, opening inventory or the disruption schedule. Keep the baseline version so you can compare the two policies. The buffer can improve service while increasing inventory and holding cost; review both. The 28-day setting is illustrative.</P></Section>
+<Section id="save" title="Draft, saved version and Validated Model"><P>A value visible in an edited cell may still be a draft. Save the edit and check that no unsaved indicator remains. A policy version captures a saved bundle for a run. A preset is a reusable starting configuration, not evidence that it suits your chain. A Validated Model binds policy and dataset versions to validation evidence and adopted simulation settings.</P><P>When the run control offers <strong>Save version and run</strong>, it is asking to bind the edits to a version. A prior validation can become outdated after inputs or policies change. Inspect the credibility message; do not assume an old validation covers a new scenario.</P></Section>
+<Section id="what-reaches-the-engine" title="Stored does not mean simulated"><P>Use <DocLink to="supplier-stage">Supplier</DocLink>, <DocLink to="plant-stage">Plant</DocLink> and <DocLink to="customer-stage">Customer</DocLink> references for each field's engine status. Disabled milestone controls describe planned support. Transport-family settings and routing flags must not be assumed to be simulated simply because they can be stored or displayed.</P><P>The engine currently models a single focal production stage. Multi-level BOM display does not introduce subassembly capacity or work-in-progress. After every significant policy change, inspect the conversion notes and effective values. Version history → Export now maps the saved policy through the same engine-input path as a run. Its Read me sheet identifies whether it used the latest run’s dataset and scenario or current project data; review that provenance before treating it as evidence for a particular run.</P><P>Next: <DocLink to="policy-versions-and-presets">versions and presets</DocLink>, then <DocLink to="model-validation">model validation</DocLink>.</P></Section>
+</>; }
