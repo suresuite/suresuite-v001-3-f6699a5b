@@ -475,8 +475,6 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         "initial_on_hand": ("materials.initial_on_hand", "supplier"),
         "sell_price": ("products.sell_price", "plant"),
         "production_capacity": ("products.production_capacity", "plant"),
-        "demand_mean": ("products.demand_mean", "plant"),
-        "demand_cv": ("products.demand_cv", "plant"),
         # PLAN.md §24 WP 14.2 — the Customer row's demand spec over
         # `outbound_logistics` (one row per customer × product).
         "row_demand_distribution": ("outbound_logistics.demand_distribution", "customer"),
@@ -569,7 +567,7 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "fg_safety_stock_days": 5, "allocation_priority_weight": 3, "rop_q_quantity": 33,
         "coverage_weeks": 3, "reorder_point": 40, "order_up_to": 400, "material_cost": 3.3,
         "material_moq": 9, "capacity_per_week": 77, "reliability_score": 0.5, "initial_on_hand": 5,
-        "sell_price": 7, "production_capacity": 66, "demand_mean": 20, "demand_cv": 0.9,
+        "sell_price": 7, "production_capacity": 66,
         "row_demand_mode": "model", "row_demand_distribution": "poisson", "row_demand_mean": 25,
         "row_demand_variation": 0.5, "row_demand_min": 5, "row_demand_max": 500,
         "backorder_allowed": True, "max_backorder_days": 21, "backorder_cost_per_day": 3,

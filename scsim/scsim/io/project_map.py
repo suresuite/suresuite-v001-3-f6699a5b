@@ -546,34 +546,6 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
                      "(capacity_units_per_day x 7 x utilization) -> max(2 x demand, 1000)",
     },
     {
-        "key": "demand_mean",
-        "scopes": ("plant",),
-        "family": "production",
-        "target": "Product.demand_mode",
-        "catalog_ref": None,
-        "master": "products.demand_mean",
-        "rows": "plant",
-        "domain": "positive",
-        "empty_default": 0.0,
-        "transform": "units per week, must be > 0. Order: the Plant-stage row -> "
-                     "products.demand_mean (master) -> the weekly outbound volume -> 0",
-    },
-    {
-        "key": "demand_cv",
-        "scopes": ("plant",),
-        "family": "production",
-        "target": "Product.demand_cv",
-        "catalog_ref": None,
-        "master": "products.demand_cv",
-        "rows": "plant",
-        "domain": "nonnegative",
-        "empty_default": None,
-        "empty_note": "the scenario demand model's CV, else 0.30",
-        "transform": "sigma / mean, >= 0. Order: the Plant-stage row -> products.demand_cv "
-                     "(master) -> the scenario demand model's cv -> 0.30. Read by the "
-                     "triangular and negative-binomial draws; not under Poisson",
-    },
-    {
         "key": "service_level_target",
         "scopes": ("default",),
         "family": "inventory",
@@ -2123,12 +2095,19 @@ def from_project_data(data: ProjectData) -> MappingResult:
             tally.add("products.sell_price", "default", p.id)
             w.append(MappingWarning("warn", f"product:{p.id}", "unit_price",
                                     "no sell_price and no outbound price → defaulted to 1.0"))
-        # demand mean
-        mean_ov = _ovr(prod_row, "demand_mean", ent, "demand_mean")
-        if mean_ov is not None:
-            mean = mean_ov
-            tally.add("products.demand_mean", "override", p.id)
-        elif p.demand_mean and p.demand_mean > 0:
+        # demand mean — the item master, then the lanes. DEMAND IS AUTHORED ON
+        # THE CUSTOMER ROWS (WP 14.2): this product-level value is only what a
+        # row with no demand of its own inherits (× its volume share). A
+        # Plant-row demand override was a second author of the same fact and is
+        # no longer read (§24 WP 14.8, §4 D286); one saved earlier is named.
+        for stale in ("demand_mean", "demand_cv"):
+            if prod_row.get(stale) not in (None, ""):
+                w.append(MappingWarning(
+                    "warn", ent, stale,
+                    f"a /policies Plant-row {stale} override ({prod_row.get(stale)!r}) is no "
+                    f"longer read — demand is set per Customer row; the item master, then "
+                    f"the outbound volume, decides the product's fallback"))
+        if p.demand_mean and p.demand_mean > 0:
             mean = float(p.demand_mean)
             tally.add("products.demand_mean", "master", p.id)
         else:
@@ -2170,11 +2149,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
                                     "no capacity source → defaulted (capacity will not bind)"))
         mode = _resolve_mode(p, prod_row, data.project_model, tally, w)
         product_modes.add(mode)
-        cv_ov = _ovr(prod_row, "demand_cv", ent, "demand_cv")
-        if cv_ov is not None:
-            cv = cv_ov
-            tally.add("products.demand_cv", "override", p.id)
-        elif p.demand_cv is not None:
+        if p.demand_cv is not None:
             cv = float(p.demand_cv)
             tally.add("products.demand_cv", "master", p.id)
         else:

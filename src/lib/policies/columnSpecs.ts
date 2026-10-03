@@ -24,7 +24,7 @@ export interface ColSpecCtx {
 }
 
 /** The master-backed fields a `visibleWhen` gate reads (via `ctx.resolved`). */
-export const GATE_FIELDS = ["fulfillment_mode", "fg_policy"] as const;
+export const GATE_FIELDS = ["fulfillment_mode", "fg_policy", "fg_base_stock"] as const;
 
 /** `projects.supply_chain_model` as the mapper reads it (`_fulfillment_mode`):
  *  Make-To-Stock / mts → mts, anything else → mto. */
@@ -175,6 +175,19 @@ const rowBackorders: ColSpec["visibleWhen"] = ({ effective, draft }) =>
  *  Read per ROW from the product's own mode, as the engine reads it; the page's
  *  fulfillment strategy decides nothing here (§4 D197). */
 const holdsFgStock: ColSpec["visibleWhen"] = (ctx) => rowFulfillmentMode(ctx) === "mts";
+/**
+ * Whether P-P.4's FG safety buffer is added for this row's product: an MTS
+ * product on base-stock whose S is EMPTY (derived). A typed S, min-max or days
+ * of cover is a typed target and gets nothing on top — the engine's
+ * `mts_mask & ~fg_typed` (`p_p4_fg_safety_stock.py`, `core/context.py`).
+ */
+export function fgBufferAppliesToRow(ctx: ColSpecCtx): boolean {
+  if (rowFulfillmentMode(ctx) !== "mts") return false;
+  if (String(ctx.resolved?.fg_policy || "base_stock") !== "base_stock") return false;
+  const s = ctx.resolved?.fg_base_stock;
+  return s === undefined || s === null || s === "";
+}
+
 /** An FG level is shown only for the FG policies that use it: base-stock S,
  *  min-max s and S, days of cover D. Empty policy = base-stock (the engine's). */
 const fgPolicyIn =
@@ -344,17 +357,11 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("production_capacity", "production", {
         master: { table: "products", field: "production_capacity", idFrom: "product_id" },
       }),
-      col("demand_mean", "production", {
-        master: { table: "products", field: "demand_mean", idFrom: "product_id" },
-      }),
-      // Demand variability — P-P.3 sizes safety stock from it and the run's
-      // demand draw spreads by it. Editable HERE so the run check's "has no
-      // products.demand_cv" points at a cell on /policies rather than at the
-      // Item Master editor (blueprint §8.3: masters are the base layer, set
-      // from this page).
-      col("demand_cv", "production", {
-        master: { table: "products", field: "demand_cv", idFrom: "product_id" },
-      }),
+      // NO DEMAND HERE (§4 D286). Demand is authored on the Customer rows (WP
+      // 14.2); the product's mean is only what a row with no demand of its own
+      // inherits (× its volume share), and that base is the item master and the
+      // outbound volume. A Plant-row demand override was a second author of one
+      // fact, and the engine no longer reads one.
       // ONE CAPACITY PER ROW (§23 WP 13.4). The plant row's capacity is the
       // `production_capacity` cell above — an override over the master. The line
       // rate and utilization below are the DERIVATION the engine falls back to when
@@ -621,8 +628,6 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   // ---- plant · production
   sell_price: { sub: "€ / unit · master", w: 92, kind: "num", dec: 2, unit: "€", keep: true },
   production_capacity: { sub: "units / wk · master", w: 100, kind: "int", prio: 5 },
-  demand_mean: { sub: "units / wk · master", w: 100, kind: "int", prio: 4 },
-  demand_cv: { sub: "σ / mean · master", w: 80, kind: "num", dec: 2, prio: 3 },
   capacity_units_per_day: { sub: "units / day", w: 96, kind: "int", keep: true },
   utilization_cap_pct: { sub: "% of line capacity", w: 84, kind: "int", unit: "%", prio: 6 },
   allocation_priority_weight: { sub: "weight", w: 76, kind: "num", dec: 2, prio: 9 },
@@ -679,8 +684,6 @@ export const SHORT_LABEL: Record<string, string> = {
   cost_per_km: "Cost / km",
   sell_price: "Sell price",
   production_capacity: "Prod. capacity",
-  demand_mean: "Demand mean",
-  demand_cv: "Demand CV",
   capacity_units_per_day: "Line capacity",
   utilization_cap_pct: "Utilization cap",
   allocation_priority_weight: "Allocation wt.",
@@ -744,6 +747,10 @@ export function fitColsForStage(stage: StageKey, rowsCtx: ColSpecCtx[]): FitCol[
  */
 const POLICIES_OVERRIDE_CELLS: Record<string, { stage: StageKey; field: string }> = {
   "materials.holding_cost_pct": { stage: "supplier", field: "holding_cost_pct" },
+  // §4 D286 — a product's demand is set where demand is authored, on its
+  // Customer rows; the product value is only what an empty row inherits.
+  "products.demand_mean": { stage: "customer", field: "row_demand_mean" },
+  "products.demand_cv": { stage: "customer", field: "row_demand_variation" },
 };
 
 export function policiesCellFor(datasetField: string): { stage: StageKey; field: string } | null {

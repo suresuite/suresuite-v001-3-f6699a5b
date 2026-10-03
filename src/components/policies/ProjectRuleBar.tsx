@@ -34,6 +34,9 @@ interface Props<F extends PolicyFamily> {
   onSave: (next: PolicyBundle[F]) => Promise<void>;
   /** A read-only bar (no right to edit policies) shows the values only. */
   readOnly?: boolean;
+  /** One plain sentence after the controls: what the setting does HERE, so
+   *  the line explains itself without a hover. */
+  note?: string;
 }
 
 const optionsFor = (field: string): readonly string[] =>
@@ -42,7 +45,7 @@ const optionsFor = (field: string): readonly string[] =>
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export function ProjectRuleBar<F extends PolicyFamily>({
-  family, title, hint, fields, value, onSave, readOnly,
+  family, title, hint, fields, value, onSave, readOnly, note,
 }: Props<F>) {
   const saved = value as unknown as Record<string, unknown>;
   const [draft, setDraft] = useState<Record<string, unknown>>(saved);
@@ -72,14 +75,14 @@ export function ProjectRuleBar<F extends PolicyFamily>({
       className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-sm border border-[#e6e6e6] bg-white px-2.5 py-1.5 text-[11.5px]"
       data-testid={`project-rule-bar-${family}`}
     >
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#737373]" title={hint}>
+      <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.14em] text-[#737373]" title={hint}>
         {title}
       </span>
       {shown.map((f) => {
         const v = draft[f.field];
         const opts = optionsFor(f.field);
         return (
-          <label key={f.field} className="flex items-center gap-1.5 text-[#404040]">
+          <label key={f.field} className="flex items-center gap-1.5 whitespace-nowrap text-[#404040]">
             <span>{f.label}</span>
             {opts.length > 0 ? (
               <Select value={String(v ?? "")} onValueChange={(x) => set(f.field, x)} disabled={readOnly}>
@@ -112,6 +115,7 @@ export function ProjectRuleBar<F extends PolicyFamily>({
           </label>
         );
       })}
+      {note && <span className="min-w-0 text-[11px] text-[#8a8a8a]">{note}</span>}
       {!readOnly && (
         <span className="ml-auto flex items-center gap-1.5">
           {dirty && (
