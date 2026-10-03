@@ -94,6 +94,7 @@ export function compareRows(
         b: d.format(vb),
         bci: `± ${d.format(ciB[key] ?? 0)}`,
         delta: p ? `${signedDelta(delta, d.format)} ± ${d.format(p.halfWidth)}` : signedDelta(delta, d.format),
+        deltaValue: delta,
         basis: p ? "paired" : "unpaired",
         better:
           !separated || d.higherIsBetter === null ? null : d.higherIsBetter ? delta > 0 : delta < 0,

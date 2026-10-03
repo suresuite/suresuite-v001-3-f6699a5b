@@ -119,6 +119,9 @@ export interface CompareRow {
   b: string;
   bci: string;
   delta: string;
+  /** the same delta as a number (paired mean when `basis` is paired), so a
+   *  many-scenario comparison can rank by it without parsing `delta` */
+  deltaValue: number;
   /** true when B is better than A on this KPI — null unless the PAIRED
    *  difference's interval excludes 0 (audit F-14) */
   better: boolean | null;
