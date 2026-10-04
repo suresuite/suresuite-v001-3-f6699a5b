@@ -23,6 +23,7 @@ interface LaneRow {
   unit_price: number | string | null;
   lead_time?: number | string | null;
   lead_time_unit?: string | null;
+  lead_time_dist?: string | null;
   expected_lead_time?: number | string | null;
   volume?: number | string | null;
   demand_distribution?: string | null;
@@ -185,6 +186,15 @@ export function useDataMap(projectId: string | null | undefined) {
         return set.length === 0
           ? { status: "default" as const, detail: `0/${inbound.length} lanes state a unit — lead time read as weeks` }
           : { status: "ok" as const, detail: `${set.length}/${inbound.length} lanes state a unit (${units.join(", ")}); the rest read as weeks` };
+      })(),
+      // WP 15.2 — a lane with no spread of its own is not a gap: it runs on its
+      // material's shape, else deterministic, as every lane did before Phase 15.
+      inbound_lead_time_spread: (() => {
+        if (inbound.length === 0) return { status: "missing" as const, detail: "no lanes uploaded" };
+        const set = inbound.filter((r) => (r.lead_time_dist ?? "") !== "").length;
+        return set === 0
+          ? { status: "default" as const, detail: `0/${inbound.length} lanes state a lead-time shape — each runs on its material's, else deterministic` }
+          : { status: "ok" as const, detail: `${set}/${inbound.length} lanes state a lead-time shape; the rest run on their material's, else deterministic` };
       })(),
       inbound_volume: laneCoverage(inbound, "volume", "carry no weight in the cost fallback"),
       outbound_unit_price: laneCoverage(outbound, "unit_price", "skipped in the weighted price"),

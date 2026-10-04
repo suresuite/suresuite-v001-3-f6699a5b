@@ -259,7 +259,45 @@ export interface EngineSupplierLink {
   /** Where `leadWeeks` came from — the mapper's `inbound_logistics.lead_time`
    *  source: the Supplier row's override, the uploaded lane, or the 2-week
    *  default for a blank one. */
-  leadSource: "override" | "master" | "default";
+  leadSource: "override" | "master" | "default" | "derived";
+  /** PLAN.md §25 WP 15.2 — the lane's OWN uploaded lead-time spread (the arc the
+   *  link was built from), bounds in weeks by `lead_time_unit`. `null` where the
+   *  lane states none. The Supplier row's spread overrides are the grid's to
+   *  apply; the material's shape is the derived fallback under these. */
+  spread: {
+    dist: string | null;
+    cv: number | null;
+    min: number | null;
+    mode: number | null;
+    max: number | null;
+  };
+}
+
+/** The six lead-time shapes a lane or a Supplier row may state —
+ *  `project_map._LANE_LT_DISTS`. */
+export const LANE_LEAD_TIME_DISTS = ["deterministic", "normal", "lognormal", "gamma", "triangular", "uniform"] as const;
+
+/**
+ * A BOUNDED lead-time shape's planning lead time — the bounds' mean
+ * (PLAN.md §25.2 rule 3: `(min + mode + max) / 3` for triangular, `(min + max) / 2`
+ * for uniform) — or `undefined` when the shape is not bounded or its bounds are
+ * incomplete, out of order or above 51 weeks (the mapper then runs the lane
+ * deterministic, warned). Mirrors `project_map._lane_lead_time_spread`.
+ */
+export function boundedLeadTimeMean(
+  dist: unknown, min: unknown, mode: unknown, max: unknown,
+): number | undefined {
+  const d = String(dist ?? "").trim().toLowerCase();
+  const n = (v: unknown) => (v === null || v === undefined || v === "" ? undefined : Number(v));
+  const lo = n(min), hi = n(max), mo = n(mode);
+  if (lo === undefined || hi === undefined || !Number.isFinite(lo) || !Number.isFinite(hi)) return undefined;
+  if (lo < 0 || hi > 51 || lo > hi) return undefined;
+  if (d === "uniform") return (lo + hi) / 2;
+  if (d === "triangular") {
+    if (mo === undefined || !Number.isFinite(mo) || mo < lo || mo > hi) return undefined;
+    return (lo + mo + hi) / 3;
+  }
+  return undefined;
 }
 
 /**
@@ -285,12 +323,32 @@ export function engineSupplierLinks(
     const key = `${supplier}::${material}`;
     const lt = num(arc.lead_time);
     const ov = leadOverrides?.get(key);
-    const weeks = ov !== undefined ? ov : lt ? (lt * (unitDays(arc.lead_time_unit as string | null) ?? 7)) / 7 : 2;
-    const leadWeeks = engineWholeWeeks(weeks);
-    const leadSource: EngineSupplierLink["leadSource"] = ov !== undefined ? "override" : lt ? "master" : "default";
+    const toWeeks = (v: number) => (v * (unitDays(arc.lead_time_unit as string | null) ?? 7)) / 7;
+    const weeks = ov !== undefined ? ov : lt ? toWeeks(lt) : 2;
+    let leadWeeks = engineWholeWeeks(weeks);
+    let leadSource: EngineSupplierLink["leadSource"] = ov !== undefined ? "override" : lt ? "master" : "default";
+    // PLAN.md §25 WP 15.2 — the lane's own spread, bounds in weeks.
+    const opt = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
+    const rawDist = arc.lead_time_dist == null || arc.lead_time_dist === "" ? null : String(arc.lead_time_dist).trim().toLowerCase();
+    const bound = (v: unknown) => { const x = opt(v); return x === null ? null : toWeeks(x); };
+    const spread = {
+      dist: rawDist && (LANE_LEAD_TIME_DISTS as readonly string[]).includes(rawDist) ? rawDist : null,
+      cv: opt(arc.lead_time_cv),
+      min: bound(arc.lead_time_min),
+      mode: bound(arc.lead_time_mode),
+      max: bound(arc.lead_time_max),
+    };
+    // A bounded lane plans on its bounds' mean, which beats the row's lead time
+    // (§25.2 rule 3). Only the lane's OWN shape is known here; a shape chosen on
+    // the Supplier row is the grid's (`rowBoundedLeadTime`).
+    const bm = boundedLeadTimeMean(spread.dist, spread.min, spread.mode, spread.max);
+    if (bm !== undefined) {
+      leadWeeks = engineWholeWeeks(bm);
+      leadSource = "derived";
+    }
     const prev = out.get(key);
     if (!prev || cost < prev.cost || (cost === prev.cost && leadWeeks < prev.leadWeeks)) {
-      out.set(key, { supplier, material, cost, leadWeeks, leadSource });
+      out.set(key, { supplier, material, cost, leadWeeks, leadSource, spread });
     }
   }
   return out;

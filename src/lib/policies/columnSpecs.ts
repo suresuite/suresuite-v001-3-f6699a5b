@@ -25,7 +25,12 @@ export interface ColSpecCtx {
 }
 
 /** The master-backed fields a `visibleWhen` gate reads (via `ctx.resolved`). */
-export const GATE_FIELDS = ["fulfillment_mode", "fg_policy", "fg_base_stock", "row_demand_distribution"] as const;
+export const GATE_FIELDS = [
+  "fulfillment_mode", "fg_policy", "fg_base_stock", "row_demand_distribution",
+  // PLAN.md §25 WP 15.3 — a Supplier row's lead-time shape and bounds: which
+  // parameter cells show, and whether the Lead time cell is the bounds' mean.
+  "lane_lead_time_dist", "lane_lead_time_min_weeks", "lane_lead_time_mode_weeks", "lane_lead_time_max_weeks",
+] as const;
 
 /** `projects.supply_chain_model` as the mapper reads it (`_fulfillment_mode`):
  *  Make-To-Stock / mts → mts, anything else → mto. */
@@ -231,6 +236,25 @@ const demandParamFor =
     return d === "triangular" || rowDemandMode(ctx) === "model";
   };
 
+/**
+ * A lead-time PARAMETER is shown only for the shapes that read it — ONE helper
+ * for every lead time a grid row carries (the Supplier row's lane, and the
+ * Plant row's production lead time, PLAN.md §25 WP 15.5), as `demandParamFor`
+ * is for demand (`single-source`):
+ *   normal, lognormal, gamma → CV · triangular → min, mode, max · uniform → min, max
+ *   deterministic → none.
+ * The shape is the row's RESOLVED one — its own, else the lane's upload, else
+ * the material's (a derived fallback), as the engine resolves it.
+ */
+export const leadTimeParamFor =
+  (param: "cv" | "min" | "mode" | "max", distField = "lane_lead_time_dist"): ColSpec["visibleWhen"] =>
+  (ctx) => {
+    const d = String(ctx.resolved?.[distField] ?? "").trim().toLowerCase();
+    if (param === "cv") return d === "normal" || d === "lognormal" || d === "gamma";
+    if (param === "mode") return d === "triangular";
+    return d === "triangular" || d === "uniform";
+  };
+
 /** An FG level is shown only for the FG policies that use it: base-stock S,
  *  min-max s and S, days of cover D. Empty policy = base-stock (the engine's). */
 const fgPolicyIn =
@@ -361,6 +385,33 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("lead_time_weeks", "sourcing", {
         master: { table: "inbound_logistics", field: "lead_time", idFrom: "supplier_id::material_id" },
         round: engineWholeWeeks,
+      }),
+      // THE LEAD TIME'S SHAPE, CHOSEN LIKE DEMAND (PLAN.md §25 WP 15.3, blueprint
+      // P-S.6). A shape per row and only the parameters it reads
+      // (`leadTimeParamFor`), each an OVERRIDE of the lane's own upload
+      // (`inbound_logistics.lead_time_dist` …), the material's shape beneath it
+      // as a derived fallback, deterministic at the bottom — the engine's order.
+      // For normal / lognormal / gamma the Lead time cell above is the MEAN; a
+      // triangular or uniform row IS its bounds, and the Lead time cell then
+      // shows the bounds' mean, derived (§25.2 rule 3). In weeks, like the lead time.
+      col("lane_lead_time_dist", "sourcing", {
+        master: { table: "inbound_logistics", field: "lead_time_dist", idFrom: "supplier_id::material_id" },
+      }),
+      col("lane_lead_time_cv", "sourcing", {
+        visibleWhen: leadTimeParamFor("cv"),
+        master: { table: "inbound_logistics", field: "lead_time_cv", idFrom: "supplier_id::material_id" },
+      }),
+      col("lane_lead_time_min_weeks", "sourcing", {
+        visibleWhen: leadTimeParamFor("min"),
+        master: { table: "inbound_logistics", field: "lead_time_min", idFrom: "supplier_id::material_id" },
+      }),
+      col("lane_lead_time_mode_weeks", "sourcing", {
+        visibleWhen: leadTimeParamFor("mode"),
+        master: { table: "inbound_logistics", field: "lead_time_mode", idFrom: "supplier_id::material_id" },
+      }),
+      col("lane_lead_time_max_weeks", "sourcing", {
+        visibleWhen: leadTimeParamFor("max"),
+        master: { table: "inbound_logistics", field: "lead_time_max", idFrom: "supplier_id::material_id" },
       }),
       col("type", "inventory"),
       // Type-specific level/lot params render inside this one dynamic vector cell
@@ -687,6 +738,12 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   capacity_per_week: { sub: "units / wk · master", w: 96, kind: "int", prio: 4 },
   reliability_score: { sub: "0–1 · master", w: 84, kind: "num", dec: 2, prio: 3 },
   lead_time_weeks: { sub: "weeks · lane · 1–51", w: 84, kind: "int", keep: true },
+  // ---- supplier · lead-time shape per lane (WP 15.3)
+  lane_lead_time_dist: { sub: "shape · per lane", w: 112, kind: "text", keep: true, align: "left" },
+  lane_lead_time_cv: { sub: "CV · normal, lognormal, gamma", w: 92, kind: "num", dec: 2, prio: 5 },
+  lane_lead_time_min_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
+  lane_lead_time_mode_weeks: { sub: "weeks · triangular", w: 84, kind: "num", dec: 1, prio: 5 },
+  lane_lead_time_max_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
   // ---- inventory (shared by supplier + plant)
   type: { sub: "s,S · S · R,Q · T,S", w: 152, kind: "type", keep: true, filterable: false, align: "left" },
   __inv_params: { sub: "levels & lot sizes", w: 184, kind: "vector", keep: true, filterable: false, align: "left" },
@@ -748,6 +805,11 @@ export const SHORT_LABEL: Record<string, string> = {
   capacity_per_week: "Capacity",
   reliability_score: "Reliability",
   lead_time_weeks: "Lead time",
+  lane_lead_time_dist: "LT shape",
+  lane_lead_time_cv: "LT CV",
+  lane_lead_time_min_weeks: "LT min",
+  lane_lead_time_mode_weeks: "LT mode",
+  lane_lead_time_max_weeks: "LT max",
   type: "Policy type",
   __inv_params: "Replenishment",
   initial_on_hand: "Initial stock",

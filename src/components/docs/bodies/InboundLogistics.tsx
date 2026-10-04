@@ -61,6 +61,18 @@ export default function InboundLogistics() {
                 put <Term>day</Term> in it and a 14 becomes two weeks rather than fourteen.
               </>
             ),
+            lead_time_dist: (
+              <>
+                How much this lane&apos;s lead time varies, chosen the way a customer row&apos;s
+                demand is: <Term>deterministic</Term>, <Term>normal</Term>, <Term>lognormal</Term> or{" "}
+                <Term>gamma</Term> around <Term>lead_time</Term> (give a <Term>lead_time_cv</Term>), or{" "}
+                <Term>triangular</Term> / <Term>uniform</Term> between bounds (give{" "}
+                <Term>lead_time_min</Term>, <Term>lead_time_mode</Term>, <Term>lead_time_max</Term>,
+                in the same unit as the lead time). A triangular or uniform lane plans on the mean of
+                its bounds. Leave it blank and the lane follows its material&apos;s shape; the Supplier
+                stage can override it per row.
+              </>
+            ),
             volume: (
               <>
                 A rate, not a stock count. Two rows are comparable only once both have been

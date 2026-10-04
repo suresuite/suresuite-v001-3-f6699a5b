@@ -3741,6 +3741,81 @@
     },
     {
       "catalog_ref": null,
+      "domain": "lead_time_distribution",
+      "empty_default": null,
+      "empty_note": "the material's lead-time shape, else deterministic",
+      "family": "sourcing",
+      "key": "lane_lead_time_dist",
+      "master": "inbound_logistics.lead_time_dist",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_dist",
+      "transform": "enum deterministic | normal | lognormal | gamma | triangular | uniform. Order: the Supplier-stage row -> inbound_logistics.lead_time_dist -> materials.lead_time_dist -> deterministic. A shape missing a parameter it reads runs deterministic, warned"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "fraction",
+      "empty_default": null,
+      "empty_note": "the material's CV, else none \u2014 normal, lognormal and gamma need one",
+      "family": "sourcing",
+      "key": "lane_lead_time_cv",
+      "master": "inbound_logistics.lead_time_cv",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_cv",
+      "transform": "fraction 0-1, read by normal, lognormal and gamma. Order: the Supplier-stage row -> inbound_logistics.lead_time_cv -> materials.lead_time_cv"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular and uniform need it",
+      "family": "sourcing",
+      "key": "lane_lead_time_min_weeks",
+      "master": "inbound_logistics.lead_time_min",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_min_weeks",
+      "transform": "weeks, >= 0; triangular and uniform. Order: the Supplier-stage row -> inbound_logistics.lead_time_min x lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular needs it",
+      "family": "sourcing",
+      "key": "lane_lead_time_mode_weeks",
+      "master": "inbound_logistics.lead_time_mode",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_mode_weeks",
+      "transform": "weeks, >= 0; triangular. Order: the Supplier-stage row -> inbound_logistics.lead_time_mode x lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular and uniform need it",
+      "family": "sourcing",
+      "key": "lane_lead_time_max_weeks",
+      "master": "inbound_logistics.lead_time_max",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_max_weeks",
+      "transform": "weeks, >= 0, at most 51; triangular and uniform. Order: the Supplier-stage row -> inbound_logistics.lead_time_max x lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
       "domain": "nonnegative",
       "empty_default": null,
       "empty_note": "the engine's own opening stock (its starting cover)",

@@ -107,7 +107,8 @@ export function MobileStagePolicyList({
     materials, products, suppliers, derived: derivedEconomics, lanes,
   } = useItemMasters(projectId);
   const derived = useDerivedMaps({
-    derived: derivedEconomics, products, outbound: lanes.outbound, inbound: lanes.inbound, defaults, overrides,
+    derived: derivedEconomics, products, outbound: lanes.outbound, inbound: lanes.inbound,
+    materials: materials as unknown as Record<string, unknown>[], defaults, overrides,
   });
   const [openRowKey, setOpenRowKey] = useState<string | null>(null);
   // A group can hold forty lanes. The panel shows what the device can hold and
@@ -184,7 +185,7 @@ export function MobileStagePolicyList({
     | Record<string, unknown>
     | undefined;
 
-  const resolveCol = (row: Record<string, unknown>, col: ColSpec) =>
+  const resolveCol = (row: Record<string, unknown>, col: ColSpec, gate?: ColSpecCtx) =>
     resolveCell({
       rowKey: String(row.key),
       row,
@@ -197,6 +198,8 @@ export function MobileStagePolicyList({
       overrides,
       scope: spec.scope,
       familyDefault,
+      // A bounded lane's Lead time is its bounds' mean (PLAN.md §25 WP 15.3).
+      gate,
     });
 
   if (loading || dataRows.length === 0) {
@@ -349,7 +352,7 @@ export function MobileStagePolicyList({
                   counter={`${cols.length + activeParams.length}`}
                 >
                   {cols.map((col) => {
-                    const cell = resolveCol(openRow, col);
+                    const cell = resolveCol(openRow, col, rowCtx);
                     const { value, provenance, placeholder, supersededBy } = cell;
                     // T2 on the phone. The desktop grid puts this sentence in a
                     // hover and a popover, neither of which a phone has — so it

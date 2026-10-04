@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 400,
-      "migrations_applied": 392,
-      "last_migration": "20261003000002_fg_policy_per_product.sql"
+      "migrations_found": 401,
+      "migrations_applied": 393,
+      "last_migration": "20261003000003_lane_lead_time_spread.sql"
     },
     "sidecars": 76,
     "registry": {
@@ -18,8 +18,8 @@
   "counts": {
     "tables_in_schema": 93,
     "tables_covered": 76,
-    "columns_covered": 995,
-    "check_constraints": 94,
+    "columns_covered": 1000,
+    "check_constraints": 95,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -11130,6 +11130,13 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "inbound_logistics_lead_time_spread_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ( (lead_time_dist IS NULL OR lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (lead_time_cv IS NULL OR (lead_time_cv >= 0 AND lead_time_cv <= 1)) AND (lead_time_min IS NULL OR lead_time_min >= 0) AND (lead_time_mode IS NULL OR lead_time_mode >= 0) AND (lead_time_max IS NULL OR lead_time_max >= 0) AND (lead_time_min IS NULL OR lead_time_mode IS NULL OR lead_time_min <= lead_time_mode) AND (lead_time_mode IS NULL OR lead_time_max IS NULL OR lead_time_mode <= lead_time_max) AND (lead_time_min IS NULL OR lead_time_max IS NULL OR lead_time_min <= lead_time_max) )",
+          "added_by": "20261003000003_lane_lead_time_spread.sql"
         }
       ],
       "indexes": [
@@ -11770,6 +11777,221 @@
             "csv_header": null,
             "required": false,
             "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "lead_time_dist",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000003_lane_lead_time_spread.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The SHAPE of this lane's lead time — deterministic, normal, lognormal, gamma, triangular or uniform (PLAN.md §25 WP 15.2, blueprint P-S.6). For deterministic, normal, lognormal and gamma, `lead_time` is the mean; a triangular or uniform lane IS its bounds, and its planning lead time is their mean. Blank: the material's shape (`materials.lead_time_dist`), else deterministic — how every lane ran before Phase 15.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_dist",
+            "transform": "lower-cased; an unknown value, or a shape missing a parameter it needs, is warned and the lane runs deterministic",
+            "missing_default": "the material's lead_time_dist, else deterministic"
+          },
+          "substitutions": [
+            {
+              "when": "blank",
+              "value": "materials.lead_time_dist + lead_time_cv of the lane's material, else deterministic",
+              "provenance": "derived",
+              "visible_as": "the Supplier table's lead-time distribution cell on /policies"
+            },
+            {
+              "when": "a shape whose parameters are missing or unusable",
+              "value": "deterministic",
+              "provenance": "default",
+              "visible_as": "MappingWarning on the run's mapping report"
+            }
+          ],
+          "ingest": {
+            "csv_header": "lead_time_dist",
+            "required": false,
+            "validate": "one of deterministic, normal, lognormal, gamma, triangular, uniform — enforced by the column's CHECK constraint; blank lands nothing",
+            "rule": {
+              "kind": "enum",
+              "values": [
+                "deterministic",
+                "normal",
+                "lognormal",
+                "gamma",
+                "triangular",
+                "uniform"
+              ],
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "lead_time_cv",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000003_lane_lead_time_spread.sql",
+          "unit": "coefficient of variation (dimensionless)",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How much this lane's lead time varies, as a coefficient of variation — read by normal, lognormal and gamma only (PLAN.md §25 WP 15.2). Bounded 0–1, as the engine bounds it.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_cv",
+            "transform": "float(); the row's CV on /policies wins",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "lead_time_cv",
+            "required": false,
+            "validate": "numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "max": 1,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "lead_time_min",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000003_lane_lead_time_spread.sql",
+          "unit": "weeks",
+          "unit_source": "column",
+          "unit_column": "lead_time_unit",
+          "normalize_at_promotion": {
+            "conversion": "duration",
+            "canonical": "week"
+          },
+          "meaning": "A triangular or uniform lane's shortest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.2).",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_min_weeks",
+            "transform": "_duration_to_weeks(lead_time_min, lead_time_unit); the row's bound on /policies wins",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "lead_time_min",
+            "required": false,
+            "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "lead_time_mode",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000003_lane_lead_time_spread.sql",
+          "unit": "weeks",
+          "unit_source": "column",
+          "unit_column": "lead_time_unit",
+          "normalize_at_promotion": {
+            "conversion": "duration",
+            "canonical": "week"
+          },
+          "meaning": "A triangular lane's most likely lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular only (PLAN.md §25 WP 15.2).",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_mode_weeks",
+            "transform": "_duration_to_weeks(lead_time_mode, lead_time_unit); the row's bound on /policies wins",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "lead_time_mode",
+            "required": false,
+            "validate": "numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "lead_time_max",
+          "type": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261003000003_lane_lead_time_spread.sql",
+          "unit": "weeks",
+          "unit_source": "column",
+          "unit_column": "lead_time_unit",
+          "normalize_at_promotion": {
+            "conversion": "duration",
+            "canonical": "week"
+          },
+          "meaning": "A triangular or uniform lane's longest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.2).",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_max_weeks",
+            "transform": "_duration_to_weeks(lead_time_max, lead_time_unit); the row's bound on /policies wins",
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": "lead_time_max",
+            "required": false,
+            "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -15976,7 +16198,7 @@
           "computed_by": null,
           "engine": {
             "consumed_by": "project_map.py::_map_supply -> SupplierLink.lead_time_dist",
-            "transform": "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC",
+            "transform": "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC. A lane's own shape (inbound_logistics.lead_time_dist) or the Supplier row's wins over it (PLAN.md §25 WP 15.2)",
             "missing_default": "deterministic"
           },
           "substitutions": [
@@ -16037,7 +16259,7 @@
           "computed_by": null,
           "engine": {
             "consumed_by": "project_map.py::_map_supply -> SupplierLink.lead_time_cv",
-            "transform": "float() when truthy, else 0.0",
+            "transform": "float() when truthy, else 0.0; above 1 → 1, warned (§4 D294). A lane's own CV (inbound_logistics.lead_time_cv) or the Supplier row's wins over it (PLAN.md §25 WP 15.2)",
             "missing_default": "0.0 — no variability, so no sampling"
           },
           "substitutions": [
@@ -16046,15 +16268,22 @@
               "value": "0.0",
               "provenance": "default",
               "visible_as": null
+            },
+            {
+              "when": "above 1 (a value stored before the upload rule bounded it — §4 D294)",
+              "value": "1.0, the engine's bound",
+              "provenance": "default",
+              "visible_as": "MappingWarning on the run's mapping report"
             }
           ],
           "ingest": {
             "csv_header": "lead_time_cv",
             "required": false,
-            "validate": "numeric >= 0",
+            "validate": "numeric 0–1 — the engine's bound (§4 D294: a CV above 1 used to fail the run)",
             "rule": {
               "kind": "numeric",
               "min": 0,
+              "max": 1,
               "blank": "null"
             }
           },
@@ -43779,5 +44008,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "262c25f1b6b7"
+  "contract_version": "16f8ea13d88e"
 }

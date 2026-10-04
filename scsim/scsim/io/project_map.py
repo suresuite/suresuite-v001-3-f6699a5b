@@ -44,6 +44,7 @@ from scsim.entities.network import (
     Product,
     Supplier,
     SupplierLink,
+    lead_time_bounds_mean,
     primary_rank,
     triangular_av,
 )
@@ -186,6 +187,13 @@ class SupplyArc:
     lead_time_unit: Optional[str] = None  # explicit override only
     time_unit: Optional[str] = None       # volume period
     volume: Optional[float] = None
+    # PLAN.md §25 WP 15.2 — the lane's own lead-time spread. The bounds are in
+    # `lead_time_unit` like `lead_time` (weeks after promotion).
+    lead_time_dist: Optional[str] = None
+    lead_time_cv: Optional[float] = None
+    lead_time_min: Optional[float] = None
+    lead_time_mode: Optional[float] = None
+    lead_time_max: Optional[float] = None
 
 
 @dataclass
@@ -536,6 +544,86 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
                      "even and clamped 1-51 like the uploaded value. Order: the Supplier-stage "
                      "row (`node:<supplier>::<material>`) -> inbound_logistics.lead_time x "
                      "lead_time_unit -> 2 weeks",
+    },
+    # ── A lane's lead-time SPREAD (PLAN.md §25 WP 15.2, D291, blueprint P-S.6) ──
+    # Chosen like demand: a shape and only the parameters it reads, per Supplier
+    # row, over the lane's own upload (`inbound_logistics`), else the material's
+    # shape (`materials.lead_time_dist` / `lead_time_cv`), else deterministic.
+    # Read per LANE exactly like `lead_time_weeks`. A bounded shape (triangular,
+    # uniform) IS its bounds and its planning lead time is their mean, so on such
+    # a lane the row's `lead_time_weeks` is not read (§25.2 rule 3).
+    {
+        "key": "lane_lead_time_dist",
+        "scopes": ("supplier",),
+        "family": "sourcing",
+        "target": "SupplierLink.lead_time_dist",
+        "catalog_ref": None,
+        "master": "inbound_logistics.lead_time_dist",
+        "rows": "supplier",
+        "domain": "lead_time_distribution",
+        "empty_default": None,
+        "empty_note": "the material's lead-time shape, else deterministic",
+        "transform": "enum deterministic | normal | lognormal | gamma | triangular | uniform. "
+                     "Order: the Supplier-stage row -> inbound_logistics.lead_time_dist -> "
+                     "materials.lead_time_dist -> deterministic. A shape missing a parameter "
+                     "it reads runs deterministic, warned",
+    },
+    {
+        "key": "lane_lead_time_cv",
+        "scopes": ("supplier",),
+        "family": "sourcing",
+        "target": "SupplierLink.lead_time_cv",
+        "catalog_ref": None,
+        "master": "inbound_logistics.lead_time_cv",
+        "rows": "supplier",
+        "domain": "fraction",
+        "empty_default": None,
+        "empty_note": "the material's CV, else none — normal, lognormal and gamma need one",
+        "transform": "fraction 0-1, read by normal, lognormal and gamma. Order: the "
+                     "Supplier-stage row -> inbound_logistics.lead_time_cv -> "
+                     "materials.lead_time_cv",
+    },
+    {
+        "key": "lane_lead_time_min_weeks",
+        "scopes": ("supplier",),
+        "family": "sourcing",
+        "target": "SupplierLink.lead_time_min_weeks",
+        "catalog_ref": None,
+        "master": "inbound_logistics.lead_time_min",
+        "rows": "supplier",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular and uniform need it",
+        "transform": "weeks, >= 0; triangular and uniform. Order: the Supplier-stage row -> "
+                     "inbound_logistics.lead_time_min x lead_time_unit",
+    },
+    {
+        "key": "lane_lead_time_mode_weeks",
+        "scopes": ("supplier",),
+        "family": "sourcing",
+        "target": "SupplierLink.lead_time_mode_weeks",
+        "catalog_ref": None,
+        "master": "inbound_logistics.lead_time_mode",
+        "rows": "supplier",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular needs it",
+        "transform": "weeks, >= 0; triangular. Order: the Supplier-stage row -> "
+                     "inbound_logistics.lead_time_mode x lead_time_unit",
+    },
+    {
+        "key": "lane_lead_time_max_weeks",
+        "scopes": ("supplier",),
+        "family": "sourcing",
+        "target": "SupplierLink.lead_time_max_weeks",
+        "catalog_ref": None,
+        "master": "inbound_logistics.lead_time_max",
+        "rows": "supplier",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular and uniform need it",
+        "transform": "weeks, >= 0, at most 51; triangular and uniform. Order: the "
+                     "Supplier-stage row -> inbound_logistics.lead_time_max x lead_time_unit",
     },
     {
         "key": "initial_on_hand",
@@ -1235,6 +1323,138 @@ def _override_num(
     return n
 
 
+# ── A lane's lead-time spread (PLAN.md §25 WP 15.2, D291, blueprint P-S.6) ──
+_LANE_LT_DISTS = ("deterministic", "normal", "lognormal", "gamma", "triangular", "uniform")
+_LT_SPREAD_KEYS = ("lane_lead_time_dist", "lane_lead_time_cv", "lane_lead_time_min_weeks",
+                   "lane_lead_time_mode_weeks", "lane_lead_time_max_weeks")
+
+
+def _lane_lead_time_spread(
+    arc: "SupplyArc", mrow: Optional["MaterialRow"], row: dict, w: list[MappingWarning],
+) -> tuple[dict[str, Any], Optional[float], dict[str, tuple[str, Any]]]:
+    """The lane's lead-time SHAPE as the engine receives it, its planning lead
+    time when the shape fixes one, and where every part came from.
+
+    Order (§25.2 rule 5), per part: the Supplier row (``row``, the lane's
+    ``sourcing`` patch) → the lane's upload → (shape and CV only) the material's
+    master → deterministic. A shape the row or the lane chose that lacks a
+    parameter it reads is WARNED and the lane runs deterministic — never a
+    guessed parameter. A material's shape keeps its pre-Phase-15 meaning exactly
+    (a missing CV is "no spread", silently), so a project that states no lane or
+    row spread maps byte-identically — except that a material CV above the
+    engine's bound of 1 is now clamped to 1 and warned instead of failing the
+    run (§4 D294).
+
+    Returns ``(link_fields, planning_weeks, resolved)``: ``planning_weeks`` is the
+    bounded shape's mean (§25.2 rule 3), else None (the lane's lead time stands);
+    ``resolved`` maps each lane column to ``(source, value)`` — the value each
+    /policies cell must show (page-equals-run), whether or not the chosen shape
+    reads it.
+    """
+    ent = f"supply:{arc.supplier_id}->{arc.material_id}"
+    src: dict[str, str] = {}
+
+    # The shape.
+    dist, dist_src = None, "default"
+    rv = row.get("lane_lead_time_dist")
+    if rv not in (None, ""):
+        t = str(rv).strip().lower()
+        if t in _LANE_LT_DISTS:
+            dist, dist_src = t, "override"
+        else:
+            w.append(MappingWarning("warn", ent, "lane_lead_time_dist",
+                                    f"/policies override {rv!r} is not one of {', '.join(_LANE_LT_DISTS)} "
+                                    f"— ignored, the lane's upload decides"))
+    if dist is None and arc.lead_time_dist not in (None, ""):
+        t = str(arc.lead_time_dist).strip().lower()
+        if t in _LANE_LT_DISTS:
+            dist, dist_src = t, "master"
+        else:
+            w.append(MappingWarning("warn", ent, "lead_time_dist",
+                                    f"lane lead-time distribution {arc.lead_time_dist!r} is not one of "
+                                    f"{', '.join(_LANE_LT_DISTS)} — ignored"))
+    if dist is None and mrow is not None and mrow.lead_time_dist:
+        dist, dist_src = str(mrow.lead_time_dist), "derived"
+    if dist is None:
+        dist = "deterministic"
+    src["lead_time_dist"] = dist_src
+
+    # The CV: row → lane → material.
+    cv, cv_src = None, "default"
+    rv = row.get("lane_lead_time_cv")
+    if rv not in (None, ""):
+        n = _override_num(rv, entity=ent, field="lane_lead_time_cv", domain="fraction", w=w)
+        if n is not None:
+            cv, cv_src = n, "override"
+    if cv is None and arc.lead_time_cv is not None:
+        cv, cv_src = float(arc.lead_time_cv), "master"
+    if cv is None and mrow is not None and mrow.lead_time_cv:
+        cv, cv_src = float(mrow.lead_time_cv), "derived"
+        if cv > 1.0:
+            w.append(MappingWarning(
+                "warn", ent, "lead_time_cv",
+                f"material lead-time CV {cv:g} is above the engine's bound of 1 → used as 1 "
+                f"(§4 D294)"))
+            cv = 1.0
+    src["lead_time_cv"] = cv_src
+
+    # The bounds: row → lane (in the lane's lead_time_unit).
+    bounds: dict[str, Optional[float]] = {}
+    for part, rkey, col in (("lead_time_min", "lane_lead_time_min_weeks", arc.lead_time_min),
+                            ("lead_time_mode", "lane_lead_time_mode_weeks", arc.lead_time_mode),
+                            ("lead_time_max", "lane_lead_time_max_weeks", arc.lead_time_max)):
+        v, vs = None, "default"
+        rv = row.get(rkey)
+        if rv not in (None, ""):
+            n = _override_num(rv, entity=ent, field=rkey, domain="nonnegative", w=w)
+            if n is not None:
+                v, vs = n, "override"
+        if v is None and col is not None:
+            v, vs = _duration_to_weeks(float(col), arc.lead_time_unit), "master"
+        bounds[part], src[part] = v, vs
+    vals: dict[str, Any] = {"lead_time_dist": dist, "lead_time_cv": cv, **bounds}
+
+    def _resolved() -> dict[str, tuple[str, Any]]:
+        return {k: (src[k], vals[k]) for k in src}
+
+    out: dict[str, Any] = {"lead_time_dist": LeadTimeDist(dist), "lead_time_cv": cv or 0.0}
+    chosen_here = dist_src in ("override", "master")
+
+    def _fallback(why: str) -> tuple[dict[str, Any], Optional[float], dict[str, tuple[str, Any]]]:
+        w.append(MappingWarning("warn", ent, "lead_time_dist",
+                                f"{dist} lead time {why} → the lane runs deterministic"))
+        src["lead_time_dist"], vals["lead_time_dist"] = "default", "deterministic"
+        return {"lead_time_dist": LeadTimeDist.DETERMINISTIC, "lead_time_cv": 0.0}, None, _resolved()
+
+    if dist in ("normal", "lognormal", "gamma"):
+        if cv is None and chosen_here:
+            return _fallback("needs a CV and none is stated (row, lane or material)")
+        return out, None, _resolved()
+    if dist in ("triangular", "uniform"):
+        lo, mo, hi = bounds["lead_time_min"], bounds["lead_time_mode"], bounds["lead_time_max"]
+        if lo is None or hi is None or (dist == "triangular" and mo is None):
+            need = "min, mode and max" if dist == "triangular" else "min and max"
+            return _fallback(f"needs {need}")
+        if dist == "uniform":
+            mo = None
+        if hi > 51:
+            return _fallback(f"max {hi:g} wk is above the engine's 51 weeks")
+        if not (lo <= (mo if mo is not None else lo) <= hi and lo <= hi):
+            return _fallback(f"needs min ≤ {'mode ≤ ' if mo is not None else ''}max, got "
+                             f"{lo:g} / {'' if mo is None else f'{mo:g} / '}{hi:g}")
+        out.update(lead_time_min_weeks=lo, lead_time_mode_weeks=mo, lead_time_max_weeks=hi,
+                   lead_time_cv=0.0)
+        mean = lead_time_bounds_mean(LeadTimeDist(dist), lo, mo, hi)
+        return out, mean, _resolved()
+    # deterministic (or the material's reserved `empirical`, which compile
+    # refuses). A row or lane that SAYS deterministic means no spread at all, so
+    # P-P.3's King formula reads no CV for it; a deterministic material keeps
+    # the CV it always carried (inert for draws), byte-identically.
+    if dist == "deterministic" and chosen_here:
+        out["lead_time_cv"] = 0.0
+    return out, None, _resolved()
+
+
 def _apply_primary_choice(
     links: list[SupplierLink], policies: dict, w: list[MappingWarning],
 ) -> None:
@@ -1896,6 +2116,23 @@ def from_project_data(data: ProjectData) -> MappingResult:
         if n is not None:
             row_lead[(sup_id, mat_id)] = n
     lt_source: dict[tuple[str, str], str] = {}
+    # The Supplier row's lead-time SPREAD cells (§25 WP 15.2), per lane, read
+    # exactly like `lead_time_weeks` above — each by its literal key so the D90
+    # gate sees the reads.
+    row_sourcing: dict[tuple[str, str], dict[str, Any]] = {}
+    for sup_id, mat_id in sorted({(a.supplier_id, a.material_id) for a in data.supply_arcs}):
+        patch = (data.policies.get(f"node:{sup_id}::{mat_id}") or {}).get("sourcing") or {}
+        picked = {
+            "lane_lead_time_dist": patch.get("lane_lead_time_dist"),
+            "lane_lead_time_cv": patch.get("lane_lead_time_cv"),
+            "lane_lead_time_min_weeks": patch.get("lane_lead_time_min_weeks"),
+            "lane_lead_time_mode_weeks": patch.get("lane_lead_time_mode_weeks"),
+            "lane_lead_time_max_weeks": patch.get("lane_lead_time_max_weeks"),
+        }
+        picked = {k: v for k, v in picked.items() if v not in (None, "")}
+        if picked:
+            row_sourcing[(sup_id, mat_id)] = picked
+    spread_source: dict[tuple[str, str], dict[str, tuple[str, Any]]] = {}
     for arc in data.supply_arcs:
         # A master row is not what makes a material real — the BOM is. An arc
         # whose material the BOM consumes counts even with no row in
@@ -1925,19 +2162,31 @@ def from_project_data(data: ProjectData) -> MappingResult:
             w.append(MappingWarning("warn", f"supply:{arc.supplier_id}->{arc.material_id}",
                                     "lead_time", "missing lead_time → defaulted to 2 weeks"))
         mrow = mat_lt_dist.get(arc.material_id)
+        # The lane's SHAPE (PLAN.md §25 WP 15.2): the row → the lane's upload →
+        # the material → deterministic. A bounded shape fixes the planning lead
+        # time at its bounds' mean, which then wins over the row's lead time.
+        spread, planning_lt, spread_src = _lane_lead_time_spread(
+            arc, mrow, row_sourcing.get(key, {}), w)
+        if planning_lt is not None:
+            if lt_src == "override":
+                w.append(MappingWarning(
+                    "info", f"supply:{arc.supplier_id}->{arc.material_id}", "lead_time_weeks",
+                    f"the row's lead time is not read on a {spread['lead_time_dist'].value} lane — "
+                    f"its planning lead time is the bounds' mean, {planning_lt:g} wk"))
+            lt_weeks, lt_src = planning_lt, "derived"
         link = SupplierLink(
             supplier_id=arc.supplier_id, material_id=arc.material_id,
             cost=cost, lead_time_weeks=int(_clamp(
                 round(lt_weeks), 1, 51, w=w, field="lead_time", unit=" wk",
                 entity=f"supply:{arc.supplier_id}->{arc.material_id}")),
-            lead_time_dist=LeadTimeDist((mrow.lead_time_dist or "deterministic")) if mrow and mrow.lead_time_dist else LeadTimeDist.DETERMINISTIC,
-            lead_time_cv=float(mrow.lead_time_cv) if mrow and mrow.lead_time_cv else 0.0,
             moq=moq_by_mat.get(arc.material_id, 0.0),
+            **spread,
         )
         prev = links_by_key.get(key)
         if prev is None:
             links_by_key[key] = link
             lt_source[key] = lt_src
+            spread_source[key] = spread_src
         else:
             w.append(MappingWarning("warn", f"supply:{arc.supplier_id}->{arc.material_id}",
                                     "duplicate_arc",
@@ -1946,6 +2195,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
             if (link.cost, link.lead_time_weeks) < (prev.cost, prev.lead_time_weeks):
                 links_by_key[key] = link
                 lt_source[key] = lt_src
+                spread_source[key] = spread_src
         cheapest_cost[arc.material_id] = min(cheapest_cost.get(arc.material_id, cost), cost)
         # `time_unit` describes the VOLUME period (§3), so the weight is a
         # weekly rate. A zero/absent/negative volume is no weight at all
@@ -1977,11 +2227,21 @@ def from_project_data(data: ProjectData) -> MappingResult:
     # run log only when some lane takes the /policies value, so a project that
     # overrides none logs exactly as before the key existed.
     any_lead_override = "override" in lt_source.values()
+    # The spread is counted only when some lane states one of its own (row or
+    # upload), so a project that sets none logs exactly as before Phase 15.
+    any_spread = any(sv[0] in ("override", "master")
+                     for srcs in spread_source.values() for sv in srcs.values())
     for (sup_id, mat_id), link in sorted(links_by_key.items()):
         lane = f"{sup_id}::{mat_id}"
         tally.add("inbound_logistics.lead_time", lt_source[(sup_id, mat_id)], lane,
                   count=any_lead_override)
         tally.value("inbound_logistics.lead_time", lane, link.lead_time_weeks)
+        srcs = spread_source.get((sup_id, mat_id), {})
+        for field in ("lead_time_dist", "lead_time_cv", "lead_time_min", "lead_time_mode",
+                      "lead_time_max"):
+            source, val = srcs.get(field, ("default", None))
+            tally.add(f"inbound_logistics.{field}", source, lane, count=any_spread)
+            tally.value(f"inbound_logistics.{field}", lane, val)
     _apply_primary_choice(links, data.policies, w)
 
     # BOM materials with no source link cannot be simulated. Since D166 this

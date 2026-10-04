@@ -306,7 +306,10 @@ const UploadWizard = ({
       // every CSV anyone has ever uploaded. Blank means weeks, which is what the
       // engine has always assumed (project_map.py::_duration_to_weeks); supplying
       // it is how a lead time quoted in days stops being read as weeks.
-      optionalHeaders: ['lead_time_unit'],
+      // PLAN.md §25 WP 15.2 — the lane's own lead-time shape: a distribution and
+      // only the parameters it reads, the bounds in `lead_time_unit` like the
+      // lead time. All optional; a lane with none follows its material's shape.
+      optionalHeaders: ['lead_time_unit', 'lead_time_dist', 'lead_time_cv', 'lead_time_min', 'lead_time_mode', 'lead_time_max'],
       category: 'inbound',
     },
     {

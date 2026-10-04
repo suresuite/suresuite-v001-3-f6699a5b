@@ -341,6 +341,7 @@ export function StagePolicyTable({
     products,
     outbound: lanes.outbound,
     inbound: lanes.inbound,
+    materials: materials as unknown as Record<string, unknown>[],
     defaults,
     overrides,
   });
@@ -1933,6 +1934,8 @@ export function StagePolicyTable({
             overrides,
             scope: spec.scope,
             familyDefault: getDefault,
+            // A bounded lane's Lead time is its bounds' mean (PLAN.md §25 WP 15.3).
+            gate: rowCtxByKey.get(rowKey),
           });
           const {
             cellValue, liveDefault, provenance: prov, edited,
@@ -1953,7 +1956,12 @@ export function StagePolicyTable({
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);
-          const kind = kindOf(col, opts, firms, cellValue, liveDefault);
+          // A bounded lane's Lead time is its bounds' mean (§25.2 rule 3): the
+          // engine reads no typed value there, so the cell is not an input.
+          const kind =
+            resolved.derivedVia?.via === "lead_time_bounds_mean"
+              ? "readonly"
+              : kindOf(col, opts, firms, cellValue, liveDefault);
           // A cleared master-backed cell is *reset to master* (§23 WP 13.1):
           // `null` removes the override on save, `undefined` would be no edit.
           // A column the engine rounds (`ColSpec.round`, the lane lead time) is
@@ -2036,7 +2044,7 @@ export function StagePolicyTable({
                 <Select value={String(cellValue ?? liveDefault ?? "")} onValueChange={commit}>
                   <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
                     {/* An empty distribution runs the PRODUCT's, × the row's share. */}
-                    <SelectValue placeholder={col.field === "row_demand_distribution" ? "product's" : "—"} />
+                    <SelectValue placeholder={col.field === "row_demand_distribution" ? "product's" : col.field === "lane_lead_time_dist" ? "deterministic" : "—"} />
                   </SelectTrigger>
                   <SelectContent>
                     {(col.field === "sourcing_firm" && firms

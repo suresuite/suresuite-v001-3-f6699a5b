@@ -34,7 +34,8 @@ describe("D9 — lead_time_unit, every link in the chain", () => {
 
   it("2. the upload wizard offers it WITHOUT requiring it", () => {
     const wiz = read("src", "components", "UploadWizard.tsx");
-    expect(wiz).toContain("optionalHeaders: ['lead_time_unit']");
+    // First of the optional headers (WP 15.2 appended the lane's lead-time shape).
+    expect(wiz).toMatch(/optionalHeaders: \['lead_time_unit'[,\]]/);
     // expectedHeaders is the required-column gate. A column added there rejects
     // every CSV that predates it, which for an optional column is a regression.
     const inbound = wiz.slice(wiz.indexOf("id: 'inbound_logistics'"), wiz.indexOf("id: 'outbound_logistics'"));
@@ -61,7 +62,8 @@ describe("D9 — lead_time_unit, every link in the chain", () => {
 
   it("4. the worker SELECTs it — PostgREST returns only what the projection names", () => {
     const datamap = read("sim-worker", "sim_worker", "datamap.py");
-    const projection = /"supplier_id,material_id,unit_price,lead_time,lead_time_unit,time_unit,volume"/;
+    // A prefix: WP 15.2 appended the lane's lead-time spread after `volume`.
+    const projection = /"supplier_id,material_id,unit_price,lead_time,lead_time_unit,time_unit,volume[",]/;
     expect(datamap, "the inbound projection must name lead_time_unit").toMatch(projection);
     // And it must still be handed to SupplyArc.
     expect(datamap).toContain('lead_time_unit=r.get("lead_time_unit")');

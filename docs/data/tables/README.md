@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 76 of 93 tables are covered,
-995 columns in all. A table that is not here is listed
+1000 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -34,7 +34,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`experiments`](experiments.md) | 5 | `engine` | 10 | One designed experiment over a project: a name, a design (full factorial or Latin hypercube), the factors and levels it varies, and the `scenarios` it cloned — one per design row — to run. A design a person authors, grouping runs that were MADE to be compared. UNREACHABLE TODAY: the only screen that writes or reads it, `ExperimentDesigner.tsx`, is mounted by no route (§4 D115), so although `useExperiments` reads and writes the table, no page a user can open reaches that code. |
 | [`external_evidence`](external_evidence.md) | 4 | `platform` | 9 | One retrieved external claim about a supply chain, as a subject–predicate–object triple with the source it came from, the confidence attached to it and the hash of the content it was read from. The network cartographer's evidence store: what an agent FOUND, kept apart from what a person entered. |
 | [`graph_level_versions`](graph_level_versions.md) | 3 | `platform` | 9 | One row per (project, level, content): the FIRST time a project's product, process, firm or simulation level had that hash. Numbered per project PER LEVEL, so "Product graph v3" and "Firm graph v5" are both sentences the system can say, and a change to one level moves that level's number and no other. A snapshot (`dataset_versions`) names its level versions — its tuple. |
-| [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 14 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed). |
+| [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 19 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed). |
 | [`ingest_files`](ingest_files.md) | 0 | `data-ingestion` | 11 | One file as received, in one run: the manifest for bytes held in storage — where they are, how many there were, and the SHA-256 of exactly the sequence received. Write-once: the row records an event that has already happened and cannot be edited into a different one. |
 | [`ingest_runs`](ingest_runs.md) | 1 | `data-ingestion` | 23 | One ingestion attempt, from any source — a connector sync, a CSV upload or an API push — with the counts and the mapping report it produced. The unit a person reviews and approves: staged rows belong to a run, and promotion is a decision about a run rather than about a row. |
 | [`ingest_staged_bom_lines`](ingest_staged_bom_lines.md) | 1 | `data-ingestion` | 13 | One component line of one staged BOM version, as the source sent it: this much of that component goes into one unit of the parent. |
@@ -91,4 +91,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `262c25f1b6b7`, engine `0.7.0`.*
+*Generated from data contract `16f8ea13d88e`, engine `0.7.0`.*

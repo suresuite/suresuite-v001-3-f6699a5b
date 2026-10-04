@@ -354,6 +354,181 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "supplier",
+    "field": "lane_lead_time_dist",
+    "family": "sourcing",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the supplier grid as `lane_lead_time_dist` (family `sourcing`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`inbound_logistics.lead_time_dist` (item master, keyed from `supplier_id::material_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "dimensionless",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_dist",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "supplier",
+    "field": "lane_lead_time_cv",
+    "family": "sourcing",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the supplier grid as `lane_lead_time_cv` (family `sourcing`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`inbound_logistics.lead_time_cv` (item master, keyed from `supplier_id::material_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`coefficient of variation (dimensionless)`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_cv",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "supplier",
+    "field": "lane_lead_time_min_weeks",
+    "family": "sourcing",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the supplier grid as `lane_lead_time_min_weeks` (family `sourcing`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`inbound_logistics.lead_time_min` (item master, keyed from `supplier_id::material_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`weeks`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_min_weeks",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "supplier",
+    "field": "lane_lead_time_mode_weeks",
+    "family": "sourcing",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the supplier grid as `lane_lead_time_mode_weeks` (family `sourcing`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`inbound_logistics.lead_time_mode` (item master, keyed from `supplier_id::material_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`weeks`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_mode_weeks",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "supplier",
+    "field": "lane_lead_time_max_weeks",
+    "family": "sourcing",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the supplier grid as `lane_lead_time_max_weeks` (family `sourcing`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`inbound_logistics.lead_time_max` (item master, keyed from `supplier_id::material_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`weeks`, fixed by `column`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_max_weeks",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "supplier",
     "field": "type",
     "family": "inventory",
     "hops": [
@@ -4202,5 +4377,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 46;
+export const CHAIN_COUNT = 51;
 export const BROKEN_COUNT = 2;

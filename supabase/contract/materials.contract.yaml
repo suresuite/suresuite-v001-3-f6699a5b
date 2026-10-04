@@ -301,7 +301,7 @@ fields:
     grain: metadata
     engine:
       consumed_by: "project_map.py::_map_supply -> SupplierLink.lead_time_dist"
-      transform: "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC"
+      transform: "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC. A lane's own shape (inbound_logistics.lead_time_dist) or the Supplier row's wins over it (PLAN.md §25 WP 15.2)"
       missing_default: "deterministic"
     substitutions:
       - when: "NULL or blank"
@@ -339,18 +339,22 @@ fields:
     grain: level
     engine:
       consumed_by: "project_map.py::_map_supply -> SupplierLink.lead_time_cv"
-      transform: "float() when truthy, else 0.0"
+      transform: "float() when truthy, else 0.0; above 1 → 1, warned (§4 D294). A lane's own CV (inbound_logistics.lead_time_cv) or the Supplier row's wins over it (PLAN.md §25 WP 15.2)"
       missing_default: "0.0 — no variability, so no sampling"
     substitutions:
       - when: "NULL or zero"
         value: "0.0"
         provenance: default
         visible_as: null
+      - when: "above 1 (a value stored before the upload rule bounded it — §4 D294)"
+        value: "1.0, the engine's bound"
+        provenance: default
+        visible_as: "MappingWarning on the run's mapping report"
     ingest:
       csv_header: "lead_time_cv"
       required: false
-      validate: "numeric >= 0"
-      rule: {kind: numeric, min: 0, blank: 'null'}
+      validate: "numeric 0–1 — the engine's bound (§4 D294: a CV above 1 used to fail the run)"
+      rule: {kind: numeric, min: 0, max: 1, blank: 'null'}
     surfaces: []
     resolution:
       default_mode: asserted

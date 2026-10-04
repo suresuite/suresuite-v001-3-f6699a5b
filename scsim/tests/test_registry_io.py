@@ -476,6 +476,12 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         # The first override of a LANE column: one supplier × material link's
         # lead time over the uploaded `inbound_logistics.lead_time`.
         "lead_time_weeks": ("inbound_logistics.lead_time", "supplier"),
+        # PLAN.md §25 WP 15.2 — the lane's lead-time SPREAD, chosen like demand.
+        "lane_lead_time_dist": ("inbound_logistics.lead_time_dist", "supplier"),
+        "lane_lead_time_cv": ("inbound_logistics.lead_time_cv", "supplier"),
+        "lane_lead_time_min_weeks": ("inbound_logistics.lead_time_min", "supplier"),
+        "lane_lead_time_mode_weeks": ("inbound_logistics.lead_time_mode", "supplier"),
+        "lane_lead_time_max_weeks": ("inbound_logistics.lead_time_max", "supplier"),
         "sell_price": ("products.sell_price", "plant"),
         "production_capacity": ("products.production_capacity", "plant"),
         # PLAN.md §24 WP 14.2 — the Customer row's demand spec over
@@ -503,7 +509,8 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         # One ENUM domain joined in WP 14.2 for the Customer row's
         # distribution; the numeric three are the mapper's `_override_num`.
         assert k.get("domain") in (None, "positive", "nonnegative", "fraction", "percent",
-                                   "distribution", "fg_policy", "fulfillment_mode"), k
+                                   "distribution", "fg_policy", "fulfillment_mode",
+                                   "lead_time_distribution"), k
         assert k["catalog_ref"] is None or not k.get("master"), k
 
 
@@ -524,7 +531,21 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         ScenarioSettings, SupplierRow, SupplyArc, from_project_data,
     )
 
-    def project():
+    # WP 15.2 — a lane-spread key is read only where the shape reads it, so its
+    # probe lane (S3) uploads the shape that key can perturb.
+    lane_spread = {
+        "lane_lead_time_dist": dict(lead_time_cv=0.2, lead_time_min=1, lead_time_mode=2,
+                                       lead_time_max=4),
+        "lane_lead_time_cv": dict(lead_time_dist="normal", lead_time_cv=0.1),
+        "lane_lead_time_min_weeks": dict(lead_time_dist="triangular", lead_time_min=1,
+                                    lead_time_mode=2, lead_time_max=4),
+        "lane_lead_time_mode_weeks": dict(lead_time_dist="triangular", lead_time_min=1,
+                                     lead_time_mode=2, lead_time_max=4),
+        "lane_lead_time_max_weeks": dict(lead_time_dist="triangular", lead_time_min=1,
+                                    lead_time_mode=2, lead_time_max=4),
+    }
+
+    def project(key=None):
         return ProjectData(
             suppliers=[SupplierRow("S1"), SupplierRow("S3")],
             materials=[MaterialRow("M1", cost=10.0)],
@@ -534,7 +555,8 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
                                  fg_base_stock=400.0, fg_reorder_point=100.0, fg_cover_days=10.0)],
             supply_arcs=[
                 SupplyArc("S1", "M1", unit_price=10, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
-                SupplyArc("S3", "M1", unit_price=11, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
+                SupplyArc("S3", "M1", unit_price=11, lead_time=2, lead_time_unit="week", volume=60, time_unit="week",
+                          **lane_spread.get(key, {})),
             ],
             bom=[BomArc("P1", "M1", 1.0)],
             # C1 states its own demand (WP 14.2), so every Customer-row key has
@@ -573,6 +595,8 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "material_cost": 3.3,
         "material_moq": 9, "capacity_per_week": 77, "reliability_score": 0.5, "initial_on_hand": 5,
         "lead_time_weeks": 5,
+        "lane_lead_time_dist": "triangular", "lane_lead_time_cv": 0.35, "lane_lead_time_min_weeks": 2,
+        "lane_lead_time_mode_weeks": 3, "lane_lead_time_max_weeks": 6,
         "sell_price": 7, "production_capacity": 66,
         "row_demand_mode": "model", "row_demand_distribution": "poisson", "row_demand_mean": 25,
         "row_demand_variation": 0.5, "row_demand_min": 5, "row_demand_max": 500,
@@ -584,8 +608,8 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
     keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1",
             "customer": "node:C1::P1"}
 
-    def mapped(policies):
-        d = project()
+    def mapped(policies, key=None):
+        d = project(key)
         d.policies = policies
         sc = from_project_data(d).scenario
         return json.dumps({"net": sc.network.model_dump(mode="json"), "pol": sc.policies},
@@ -596,11 +620,11 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         assert set(k["scopes"]) <= set(keys) and k["scopes"], k
         assert k["key"] in value, f"no probe value for {k['key']} — add one"
         base = {"default": copy.deepcopy(context.get(k["key"], {}))}
-        before = mapped(base)
+        before = mapped(base, k["key"])
         for scope, target in keys.items():
             pol = copy.deepcopy(base)
             pol.setdefault(target, {}).setdefault(k["family"], {})[k["key"]] = value[k["key"]]
-            read = mapped(pol) != before
+            read = mapped(pol, k["key"]) != before
             if read != (scope in k["scopes"]):
                 wrong.append(f"{k['family']}.{k['key']} @ {scope}: declared "
                              f"{'read' if scope in k['scopes'] else 'not read'}, mapper "
