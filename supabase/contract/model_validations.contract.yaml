@@ -19,17 +19,20 @@ natural_key_unique:
   - source: "partial unique index 20261001000020_simulation_scope.sql (WHERE status = 'active')"
     columns: [project_id, policy_hash, "(COALESCE(hash_simulation, graph_hash))", scenario_hash]
     name: "model_validations_active_content_uq"
+  - source: "constraint 20261004000001_version_codes.sql"
+    columns: [project_id, model_code]
+    name: "model_validations_model_code_key"
 
 surfaces:
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:333"
+    evidence: "src/hooks/useModelValidation.tsx:344"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:333"
+    evidence: "src/hooks/useModelValidation.tsx:344"
     confirmed: true
 
 governance:
@@ -45,7 +48,10 @@ governance:
     enforces the adoption rule: every selected KPI passed, or a recorded face-validation
     statement), the legacy `record_model_validation` (its agent caller), and
     `revoke_model_validation`; all three reach one insert path. Audited at statement
-    grain since WP 10.3. A BEFORE UPDATE trigger refuses every change but the lifecycle.
+    grain since WP 10.3. A BEFORE UPDATE trigger refuses every change but the lifecycle —
+    and three fill-once completions: the engine id, the simulation hash (WP 11.2), and the
+    planning period with its code, set by `set_model_planning_period` (same writer gate as
+    saving the model) on a model saved without one (WP 10.5 follow-up).
 
 fields:
   id:
@@ -395,6 +401,36 @@ fields:
     unit_source: none
     meaning: >-
       "Model v3" — one number per model per project, assigned on insert.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  planning_period:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The planning period the model is FOR (`2026Q3`), chosen by the modeller when the model
+      is saved and never derived from a date — a model validated in October may be the Q3
+      model. CHECK `^[0-9]{4}Q[1-4]$`. Not part of `model_hash`: it names the model, it is not
+      what the model is. NULL on a model saved before it existed, until it is set ONCE through
+      `set_model_planning_period` (the immutability trigger's fill-once completion).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  model_code:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      "2026Q3", or "2026Q3-2" for the second model of that period in the project — the code
+      a person says. Assigned by trigger whenever the period is set, unique per project, and
+      never re-issued: the suffix is one past the highest stored for that period.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

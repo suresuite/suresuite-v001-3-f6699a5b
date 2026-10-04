@@ -86,7 +86,7 @@ describe("the protocol", () => {
     expect(protocolProblems(p)).toEqual([]);
   });
   it("reads in one line", () => {
-    expect(protocolLine(p)).toBe("30 seeds · steady from wk 12 · 156 wks");
+    expect(protocolLine(p)).toBe("30 replications · 156 weeks · results from wk 12");
   });
   it("refuses what the database refuses", () => {
     expect(protocolProblems({ ...p, replications: 500 })).not.toEqual([]);

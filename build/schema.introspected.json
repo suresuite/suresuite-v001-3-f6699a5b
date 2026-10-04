@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 400,
-  "migrations_applied": 392,
+  "migrations_found": 401,
+  "migrations_applied": 393,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261003000002_fg_policy_per_product.sql",
+  "last_migration": "20261004000001_version_codes.sql",
   "counts": {
     "tables": 93,
     "views": 8,
     "enums": 4,
-    "functions": 411,
+    "functions": 416,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -8119,6 +8119,18 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "version_code",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_version_codes.sql"
         }
       ],
       "constraints": [
@@ -8163,6 +8175,24 @@
           "definition": "CHECK (level IN ('product', 'process', 'firm', 'simulation'))",
           "implicit": true,
           "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "graph_level_versions_version_code_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')",
+          "added_by": "20261004000001_version_codes.sql"
+        },
+        {
+          "name": "graph_level_versions_code_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "level",
+            "version_code"
+          ],
+          "definition": "UNIQUE (project_id, level, version_code)",
+          "added_by": "20261004000001_version_codes.sql"
         }
       ],
       "indexes": [],
@@ -8208,6 +8238,15 @@
             "id"
           ],
           "name": "graph_level_versions_pkey"
+        },
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "level",
+            "version_code"
+          ],
+          "name": "graph_level_versions_code_key"
         }
       ]
     },
@@ -11235,6 +11274,30 @@
             "on_delete": "SET NULL"
           },
           "added_by": "20261001000020_simulation_scope.sql"
+        },
+        {
+          "name": "planning_period",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_version_codes.sql"
+        },
+        {
+          "name": "model_code",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_version_codes.sql"
         }
       ],
       "constraints": [
@@ -11323,6 +11386,30 @@
           ],
           "definition": "FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)",
           "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "model_validations_planning_period_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (planning_period IS NULL OR planning_period ~ '^[0-9]{4}Q[1-4]$')",
+          "added_by": "20261004000001_version_codes.sql"
+        },
+        {
+          "name": "model_validations_model_code_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((planning_period IS NULL) = (model_code IS NULL) AND (model_code IS NULL OR model_code ~ ('^' || planning_period || '(-[0-9]+)?$')))",
+          "added_by": "20261004000001_version_codes.sql"
+        },
+        {
+          "name": "model_validations_model_code_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "model_code"
+          ],
+          "definition": "UNIQUE (project_id, model_code)",
+          "added_by": "20261004000001_version_codes.sql"
         }
       ],
       "indexes": [
@@ -11380,6 +11467,14 @@
             "id"
           ],
           "name": "model_validations_pkey"
+        },
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "model_code"
+          ],
+          "name": "model_validations_model_code_key"
         },
         {
           "source": "partial UNIQUE index",
@@ -15372,6 +15467,18 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000006_policy_versions_by_content.sql"
+        },
+        {
+          "name": "version_code",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_version_codes.sql"
         }
       ],
       "constraints": [
@@ -15384,6 +15491,13 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260609000002_policy_versions.sql"
+        },
+        {
+          "name": "policy_versions_version_code_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')",
+          "added_by": "20261004000001_version_codes.sql"
         }
       ],
       "indexes": [
@@ -24599,7 +24713,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000019_graph_level_versions.sql"
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "_graph_level_versions_number",
@@ -24609,7 +24723,7 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000019_graph_level_versions.sql"
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "_graph_state_mark",
@@ -24727,6 +24841,32 @@
       "volatility": "VOLATILE",
       "comment": null,
       "defined_by": "20260929000002_admin_users_read.sql"
+    },
+    {
+      "name": "_model_code_for",
+      "signature": "_model_code_for(uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_period text"
+      ],
+      "returns": "text LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000001_version_codes.sql"
+    },
+    {
+      "name": "_next_version_code",
+      "signature": "_next_version_code(text, text[])",
+      "args": [
+        "p_base text",
+        "p_taken text[]"
+      ],
+      "returns": "text LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "_policy_version_hash",
@@ -24892,7 +25032,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000020_simulation_scope.sql"
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "_validated_model_number",
@@ -24902,7 +25042,31 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000008_validated_model.sql"
+      "defined_by": "20261004000001_version_codes.sql"
+    },
+    {
+      "name": "_version_codes_backfill",
+      "signature": "_version_codes_backfill(uuid)",
+      "args": [
+        "p_project_id uuid DEFAULT NULL"
+      ],
+      "returns": "integer LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000001_version_codes.sql"
+    },
+    {
+      "name": "_version_day_code",
+      "signature": "_version_day_code(timestamptz)",
+      "args": [
+        "p_at timestamptz"
+      ],
+      "returns": "text LANGUAGE sql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "account_self_resolve",
@@ -26943,7 +27107,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000021_level_version_reads.sql"
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "dataset_versions_assign_number",
@@ -28348,11 +28512,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "TABLE ( id uuid, label text, notes text, author_email text, author_name text, parent_version_id uuid, policy_hash text, created_at timestamptz, run_count bigint, card_count bigint, version_no integer )",
+      "returns": "TABLE ( id uuid, label text, notes text, author_email text, author_name text, parent_version_id uuid, policy_hash text, created_at timestamptz, run_count bigint, card_count bigint, version_no integer, version_code text )",
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000006_policy_versions_by_content.sql"
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "list_projects",
@@ -28610,7 +28774,7 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000006_policy_versions_by_content.sql"
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "process_structure",
@@ -28914,7 +29078,7 @@
     },
     {
       "name": "record_validated_model",
-      "signature": "record_validated_model(uuid, uuid, uuid, uuid, text, jsonb, text, jsonb, jsonb, jsonb, text, text, uuid, jsonb, uuid, text)",
+      "signature": "record_validated_model(uuid, uuid, uuid, uuid, text, jsonb, text, jsonb, jsonb, jsonb, text, text, uuid, jsonb, uuid, text, text)",
       "args": [
         "p_project_id uuid",
         "p_policy_version_id uuid",
@@ -28931,13 +29095,14 @@
         "p_evidence_run_id uuid",
         "p_evidence jsonb",
         "_actor_user_id uuid",
-        "p_user_email text DEFAULT NULL"
+        "p_user_email text DEFAULT NULL",
+        "p_planning_period text DEFAULT NULL"
       ],
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000008_validated_model.sql"
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "refresh_node_list_for_project",
@@ -29199,6 +29364,20 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
+    },
+    {
+      "name": "set_model_planning_period",
+      "signature": "set_model_planning_period(uuid, text, uuid)",
+      "args": [
+        "p_validation_id uuid",
+        "p_planning_period text",
+        "_actor_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "text LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000001_version_codes.sql"
     },
     {
       "name": "set_network_data_defaults",

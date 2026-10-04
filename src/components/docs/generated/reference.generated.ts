@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 995;
+export const REFERENCE_COLUMN_COUNT = 999;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -3149,7 +3149,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc record_model_validation",
-        "evidence": "src/hooks/useModelValidation.tsx:513"
+        "evidence": "src/hooks/useModelValidation.tsx:524"
       },
       {
         "page": "DeveloperApi.tsx",
@@ -3164,12 +3164,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc record_validated_model (Save Validated Model, WP 10.3)",
-        "evidence": "src/hooks/useModelValidation.tsx:541"
+        "evidence": "src/hooks/useModelValidation.tsx:571"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc record_model_validation",
-        "evidence": "src/hooks/useModelValidation.tsx:513"
+        "evidence": "src/hooks/useModelValidation.tsx:524"
       }
     ],
     "governance": {
@@ -6813,7 +6813,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       "project_id",
       "level",
       "version_no",
-      "id"
+      "id",
+      "project_id",
+      "level",
+      "version_code"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -6824,6 +6827,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "graph_level_versions_level_check",
         "definition": "CHECK (level IN ('product', 'process', 'firm', 'simulation'))"
+      },
+      {
+        "name": "graph_level_versions_version_code_check",
+        "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')"
       }
     ],
     "ingestDataset": null,
@@ -7057,6 +7064,30 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the project's level first had this content — the first snapshot's `created_at`, so a backfilled row is dated by its history, not by the migration.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "version_code",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "\"Data 20260915\" for the `simulation` level — the code a person says. The UTC day this level first had this content (`YYYYMMDD`), and `-n` for the n-th content of the level first seen that day. Assigned by the numbering trigger, unique per project and level, and immutable once stored (a row that predates it learns it once, from the backfill).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -10814,6 +10845,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKey": [
       "id",
       "project_id",
+      "model_code",
+      "project_id",
       "policy_hash",
       "(COALESCE(hash_simulation, graph_hash))",
       "scenario_hash"
@@ -10847,6 +10880,14 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "model_validations_protocol_check",
         "definition": "CHECK (protocol IS NULL OR cardinality(public.validated_model_protocol_problems(protocol)) = 0)"
+      },
+      {
+        "name": "model_validations_planning_period_check",
+        "definition": "CHECK (planning_period IS NULL OR planning_period ~ '^[0-9]{4}Q[1-4]$')"
+      },
+      {
+        "name": "model_validations_model_code_check",
+        "definition": "CHECK ((planning_period IS NULL) = (model_code IS NULL) AND (model_code IS NULL OR model_code ~ ('^' || planning_period || '(-[0-9]+)?$')))"
       }
     ],
     "ingestDataset": null,
@@ -10854,12 +10895,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useModelValidation.tsx:333"
+        "evidence": "src/hooks/useModelValidation.tsx:344"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useModelValidation.tsx:333"
+        "evidence": "src/hooks/useModelValidation.tsx:344"
       }
     ],
     "governance": {
@@ -11780,6 +11821,54 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "planning_period",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The planning period the model is FOR (`2026Q3`), chosen by the modeller when the model is saved and never derived from a date — a model validated in October may be the Q3 model. CHECK `^[0-9]{4}Q[1-4]$`. Not part of `model_hash`: it names the model, it is not what the model is. NULL on a model saved before it existed, until it is set ONCE through `set_model_planning_period` (the immutability trigger's fill-once completion).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "model_code",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "\"2026Q3\", or \"2026Q3-2\" for the second model of that period in the project — the code a person says. Assigned by trigger whenever the period is set, unique per project, and never re-issued: the suffix is one past the highest stored for that period.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
         "computedBy": null
       }
     ]
@@ -16086,17 +16175,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:181"
+        "evidence": "src/hooks/usePolicies.tsx:185"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:181"
+        "evidence": "src/hooks/usePolicies.tsx:185"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:181"
+        "evidence": "src/hooks/usePolicies.tsx:185"
       }
     ],
     "governance": {
@@ -16509,17 +16598,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:182"
+        "evidence": "src/hooks/usePolicies.tsx:186"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:182"
+        "evidence": "src/hooks/usePolicies.tsx:186"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:182"
+        "evidence": "src/hooks/usePolicies.tsx:186"
       }
     ],
     "governance": {
@@ -17042,13 +17131,18 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "policy_versions_version_code_check",
+        "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')"
+      }
+    ],
     "ingestDataset": null,
     "surfaces": [
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:510"
+        "evidence": "src/hooks/usePolicies.tsx:514"
       }
     ],
     "governance": {
@@ -17400,6 +17494,30 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "\"Policy v4\" — one number per CONTENT per project, in order of first appearance, assigned by a BEFORE INSERT trigger (so a direct insert numbers too). Rows saved before WP 10.2 that share a `policy_hash` share the number, because they are one model saved twice (§4 D241).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "version_code",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "\"Policy 20261004\" — the code a person says. The UTC day this CONTENT was first saved (`YYYYMMDD`), and `-n` for the n-th distinct content first saved that day. Rows of one content share it, as they share `version_no`. Assigned by the numbering trigger and STORED, so deleting an older same-day version never moves a surviving code; the suffix is one past the highest ever stored that day (WP 10.5 follow-up, `20261004000001`).",
         "primaryKey": false,
         "unique": false,
         "references": null,

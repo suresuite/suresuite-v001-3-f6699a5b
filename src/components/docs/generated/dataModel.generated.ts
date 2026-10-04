@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "4c80c3d64438";
+export const CONTRACT_VERSION = "1fd26521a8d8";
 export const ENGINE_VERSION = "0.6.1";
-export const LAST_MIGRATION = "20261003000002_fg_policy_per_product.sql";
+export const LAST_MIGRATION = "20261004000001_version_codes.sql";
 
 export const COUNTS = {
   "tablesInSchema": 93,
   "tablesDescribed": 76,
-  "columnsDescribed": 995,
+  "columnsDescribed": 999,
   "tablesUndescribed": 17
 } as const;
 
@@ -189,7 +189,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "graph_level_versions",
         "grain": "One row per (project, level, content): the FIRST time a project's product, process, firm or simulation level had that hash. Numbered per project PER LEVEL, so \"Product graph v3\" and \"Firm graph v5\" are both sentences the system can say, and a change to one level moves that level's number and no other. A snapshot (`dataset_versions`) names its level versions — its tuple.",
-        "columns": 9,
+        "columns": 10,
         "owner": "platform"
       },
       {
@@ -285,7 +285,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "model_validations",
         "grain": "One VALIDATED MODEL: a decision about how a project's model may be used, bound to the exact policy content, graph version and scenario world it was established on and stating the run protocol every decision-grade run must follow — how many seeds, the week steady state begins, horizon, analysis window, CI level and stopping rule — with who validated it and when. Immutable: only its lifecycle (status, supersession, revocation) changes. Matched by CONTENT, never by id (WP 10.2).",
-        "columns": 36,
+        "columns": 38,
         "owner": "policy-ui"
       },
       {
@@ -315,7 +315,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "policy_versions",
         "grain": "One saved snapshot of a project's whole policy bundle, with the bundle it replaced and the hash of both. The audit trail of the /policies grid: what the policies WERE at a moment somebody chose to record, which is what makes a simulation result reproducible from the policy side.",
-        "columns": 14,
+        "columns": 15,
         "owner": "policy-ui"
       },
       {

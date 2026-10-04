@@ -1294,7 +1294,7 @@ export function StagePolicyTable({
         onClick: () => {
           void (async () => {
             try {
-              if (saveSnapshot) await saveSnapshot(`Grid edits — ${new Date().toLocaleString()}`);
+              if (saveSnapshot) await saveSnapshot("Grid edits");
               toast.success("Version saved", TOAST);
             } catch (e) {
               toast.error(errMsg(e, "Failed to save version"), TOAST);

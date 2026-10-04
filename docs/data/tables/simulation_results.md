@@ -260,6 +260,6 @@ When the row was last changed.
 
 ---
 
-*Generated from data contract `4c80c3d64438`, engine `0.6.1`,
+*Generated from data contract `1fd26521a8d8`, engine `0.6.1`,
 sidecar `supabase/contract/simulation_results.contract.yaml`, table created by `20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -21,6 +21,9 @@ natural_key_unique:
   - source: "constraint 20261001000019_graph_level_versions.sql"
     columns: [project_id, level, version_no]
     name: "graph_level_versions_number_key"
+  - source: "constraint 20261004000001_version_codes.sql"
+    columns: [project_id, level, version_code]
+    name: "graph_level_versions_code_key"
 
 natural_key_intended: [project_id, level, level_hash]
 
@@ -106,6 +109,21 @@ fields:
       first appearance, assigned by a BEFORE INSERT trigger under a per-(project,
       level) lock. History was backfilled in each project's `created_at` order, so
       v1 is the first content the project ever froze at that level.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  version_code:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      "Data 20260915" for the `simulation` level — the code a person says. The UTC day this
+      level first had this content (`YYYYMMDD`), and `-n` for the n-th content of the level
+      first seen that day. Assigned by the numbering trigger, unique per project and level,
+      and immutable once stored (a row that predates it learns it once, from the backfill).
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

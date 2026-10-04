@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 400,
-      "migrations_applied": 392,
-      "last_migration": "20261003000002_fg_policy_per_product.sql"
+      "migrations_found": 401,
+      "migrations_applied": 393,
+      "last_migration": "20261004000001_version_codes.sql"
     },
     "sidecars": 76,
     "registry": {
@@ -18,8 +18,8 @@
   "counts": {
     "tables_in_schema": 93,
     "tables_covered": 76,
-    "columns_covered": 995,
-    "check_constraints": 94,
+    "columns_covered": 999,
+    "check_constraints": 98,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -5046,7 +5046,7 @@
           "page": "DataManager.tsx",
           "via": "rpc record_model_validation",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:513",
+          "evidence": "src/hooks/useModelValidation.tsx:524",
           "confirmed": true
         },
         {
@@ -5067,14 +5067,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc record_validated_model (Save Validated Model, WP 10.3)",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:541",
+          "evidence": "src/hooks/useModelValidation.tsx:571",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc record_model_validation",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:513",
+          "evidence": "src/hooks/useModelValidation.tsx:524",
           "confirmed": true
         }
       ],
@@ -10603,6 +10603,15 @@
             "id"
           ],
           "name": "graph_level_versions_pkey"
+        },
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "level",
+            "version_code"
+          ],
+          "name": "graph_level_versions_code_key"
         }
       ],
       "natural_key_intended": [
@@ -10677,6 +10686,24 @@
           "definition": "CHECK (level IN ('product', 'process', 'firm', 'simulation'))",
           "implicit": true,
           "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "graph_level_versions_version_code_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')",
+          "added_by": "20261004000001_version_codes.sql"
+        },
+        {
+          "name": "graph_level_versions_code_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "level",
+            "version_code"
+          ],
+          "definition": "UNIQUE (project_id, level, version_code)",
+          "added_by": "20261004000001_version_codes.sql"
         }
       ],
       "indexes": [],
@@ -10965,6 +10992,38 @@
           "unit_column": null,
           "normalize_at_promotion": null,
           "meaning": "When the project's level first had this content — the first snapshot's `created_at`, so a backfilled row is dated by its history, not by the migration.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "version_code",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_version_codes.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "\"Data 20260915\" for the `simulation` level — the code a person says. The UTC day this level first had this content (`YYYYMMDD`), and `-n` for the n-th content of the level first seen that day. Assigned by the numbering trigger, unique per project and level, and immutable once stored (a row that predates it learns it once, from the backfill).",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -16742,6 +16801,14 @@
           "name": "model_validations_pkey"
         },
         {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "model_code"
+          ],
+          "name": "model_validations_model_code_key"
+        },
+        {
           "source": "partial UNIQUE index",
           "columns": [
             "project_id",
@@ -16760,14 +16827,14 @@
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:333",
+          "evidence": "src/hooks/useModelValidation.tsx:344",
           "confirmed": true
         },
         {
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:333",
+          "evidence": "src/hooks/useModelValidation.tsx:344",
           "confirmed": true
         }
       ],
@@ -16777,7 +16844,7 @@
         "min_project_role": "analyst",
         "audited": true,
         "rls_enabled": true,
-        "note": "Tier 4 — a DECISION. Readable by every API role (`model_validations_read_all`, D28's pinned list); written only through SECURITY DEFINER functions: `record_validated_model` (Save Validated Model — authenticates the actor through the shared preamble and enforces the adoption rule: every selected KPI passed, or a recorded face-validation statement), the legacy `record_model_validation` (its agent caller), and `revoke_model_validation`; all three reach one insert path. Audited at statement grain since WP 10.3. A BEFORE UPDATE trigger refuses every change but the lifecycle."
+        "note": "Tier 4 — a DECISION. Readable by every API role (`model_validations_read_all`, D28's pinned list); written only through SECURITY DEFINER functions: `record_validated_model` (Save Validated Model — authenticates the actor through the shared preamble and enforces the adoption rule: every selected KPI passed, or a recorded face-validation statement), the legacy `record_model_validation` (its agent caller), and `revoke_model_validation`; all three reach one insert path. Audited at statement grain since WP 10.3. A BEFORE UPDATE trigger refuses every change but the lifecycle — and three fill-once completions: the engine id, the simulation hash (WP 11.2), and the planning period with its code, set by `set_model_planning_period` (same writer gate as saving the model) on a model saved without one (WP 10.5 follow-up)."
       },
       "rls": {
         "enabled": true,
@@ -16883,6 +16950,30 @@
           ],
           "definition": "FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)",
           "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "model_validations_planning_period_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (planning_period IS NULL OR planning_period ~ '^[0-9]{4}Q[1-4]$')",
+          "added_by": "20261004000001_version_codes.sql"
+        },
+        {
+          "name": "model_validations_model_code_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((planning_period IS NULL) = (model_code IS NULL) AND (model_code IS NULL OR model_code ~ ('^' || planning_period || '(-[0-9]+)?$')))",
+          "added_by": "20261004000001_version_codes.sql"
+        },
+        {
+          "name": "model_validations_model_code_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "model_code"
+          ],
+          "definition": "UNIQUE (project_id, model_code)",
+          "added_by": "20261004000001_version_codes.sql"
         }
       ],
       "indexes": [
@@ -18091,6 +18182,70 @@
           "normalize_at_promotion": null,
           "meaning": "The simulation scope's level version (\"simulation inputs v4\") — `graph_level_versions`, from the same snapshot. NULL exactly where `hash_simulation` is.",
           "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "planning_period",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_version_codes.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The planning period the model is FOR (`2026Q3`), chosen by the modeller when the model is saved and never derived from a date — a model validated in October may be the Q3 model. CHECK `^[0-9]{4}Q[1-4]$`. Not part of `model_hash`: it names the model, it is not what the model is. NULL on a model saved before it existed, until it is set ONCE through `set_model_planning_period` (the immutability trigger's fill-once completion).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "model_code",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_version_codes.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "\"2026Q3\", or \"2026Q3-2\" for the second model of that period in the project — the code a person says. Assigned by trigger whenever the period is set, unique per project, and never re-issued: the suffix is one past the highest stored for that period.",
+          "grain": "metadata",
           "computed_by": null,
           "engine": {
             "consumed_by": null,
@@ -24640,21 +24795,21 @@
           "page": "ProjectIntelligence.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:181",
+          "evidence": "src/hooks/usePolicies.tsx:185",
           "confirmed": true
         },
         {
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:181",
+          "evidence": "src/hooks/usePolicies.tsx:185",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:181",
+          "evidence": "src/hooks/usePolicies.tsx:185",
           "confirmed": true
         }
       ],
@@ -25280,21 +25435,21 @@
           "page": "ProjectIntelligence.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:182",
+          "evidence": "src/hooks/usePolicies.tsx:186",
           "confirmed": true
         },
         {
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:182",
+          "evidence": "src/hooks/usePolicies.tsx:186",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:182",
+          "evidence": "src/hooks/usePolicies.tsx:186",
           "confirmed": true
         }
       ],
@@ -26207,7 +26362,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:510",
+          "evidence": "src/hooks/usePolicies.tsx:514",
           "confirmed": true
         },
         {
@@ -26276,6 +26431,13 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260609000002_policy_versions.sql"
+        },
+        {
+          "name": "policy_versions_version_code_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')",
+          "added_by": "20261004000001_version_codes.sql"
         }
       ],
       "indexes": [
@@ -26749,6 +26911,38 @@
           "unit_column": null,
           "normalize_at_promotion": null,
           "meaning": "\"Policy v4\" — one number per CONTENT per project, in order of first appearance, assigned by a BEFORE INSERT trigger (so a direct insert numbers too). Rows saved before WP 10.2 that share a `policy_hash` share the number, because they are one model saved twice (§4 D241).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "version_code",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_version_codes.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "\"Policy 20261004\" — the code a person says. The UTC day this CONTENT was first saved (`YYYYMMDD`), and `-n` for the n-th distinct content first saved that day. Rows of one content share it, as they share `version_no`. Assigned by the numbering trigger and STORED, so deleting an older same-day version never moves a surviving code; the suffix is one past the highest ever stored that day (WP 10.5 follow-up, `20261004000001`).",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -43779,5 +43973,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "4c80c3d64438"
+  "contract_version": "1fd26521a8d8"
 }

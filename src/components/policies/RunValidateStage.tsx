@@ -124,6 +124,7 @@ import { formatMoney, MONEY_SYMBOL } from "@/lib/sim/money";
 import { WeeksInput } from "@/components/sim/WeeksInput";
 import { formatDuration } from "@/lib/sim/planningTime";
 import { VALIDATION_SCENARIO_NAME, findValidationBaseline } from "@/lib/sim/validationBaseline";
+import { planningPeriodOptions, quarterOf } from "@/lib/versions/versionLabels";
 
 /** The planning-unit inputs, sized like the seed input beside them. */
 const WEEKS_FIELD = "h-6 w-[94px] text-right font-mono text-[11.5px] md:min-h-0";
@@ -611,6 +612,9 @@ export function RunValidateStage({
   // the model and its evidence, not a checkbox nobody can read back (D244).
   const [faceStatement, setFaceStatement] = useState("");
   const [modelName, setModelName] = useState("");
+  // WP 10.5 follow-up — the planning period the model is FOR; it names the model
+  // ("2026Q3"), the database adds "-2" for a second model of the same period.
+  const [planningPeriod, setPlanningPeriod] = useState(() => quarterOf(new Date()));
   const [adopting, setAdopting] = useState(false);
 
   // The scenario leg of the provenance triple: the validation scenario's
@@ -1081,7 +1085,7 @@ export function RunValidateStage({
       // a DB write; it computes in the browser regardless. Since WP 10.2 the save
       // is deduplicated by content (§4 D241): an unchanged policy set returns the
       // version already in force and nothing new is minted, so it runs quietly.
-      const versionId = await saveSnapshot(`Validate single — ${new Date().toLocaleString()}`, undefined, { quiet: true });
+      const versionId = await saveSnapshot("Validate single", undefined, { quiet: true });
       const scenarioId =
         (await ensureValidationScenario({
           replications: 1,
@@ -1129,7 +1133,7 @@ export function RunValidateStage({
         toast.warning("Provide at least one seed.");
         return;
       }
-      const versionId = await saveSnapshot(`Validate ×${seeds.length} — ${new Date().toLocaleString()}`, undefined, { quiet: true });
+      const versionId = await saveSnapshot(`Validate ×${seeds.length}`, undefined, { quiet: true });
       const scenarioId =
         (await ensureValidationScenario({
           replications: seeds.length,
@@ -1307,6 +1311,7 @@ export function RunValidateStage({
         datasetVersionId,
         scenarioId: validationScenarioId,
         name: modelName.trim() || "Validated model",
+        planningPeriod,
         protocol,
         warmupMethod: warmCfg.method,
         replicationBasis: {
@@ -2103,6 +2108,8 @@ export function RunValidateStage({
                 onFaceStatement={setFaceStatement}
                 modelName={modelName}
                 onModelName={setModelName}
+                planningPeriod={planningPeriod}
+                onPlanningPeriod={setPlanningPeriod}
                 credibility={liveCredibility}
                 projectId={projectId ?? null}
                 triple={{
@@ -2247,6 +2254,8 @@ interface AdoptStepProps {
   onFaceStatement: (v: string) => void;
   modelName: string;
   onModelName: (v: string) => void;
+  planningPeriod: string;
+  onPlanningPeriod: (v: string) => void;
   credibility: Credibility;
   projectId: string | null;
   triple: {
@@ -2289,6 +2298,8 @@ function AdoptStep({
   onFaceStatement,
   modelName,
   onModelName,
+  planningPeriod,
+  onPlanningPeriod,
   credibility,
   projectId,
   triple,
@@ -2429,6 +2440,22 @@ function AdoptStep({
           placeholder="Validated model"
           className="h-6 w-64 text-[12px]"
         />
+      </Field>
+
+      <Field label="Planning period">
+        <select
+          aria-label="Planning period"
+          value={planningPeriod}
+          onChange={(e) => onPlanningPeriod(e.target.value)}
+          className="h-6 rounded-sm border border-[--hair-border] bg-background px-1 font-mono text-[12px]"
+          title="The period this model is for — its code. A second model of the same period becomes -2."
+        >
+          {planningPeriodOptions().map((q) => (
+            <option key={q} value={q}>
+              {q}
+            </option>
+          ))}
+        </select>
       </Field>
 
       {/* the provenance triple the card binds to (§9.5 identity) */}

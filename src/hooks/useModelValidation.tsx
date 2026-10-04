@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isMissingRpcSignature } from "@/hooks/usePolicies";
 import type { ValidatedModelProtocol } from "@/lib/sim/validatedModel";
 
 // Model-validation cards — Phase B0 / G13 / §9.5.
@@ -75,6 +76,12 @@ export interface ModelValidationCard {
    *  on). NULL on a card no snapshot could teach — that card keeps the composite rule. */
   hash_simulation?: string | null;
   simulation_version_id?: string | null;
+  // ── WP 10.5 follow-up — the code a person says ───────────────────────────
+  /** The planning period the model is FOR ("2026Q3"), chosen when saved; NULL on a
+   *  model saved before periods existed, until set once. */
+  planning_period?: string | null;
+  /** "2026Q3" or "2026Q3-2" — stored by trigger, never computed here. */
+  model_code?: string | null;
 }
 
 export type DriftComponent = "policy" | "data" | "scenario" | "engine";
@@ -164,6 +171,8 @@ export interface RecordValidatedModelArgs {
   /** warm-up series + detector outputs, replication analysis, run ids. */
   evidence: Record<string, unknown>;
   userEmail?: string | null;
+  /** "2026Q3" — the planning period the model is for. */
+  planningPeriod?: string | null;
 }
 
 /** Fetch the baseline fingerprint hash of a scenario (single canonicalization
@@ -299,6 +308,8 @@ export interface UseModelValidationResult {
   record: (args: RecordValidationArgs) => Promise<string>;
   /** record_validated_model RPC — Save Validated Model (WP 10.3). */
   recordValidatedModel: (args: RecordValidatedModelArgs) => Promise<string>;
+  /** set_model_planning_period RPC — a model saved without a period gets one, once. */
+  setPlanningPeriod: (validationId: string, period: string) => Promise<void>;
   /** revoke_model_validation RPC — status flip, never a delete. */
   revoke: (validationId: string, reason?: string) => Promise<void>;
 }
@@ -538,7 +549,7 @@ export function useModelValidation(
     async (args: RecordValidatedModelArgs): Promise<string> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
-      const { data, error } = await sb.rpc("record_validated_model", {
+      const base = {
         p_project_id: args.projectId,
         p_policy_version_id: args.policyVersionId,
         p_dataset_version_id: args.datasetVersionId,
@@ -555,10 +566,34 @@ export function useModelValidation(
         p_evidence: args.evidence,
         _actor_user_id: user?.id ?? null,
         p_user_email: args.userEmail ?? null,
-      });
+      };
+      let { data, error } = await sb.rpc(
+        "record_validated_model",
+        args.planningPeriod ? { ...base, p_planning_period: args.planningPeriod } : base,
+      );
+      // A database before `20261004000001` (the deploy window) has no period
+      // parameter: save the model, unnamed by a period, rather than fail the save.
+      if (error && args.planningPeriod && isMissingRpcSignature(error)) {
+        ({ data, error } = await sb.rpc("record_validated_model", base));
+      }
       if (error) throw new Error(error.message ?? String(error));
       await refresh();
       return data as string;
+    },
+    [refresh, user?.id],
+  );
+
+  const setPlanningPeriod = useCallback(
+    async (validationId: string, period: string): Promise<void> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const { error } = await sb.rpc("set_model_planning_period", {
+        p_validation_id: validationId,
+        p_planning_period: period,
+        _actor_user_id: user?.id ?? null,
+      });
+      if (error) throw new Error(error.message ?? String(error));
+      await refresh();
     },
     [refresh, user?.id],
   );
@@ -593,6 +628,7 @@ export function useModelValidation(
       applyIfValidated,
       record,
       recordValidatedModel,
+      setPlanningPeriod,
       revoke,
     }),
     [
@@ -609,6 +645,7 @@ export function useModelValidation(
       applyIfValidated,
       record,
       recordValidatedModel,
+      setPlanningPeriod,
       revoke,
     ],
   );

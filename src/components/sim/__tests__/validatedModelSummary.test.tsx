@@ -65,14 +65,14 @@ const card: ModelValidationCard = {
   protocol_hash: "11aa",
   model_hash: "77bb88cc99",
 };
-const refs = { graphVersionNo: 7, policyVersionNo: 3, simulationVersionNo: 4 };
+const refs = { graphVersionNo: 7, policyVersionNo: 3, simulationVersionNo: 4, policyCode: "20261004", simulationCode: "20260915" };
 
 describe("every figure on the card has a source", () => {
   const lines = validatedModelLines(card, refs);
 
   it("shows the lines the brief names — the simulation inputs first, the snapshot second (WP 11.3)", () => {
     expect(lines.map((l) => l.label)).toEqual([
-      "Simulation inputs",
+      "Data (simulation inputs)",
       "Snapshot",
       "Policy",
       "Engine",
@@ -106,10 +106,11 @@ describe("every figure on the card has a source", () => {
 
   it("reads the figures the protocol states", () => {
     const by = Object.fromEntries(lines.map((l) => [l.label, l.value]));
-    expect(by["Simulation inputs"]).toBe("Simulation inputs v4 · 5a5a5a5");
+    // WP 10.5 follow-up — the stored codes, the hash beside them.
+    expect(by["Data (simulation inputs)"]).toBe("Data 20260915 · 5a5a5a5");
     expect(by.Snapshot).toBe("Snapshot v7 · f00dbab");
-    expect(by.Policy).toBe("Policy v3 · abc1234");
-    expect(by.Run).toBe("37 seeds · root seed 42 · CRN on");
+    expect(by.Policy).toBe("Policy 20261004 · abc1234");
+    expect(by.Run).toBe("37 replications · root seed 42 · CRN on");
     expect(by["Steady state from"]).toBe("week 13");
     expect(by.Horizon).toBe("156 weeks");
     expect(by["Analysis window"]).toBe("143 weeks");
@@ -153,7 +154,7 @@ describe("the card's action and its staleness", () => {
     const html = render({ state: "validated", card });
     expect(html).toContain("Open in Simulation Lab");
     expect(html).toContain('href="/simulation-lab?project=p1&amp;model=m1"');
-    expect(html).toContain("Q4 baseline · v4");
+    expect(html).toContain("v4 · no period · Q4 baseline");
   });
 
   it("newer data never mutates the model — the card says re-validate", () => {
@@ -166,22 +167,26 @@ describe("the card's action and its staleness", () => {
 
 describe("the Lab names the model a ?model= link opened", () => {
   it("in force, superseded, stale", () => {
-    expect(openedModelLine(card, { state: "validated" })).toBe(
-      "Model Q4 baseline v4 · 37 seeds · steady from wk 13 · 156 wks · in force",
+    expect(openedModelLine({ ...card, model_code: "2026Q3" }, { state: "validated" })).toBe(
+      "Model 2026Q3 · Q4 baseline · 37 replications · 156 weeks · results from wk 13 · valid",
     );
     expect(openedModelLine({ ...card, status: "superseded" }, { state: "validated" })).toMatch(
-      /superseded — a newer model is in force$/,
+      /superseded by a newer model$/,
     );
-    expect(openedModelLine(card, { state: "stale", drift: ["data"] })).toMatch(/the simulation's inputs changed → re-validate$/);
+    // §23 WP 13.3 — the opened line and the Lab's pill say the same thing about moved data.
+    expect(openedModelLine(card, { state: "stale", drift: ["data"] })).toMatch(/a run replays the validated data$/);
+    expect(openedModelLine(card, { state: "stale", drift: ["data", "policy"] })).toMatch(
+      /the simulation's inputs changed · a newer policy exists → re-validate$/,
+    );
   });
 });
 
 // WP 11.3 · §4 D259 — the model binds the simulation's inputs; a deep-tier change is a
 // note the card SHOWS and never a reason to re-validate.
 describe("the simulation inputs, and a change the simulation does not read", () => {
-  it("a deep-tier change reads 'in force' with its note, never 're-validate'", () => {
+  it("a deep-tier change reads 'valid' with its note, never 're-validate'", () => {
     const line = openedModelLine(card, { state: "validated", notes: ["network"] });
-    expect(line).toMatch(/in force \(the deep tier changed — not read by the simulation\)$/);
+    expect(line).toMatch(/valid \(the deep tier changed — not read by the simulation\)$/);
     expect(line).not.toMatch(/re-validate/);
     const html = renderToStaticMarkup(
       createElement(MemoryRouter, null, createElement(ValidatedModelSummary, {
@@ -193,7 +198,7 @@ describe("the simulation inputs, and a change the simulation does not read", () 
 
   it("a model with no simulation hash says why, rather than printing the snapshot as its inputs", () => {
     const legacy = { ...card, hash_simulation: null, simulation_version_id: null };
-    const l = validatedModelLines(legacy, refs).find((x) => x.label === "Simulation inputs")!;
+    const l = validatedModelLines(legacy, refs).find((x) => x.label === "Data (simulation inputs)")!;
     expect(l.value).toBeNull();
     expect(l.reason).toMatch(/matched on its snapshot/);
   });
