@@ -150,8 +150,17 @@ def test_every_field_of_every_row_has_a_unit_and_meaning_entry():
     assert set(out["scenario"]["settings"]) <= set(out["fields"]["settings"])
 
 
+# WP 15.1 — the build changes with every engine commit, so the fixture holds a
+# stand-in and this test checks the real value instead of freezing it.
+FIXTURE_BUILD = "scsim-0.0.0+000000000000"
+
+
 def test_the_fixture_the_workbook_test_reads_is_current():
+    from sim_worker.build import code_version
+
     out = json.loads(json.dumps(_export(), ensure_ascii=False))
+    assert out.pop("engine_build") == code_version()
+    out = {"engine_version": out.pop("engine_version"), "engine_build": FIXTURE_BUILD, **out}
     if os.environ.get("REGEN") == "1":
         OUT.write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
     assert json.loads(OUT.read_text()) == out, (

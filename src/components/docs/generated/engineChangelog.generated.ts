@@ -71,6 +71,12 @@ export const ENGINE_CHANGES: EngineChange[] = [
         "commit": "e34945f4",
         "tier": 2,
         "summary": "A Supplier row's lead time (`lead_time_weeks`) is read as an override of its lane, for that link only, rounded and clamped as an upload is. Neutral for a project that sets none (D290)."
+      },
+      {
+        "date": "2026-10-03",
+        "commit": null,
+        "tier": 1,
+        "summary": "Build identity (WP 15.1): a run's code_version names its build by content (`scsim-0.6.1+<digest>` over scsim and the worker's compute path), the package version is ENGINE_VERSION (the wheel is scsim-0.6.1), and the version line no longer carries a comment. No result changes; every frozen reference run kept its digest."
       }
     ],
     "backfilled": true,

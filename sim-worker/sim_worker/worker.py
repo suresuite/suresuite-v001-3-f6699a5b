@@ -81,8 +81,11 @@ def engine_report_payload(scsim_on: bool) -> dict[str, Any]:
     if scsim_on:
         from scsim import ENGINE_VERSION
 
+        from sim_worker.build import code_version
+
+        # WP 15.1 · §4 D292 — the build, by content (`scsim-0.6.1+<digest>`).
         return {"p_slug": "scsim", "p_version": ENGINE_VERSION,
-                "p_code_version": f"scsim-{ENGINE_VERSION}", "p_capabilities": None}
+                "p_code_version": code_version(), "p_capabilities": None}
     return {"p_slug": "legacy-worker", "p_version": None,
             "p_code_version": "worker-legacy", "p_capabilities": None}
 

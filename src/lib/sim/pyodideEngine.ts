@@ -240,6 +240,8 @@ export function engineInputInBrowser(
 /** `sim_worker/engine_input.py::describe` — the shape `_inputs` returns. */
 export interface EngineInput {
   engine_version: string;
+  /** WP 15.1 · §4 D292 — the build (`scsim-0.6.1+<digest>`); absent from an older wheel. */
+  engine_build?: string;
   /** The mapped scsim `Scenario` (`model_dump(mode="json")`): network, settings,
    *  events, policies — what `run_scenario` simulates. */
   scenario: {

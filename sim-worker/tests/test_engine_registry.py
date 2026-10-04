@@ -29,7 +29,12 @@ def test_the_boot_report_names_the_registered_engine_and_the_build_runs_carry():
     assert p["p_slug"] == "scsim"
     assert p["p_version"] == ENGINE_VERSION
     # Spelled exactly as a run is stamped, so the registry and the rows agree.
-    stamped = build_run_update({"source": "scsim", "engine_version": ENGINE_VERSION}, 1)
+    from sim_worker.build import code_version
+
+    stamped = build_run_update({"source": "scsim", "engine_version": ENGINE_VERSION,
+                                "engine_build": code_version()}, 1)
+    # WP 15.1 · §4 D292 — the BUILD, by content, not the version alone.
+    assert p["p_code_version"] == code_version() != f"scsim-{ENGINE_VERSION}"
     assert p["p_code_version"] == stamped["code_version"]
     legacy = engine_report_payload(False)
     assert legacy["p_slug"] == "legacy-worker" and legacy["p_code_version"] == "worker-legacy"

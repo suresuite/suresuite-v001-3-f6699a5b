@@ -42,6 +42,14 @@ _BRIDGE_KEYS = (
 )
 
 
+
+def _engine_build() -> str:
+    """WP 15.1 — the build this run is computed by (scsim + the compute path)."""
+    from sim_worker.build import code_version
+
+    return code_version()
+
+
 def _finite(v: Any, ndigits: int) -> Any:
     """Round a numeric value, mapping non-finite floats (NaN/±inf) to None.
 
@@ -89,6 +97,7 @@ def compute_kpis_scsim(
     out: dict[str, Any] = {
         "source": "scsim",
         "engine_version": ENGINE_VERSION,
+        "engine_build": _engine_build(),
         "n_reps": result.stats.n_replications,
         "below_replication_floor": result.stats.below_replication_floor,
         "scsim_notes": conversion.notes,
@@ -209,6 +218,7 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
     out: dict[str, Any] = {
         "source": "scsim",
         "engine_version": ENGINE_VERSION,
+        "engine_build": _engine_build(),
         "n_reps": result.stats.n_replications,
         "below_replication_floor": result.stats.below_replication_floor,
         # Audit F-13 — getattr-guarded so an older engine wheel keeps working.
