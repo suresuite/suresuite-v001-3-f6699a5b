@@ -409,11 +409,11 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
   // fulfillment
   allocation: AllocationRule.options,
   // customer · demand per row (WP 14.2) — the engine's own enum domains
-  row_demand_mode: ["forecast", "model"],
+  row_demand_mode: ["forecast", "model", "schedule"],
   row_demand_distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
-  // PLAN.md §25 WP 15.3 — a Supplier row's lead-time shape (`project_map._LANE_LT_DISTS`).
+  // PLAN.md §26 WP 16.3 — a Supplier row's lead-time shape (`project_map._LANE_LT_DISTS`).
   lane_lead_time_dist: ["deterministic", "normal", "lognormal", "gamma", "triangular", "uniform"],
-  // WP 15.5 — a Plant row's production lead-time shape, the same six.
+  // WP 16.5 — a Plant row's production lead-time shape, the same six.
   prod_lead_time_dist: ["deterministic", "normal", "lognormal", "gamma", "triangular", "uniform"],
   // PLAN.md §24 WP 14.4 — the Plant row's FG policy (MTS).
   fg_policy: ["base_stock", "min_max", "days_of_cover"],
@@ -495,7 +495,9 @@ export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<stri
   // PLAN.md §24 WP 14.2 — the Customer row's forecast-or-model choice. The
   // row's other demand cells are master overrides (`outbound_logistics`), which
   // the grid resolves through their own rule, not through this map.
-  demand: new Set(["row_demand_mode"]),
+  // `row_demand_schedule` is the row's requested delivery schedule (units per
+  // week), typed here and read when the mode is `schedule` (or empty).
+  demand: new Set(["row_demand_mode", "row_demand_schedule"]),
 };
 
 /** True when a default-level field is exposed in the GUI (consumed by scsim). */
@@ -657,7 +659,8 @@ export const FIELD_LABELS: Record<string, string> = {
   production_lead_time_std_days: "Production lead time σ (days)",
   // customer · demand per row (PLAN.md §24 WP 14.2) — overrides of the
   // outbound row's own spec, read by the engine before the uploaded value.
-  row_demand_mode: "Demand mode (forecast / model)",
+  row_demand_mode: "Demand mode (forecast / model / schedule)",
+  row_demand_schedule: "Requested delivery schedule (units/wk, one per week)",
   row_forecast: "Forecast series (uploaded)",
   row_demand_distribution: "Demand distribution",
   row_demand_mean: "Demand mean (units/wk)",

@@ -260,7 +260,7 @@ export interface EngineSupplierLink {
    *  source: the Supplier row's override, the uploaded lane, or the 2-week
    *  default for a blank one. */
   leadSource: "override" | "master" | "default" | "derived";
-  /** PLAN.md §25 WP 15.2 — the lane's OWN uploaded lead-time spread (the arc the
+  /** PLAN.md §26 WP 16.2 — the lane's OWN uploaded lead-time spread (the arc the
    *  link was built from), bounds in weeks by `lead_time_unit`. `null` where the
    *  lane states none. The Supplier row's spread overrides are the grid's to
    *  apply; the material's shape is the derived fallback under these. */
@@ -279,7 +279,7 @@ export const LANE_LEAD_TIME_DISTS = ["deterministic", "normal", "lognormal", "ga
 
 /**
  * A BOUNDED lead-time shape's planning lead time — the bounds' mean
- * (PLAN.md §25.2 rule 3: `(min + mode + max) / 3` for triangular, `(min + max) / 2`
+ * (PLAN.md §26.2 rule 3: `(min + mode + max) / 3` for triangular, `(min + max) / 2`
  * for uniform) — or `undefined` when the shape is not bounded or its bounds are
  * incomplete, out of order or above 51 weeks (the mapper then runs the lane
  * deterministic, warned). Mirrors `project_map._lane_lead_time_spread`.
@@ -327,7 +327,7 @@ export function engineSupplierLinks(
     const weeks = ov !== undefined ? ov : lt ? toWeeks(lt) : 2;
     let leadWeeks = engineWholeWeeks(weeks);
     let leadSource: EngineSupplierLink["leadSource"] = ov !== undefined ? "override" : lt ? "master" : "default";
-    // PLAN.md §25 WP 15.2 — the lane's own spread, bounds in weeks.
+    // PLAN.md §26 WP 16.2 — the lane's own spread, bounds in weeks.
     const opt = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
     const rawDist = arc.lead_time_dist == null || arc.lead_time_dist === "" ? null : String(arc.lead_time_dist).trim().toLowerCase();
     const bound = (v: unknown) => { const x = opt(v); return x === null ? null : toWeeks(x); };
@@ -339,7 +339,7 @@ export function engineSupplierLinks(
       max: bound(arc.lead_time_max),
     };
     // A bounded lane plans on its bounds' mean, which beats the row's lead time
-    // (§25.2 rule 3). Only the lane's OWN shape is known here; a shape chosen on
+    // (§26.2 rule 3). Only the lane's OWN shape is known here; a shape chosen on
     // the Supplier row is the grid's (`rowBoundedLeadTime`).
     const bm = boundedLeadTimeMean(spread.dist, spread.min, spread.mode, spread.max);
     if (bm !== undefined) {
@@ -1233,10 +1233,31 @@ export function demandRowFindings(
 
   const bad: Record<string, string[]> = {};
   const note = (msg: string, row: string) => (bad[msg] = [...(bad[msg] ?? []), row]);
+  const noSchedule: string[] = [];
+  const badSchedule: string[] = [];
+  const shortSchedule: string[] = [];
   for (const o of outbound) {
     if (o.customer_id == null || o.product_id == null) continue;
     const key = `${o.customer_id}::${o.product_id}`;
     const p = patchOf.get(key) ?? {};
+    // The requested delivery schedule (`row_demand_schedule`) runs when the mode
+    // is `schedule` or empty, and replaces the row's spec whole — so a row that
+    // runs one has no distribution to check.
+    const mode = p.row_demand_mode;
+    const sched = p.row_demand_schedule;
+    const hasSched = Array.isArray(sched) && sched.length > 0;
+    if (mode === "schedule" && !hasSched) noSchedule.push(key);
+    if (hasSched && (mode == null || mode === "" || mode === "schedule")) {
+      const ok = (sched as unknown[]).every(
+        (v) => v === null || v === "" || (typeof v === "number" && Number.isFinite(v) && v >= 0));
+      if (!ok) badSchedule.push(key);
+      else {
+        if (horizonWeeks !== undefined && (sched as unknown[]).length < horizonWeeks) {
+          shortSchedule.push(`${key} (${(sched as unknown[]).length} of ${horizonWeeks} wk)`);
+        }
+        continue;
+      }
+    }
     const pick = (field: string, override: string) =>
       p[override] !== undefined && p[override] !== null && p[override] !== "" ? p[override] : o[field];
     const kind = rowKind(pick("demand_distribution", "row_demand_distribution"));
@@ -1275,6 +1296,44 @@ export function demandRowFindings(
         `${rows.length} customer × product row(s) ${msg}. The engine would drop the row's spec and ` +
         "run it on its product's distribution instead — fix the row on the Customer stage or in the upload.",
       reason: "A row's demand spec must carry every parameter its distribution needs (ADR 0002 decision 2).",
+    });
+  }
+
+  if (noSchedule.length) {
+    out.push({
+      severity: "block",
+      field: "demand.row_demand_schedule",
+      policy,
+      rows: noSchedule.slice(0, 25),
+      message:
+        `${noSchedule.length} customer × product row(s) are set to a requested delivery schedule with no ` +
+        "weeks entered. The engine would ignore the choice and run the row's forecast or model — enter " +
+        "the schedule on the Customer stage, or pick another demand mode.",
+      reason: "A delivery schedule is the row's demand week by week; an empty one states none.",
+    });
+  }
+  if (badSchedule.length) {
+    out.push({
+      severity: "block",
+      field: "demand.row_demand_schedule",
+      policy,
+      rows: badSchedule.slice(0, 25),
+      message:
+        `${badSchedule.length} row(s) have a delivery schedule with a week that is not a quantity ≥ 0. ` +
+        "The engine would ignore the whole schedule — fix it on the Customer stage.",
+      reason: "Every week of a requested delivery schedule is a non-negative quantity.",
+    });
+  }
+  if (shortSchedule.length) {
+    out.push({
+      severity: "warn",
+      field: "demand.row_demand_schedule",
+      policy,
+      rows: shortSchedule.slice(0, 25),
+      message:
+        `${shortSchedule.length} row(s) have a delivery schedule shorter than the run. Past its last ` +
+        "week the row has no demand.",
+      reason: "A requested delivery schedule is firm demand; a week it does not name has none.",
     });
   }
 

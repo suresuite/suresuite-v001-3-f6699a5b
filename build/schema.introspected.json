@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 402,
-  "migrations_applied": 394,
+  "migrations_found": 404,
+  "migrations_applied": 396,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261003000004_production_lead_time.sql",
+  "last_migration": "20261004000004_production_lead_time.sql",
   "counts": {
-    "tables": 93,
+    "tables": 94,
     "views": 8,
     "enums": 4,
-    "functions": 411,
+    "functions": 420,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -8119,6 +8119,18 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "version_code",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000002_version_codes.sql"
         }
       ],
       "constraints": [
@@ -8163,6 +8175,24 @@
           "definition": "CHECK (level IN ('product', 'process', 'firm', 'simulation'))",
           "implicit": true,
           "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "graph_level_versions_version_code_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')",
+          "added_by": "20261004000002_version_codes.sql"
+        },
+        {
+          "name": "graph_level_versions_code_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "level",
+            "version_code"
+          ],
+          "definition": "UNIQUE (project_id, level, version_code)",
+          "added_by": "20261004000002_version_codes.sql"
         }
       ],
       "indexes": [],
@@ -8208,6 +8238,15 @@
             "id"
           ],
           "name": "graph_level_versions_pkey"
+        },
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "level",
+            "version_code"
+          ],
+          "name": "graph_level_versions_code_key"
         }
       ]
     },
@@ -8408,7 +8447,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000003_lane_lead_time_spread.sql"
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
         },
         {
           "name": "lead_time_cv",
@@ -8420,7 +8459,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000003_lane_lead_time_spread.sql"
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
         },
         {
           "name": "lead_time_min",
@@ -8432,7 +8471,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000003_lane_lead_time_spread.sql"
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
         },
         {
           "name": "lead_time_mode",
@@ -8444,7 +8483,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000003_lane_lead_time_spread.sql"
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
         },
         {
           "name": "lead_time_max",
@@ -8456,7 +8495,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000003_lane_lead_time_spread.sql"
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
         }
       ],
       "constraints": [
@@ -8491,7 +8530,7 @@
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK ( (lead_time_dist IS NULL OR lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (lead_time_cv IS NULL OR (lead_time_cv >= 0 AND lead_time_cv <= 1)) AND (lead_time_min IS NULL OR lead_time_min >= 0) AND (lead_time_mode IS NULL OR lead_time_mode >= 0) AND (lead_time_max IS NULL OR lead_time_max >= 0) AND (lead_time_min IS NULL OR lead_time_mode IS NULL OR lead_time_min <= lead_time_mode) AND (lead_time_mode IS NULL OR lead_time_max IS NULL OR lead_time_mode <= lead_time_max) AND (lead_time_min IS NULL OR lead_time_max IS NULL OR lead_time_min <= lead_time_max) )",
-          "added_by": "20261003000003_lane_lead_time_spread.sql"
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
         }
       ],
       "indexes": [
@@ -11302,6 +11341,30 @@
             "on_delete": "SET NULL"
           },
           "added_by": "20261001000020_simulation_scope.sql"
+        },
+        {
+          "name": "planning_period",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000002_version_codes.sql"
+        },
+        {
+          "name": "model_code",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000002_version_codes.sql"
         }
       ],
       "constraints": [
@@ -11390,6 +11453,30 @@
           ],
           "definition": "FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)",
           "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "model_validations_planning_period_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (planning_period IS NULL OR planning_period ~ '^[0-9]{4}Q[1-4]$')",
+          "added_by": "20261004000002_version_codes.sql"
+        },
+        {
+          "name": "model_validations_model_code_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((planning_period IS NULL) = (model_code IS NULL) AND (model_code IS NULL OR model_code ~ ('^' || planning_period || '(-[0-9]+)?$')))",
+          "added_by": "20261004000002_version_codes.sql"
+        },
+        {
+          "name": "model_validations_model_code_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "model_code"
+          ],
+          "definition": "UNIQUE (project_id, model_code)",
+          "added_by": "20261004000002_version_codes.sql"
         }
       ],
       "indexes": [
@@ -11447,6 +11534,14 @@
             "id"
           ],
           "name": "model_validations_pkey"
+        },
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "model_code"
+          ],
+          "name": "model_validations_model_code_key"
         },
         {
           "source": "partial UNIQUE index",
@@ -15439,6 +15534,18 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000006_policy_versions_by_content.sql"
+        },
+        {
+          "name": "version_code",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000002_version_codes.sql"
         }
       ],
       "constraints": [
@@ -15451,6 +15558,13 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260609000002_policy_versions.sql"
+        },
+        {
+          "name": "policy_versions_version_code_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')",
+          "added_by": "20261004000002_version_codes.sql"
         }
       ],
       "indexes": [
@@ -15836,7 +15950,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000004_production_lead_time.sql"
+          "added_by": "20261004000004_production_lead_time.sql"
         },
         {
           "name": "production_lead_time_unit",
@@ -15848,7 +15962,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000004_production_lead_time.sql"
+          "added_by": "20261004000004_production_lead_time.sql"
         },
         {
           "name": "production_lead_time_dist",
@@ -15860,7 +15974,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000004_production_lead_time.sql"
+          "added_by": "20261004000004_production_lead_time.sql"
         },
         {
           "name": "production_lead_time_cv",
@@ -15872,7 +15986,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000004_production_lead_time.sql"
+          "added_by": "20261004000004_production_lead_time.sql"
         },
         {
           "name": "production_lead_time_min",
@@ -15884,7 +15998,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000004_production_lead_time.sql"
+          "added_by": "20261004000004_production_lead_time.sql"
         },
         {
           "name": "production_lead_time_mode",
@@ -15896,7 +16010,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000004_production_lead_time.sql"
+          "added_by": "20261004000004_production_lead_time.sql"
         },
         {
           "name": "production_lead_time_max",
@@ -15908,7 +16022,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261003000004_production_lead_time.sql"
+          "added_by": "20261004000004_production_lead_time.sql"
         }
       ],
       "constraints": [
@@ -15950,7 +16064,7 @@
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK ( (production_lead_time_unit IS NULL OR public.unit_days(production_lead_time_unit) IS NOT NULL) AND (production_lead_time_dist IS NULL OR production_lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (production_lead_time_cv IS NULL OR (production_lead_time_cv >= 0 AND production_lead_time_cv <= 1)) AND coalesce(production_lead_time, 0) >= 0 AND coalesce(production_lead_time_min, 0) >= 0 AND coalesce(production_lead_time_mode, 0) >= 0 AND coalesce(production_lead_time_max, 0) >= 0 AND (production_lead_time_min IS NULL OR production_lead_time_mode IS NULL OR production_lead_time_min <= production_lead_time_mode) AND (production_lead_time_mode IS NULL OR production_lead_time_max IS NULL OR production_lead_time_mode <= production_lead_time_max) AND (production_lead_time_min IS NULL OR production_lead_time_max IS NULL OR production_lead_time_min <= production_lead_time_max) )",
-          "added_by": "20261003000004_production_lead_time.sql"
+          "added_by": "20261004000004_production_lead_time.sql"
         }
       ],
       "indexes": [],
@@ -19854,6 +19968,307 @@
           ],
           "name": "scenarios_one_validation_baseline",
           "predicate": "role = 'validation_baseline'"
+        }
+      ]
+    },
+    {
+      "name": "sim_engine_builds",
+      "schema": "public",
+      "created_by": "20261004000001_engine_build_ledger.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "engine_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "sim_engines",
+            "columns": [
+              "id"
+            ],
+            "on_delete": null
+          },
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "code_version",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "scsim_digest",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "sim_worker_digest",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "commit_sha",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "image_digest",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "first_seen_by",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "first_seen_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "last_seen_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "withdrawn_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "withdrawn_reason",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "withdrawn_by",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "sim_engine_builds_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "engine_id",
+            "code_version"
+          ],
+          "definition": "UNIQUE (engine_id, code_version)",
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "sim_engine_builds_withdrawal_whole",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((withdrawn_at IS NULL) = (withdrawn_reason IS NULL) AND (withdrawn_reason IS NULL OR btrim(withdrawn_reason) <> ''))",
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "sim_engine_builds_seen_order",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (last_seen_at >= first_seen_at)",
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "sim_engine_builds_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "sim_engine_builds_code_version_shape",
+          "kind": "CHECK",
+          "columns": [
+            "code_version"
+          ],
+          "definition": "CHECK (btrim(code_version) <> '' AND code_version = btrim(code_version))",
+          "implicit": true,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "sim_engine_builds_scsim_digest_shape",
+          "kind": "CHECK",
+          "columns": [
+            "scsim_digest"
+          ],
+          "definition": "CHECK (scsim_digest ~ '^[0-9a-f]{64}$')",
+          "implicit": true,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "sim_engine_builds_worker_digest_shape",
+          "kind": "CHECK",
+          "columns": [
+            "sim_worker_digest"
+          ],
+          "definition": "CHECK (sim_worker_digest ~ '^[0-9a-f]{64}$')",
+          "implicit": true,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "sim_engine_builds_commit_shape",
+          "kind": "CHECK",
+          "columns": [
+            "commit_sha"
+          ],
+          "definition": "CHECK (commit_sha ~ '^[0-9a-f]{7,40}$')",
+          "implicit": true,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        },
+        {
+          "name": "sim_engine_builds_first_seen_by",
+          "kind": "CHECK",
+          "columns": [
+            "first_seen_by"
+          ],
+          "definition": "CHECK (first_seen_by IN ('worker_report', 'run', 'backfill'))",
+          "implicit": true,
+          "added_by": "20261004000001_engine_build_ledger.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "sim_engine_builds_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20261004000001_engine_build_ledger.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 15.2 · §4 D292 — the engine build ledger: one row per (engine, code_version) that produced a result or was reported running. Append-only; a build is withdrawn, never deleted.",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "engine_id",
+            "code_version"
+          ],
+          "name": "sim_engine_builds_key"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "sim_engine_builds_pkey"
         }
       ]
     },
@@ -24499,7 +24914,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261003000004_production_lead_time.sql"
+      "defined_by": "20261004000004_production_lead_time.sql"
     },
     {
       "name": "_build_dataset_snapshot",
@@ -24678,6 +25093,31 @@
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
+      "name": "_engine_build_append_only",
+      "signature": "_engine_build_append_only()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000001_engine_build_ledger.sql"
+    },
+    {
+      "name": "_engine_build_record",
+      "signature": "_engine_build_record(uuid, text, text, jsonb)",
+      "args": [
+        "p_engine_id uuid",
+        "p_code_version text",
+        "p_source text",
+        "p_build jsonb DEFAULT NULL"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000001_engine_build_ledger.sql"
+    },
+    {
       "name": "_engine_for_code_version",
       "signature": "_engine_for_code_version(text)",
       "args": [
@@ -24757,7 +25197,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000019_graph_level_versions.sql"
+      "defined_by": "20261004000002_version_codes.sql"
     },
     {
       "name": "_graph_level_versions_number",
@@ -24767,7 +25207,7 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000019_graph_level_versions.sql"
+      "defined_by": "20261004000002_version_codes.sql"
     },
     {
       "name": "_graph_state_mark",
@@ -24887,6 +25327,32 @@
       "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
+      "name": "_model_code_for",
+      "signature": "_model_code_for(uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_period text"
+      ],
+      "returns": "text LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000002_version_codes.sql"
+    },
+    {
+      "name": "_next_version_code",
+      "signature": "_next_version_code(text, text[])",
+      "args": [
+        "p_base text",
+        "p_taken text[]"
+      ],
+      "returns": "text LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261004000002_version_codes.sql"
+    },
+    {
       "name": "_policy_version_hash",
       "signature": "_policy_version_hash(uuid)",
       "args": [
@@ -24974,6 +25440,16 @@
       "defined_by": "20261001000014_series_sweep_via_storage_api.sql"
     },
     {
+      "name": "_simulation_run_record_build",
+      "signature": "_simulation_run_record_build()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000001_engine_build_ledger.sql"
+    },
+    {
       "name": "_simulation_run_retention",
       "signature": "_simulation_run_retention()",
       "args": [],
@@ -25050,7 +25526,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000020_simulation_scope.sql"
+      "defined_by": "20261004000002_version_codes.sql"
     },
     {
       "name": "_validated_model_number",
@@ -25060,7 +25536,31 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000008_validated_model.sql"
+      "defined_by": "20261004000002_version_codes.sql"
+    },
+    {
+      "name": "_version_codes_backfill",
+      "signature": "_version_codes_backfill(uuid)",
+      "args": [
+        "p_project_id uuid DEFAULT NULL"
+      ],
+      "returns": "integer LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000002_version_codes.sql"
+    },
+    {
+      "name": "_version_day_code",
+      "signature": "_version_day_code(timestamptz)",
+      "args": [
+        "p_at timestamptz"
+      ],
+      "returns": "text LANGUAGE sql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261004000002_version_codes.sql"
     },
     {
       "name": "account_self_resolve",
@@ -27101,7 +27601,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000021_level_version_reads.sql"
+      "defined_by": "20261004000002_version_codes.sql"
     },
     {
       "name": "dataset_versions_assign_number",
@@ -28264,7 +28764,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": "Phase 3 / WP 3.3 — the unit conversions ingest_apply_run applies as it ",
-      "defined_by": "20261003000004_production_lead_time.sql"
+      "defined_by": "20261004000004_production_lead_time.sql"
     },
     {
       "name": "ingest_promotion_plan",
@@ -28506,11 +29006,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "TABLE ( id uuid, label text, notes text, author_email text, author_name text, parent_version_id uuid, policy_hash text, created_at timestamptz, run_count bigint, card_count bigint, version_no integer )",
+      "returns": "TABLE ( id uuid, label text, notes text, author_email text, author_name text, parent_version_id uuid, policy_hash text, created_at timestamptz, run_count bigint, card_count bigint, version_no integer, version_code text )",
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000006_policy_versions_by_content.sql"
+      "defined_by": "20261004000002_version_codes.sql"
     },
     {
       "name": "list_projects",
@@ -28768,7 +29268,7 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000006_policy_versions_by_content.sql"
+      "defined_by": "20261004000002_version_codes.sql"
     },
     {
       "name": "process_structure",
@@ -29072,7 +29572,7 @@
     },
     {
       "name": "record_validated_model",
-      "signature": "record_validated_model(uuid, uuid, uuid, uuid, text, jsonb, text, jsonb, jsonb, jsonb, text, text, uuid, jsonb, uuid, text)",
+      "signature": "record_validated_model(uuid, uuid, uuid, uuid, text, jsonb, text, jsonb, jsonb, jsonb, text, text, uuid, jsonb, uuid, text, text)",
       "args": [
         "p_project_id uuid",
         "p_policy_version_id uuid",
@@ -29089,13 +29589,14 @@
         "p_evidence_run_id uuid",
         "p_evidence jsonb",
         "_actor_user_id uuid",
-        "p_user_email text DEFAULT NULL"
+        "p_user_email text DEFAULT NULL",
+        "p_planning_period text DEFAULT NULL"
       ],
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000008_validated_model.sql"
+      "defined_by": "20261004000002_version_codes.sql"
     },
     {
       "name": "refresh_node_list_for_project",
@@ -29359,6 +29860,20 @@
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
+      "name": "set_model_planning_period",
+      "signature": "set_model_planning_period(uuid, text, uuid)",
+      "args": [
+        "p_validation_id uuid",
+        "p_planning_period text",
+        "_actor_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "text LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000002_version_codes.sql"
+    },
+    {
       "name": "set_network_data_defaults",
       "signature": "set_network_data_defaults()",
       "args": [],
@@ -29493,6 +30008,20 @@
       "defined_by": "20260718000001_stage1_agent_rights_and_summary.sql"
     },
     {
+      "name": "sim_engine_build_withdraw",
+      "signature": "sim_engine_build_withdraw(uuid, text, uuid)",
+      "args": [
+        "p_build_id uuid",
+        "p_reason text",
+        "_actor_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "public.sim_engine_builds LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261004000001_engine_build_ledger.sql"
+    },
+    {
       "name": "sim_engine_for_dispatch",
       "signature": "sim_engine_for_dispatch(uuid)",
       "args": [
@@ -29502,22 +30031,23 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261004000001_engine_build_ledger.sql"
     },
     {
       "name": "sim_engine_report",
-      "signature": "sim_engine_report(text, text, text, jsonb)",
+      "signature": "sim_engine_report(text, text, text, jsonb, jsonb)",
       "args": [
         "p_slug text",
         "p_version text",
         "p_code_version text",
-        "p_capabilities jsonb DEFAULT NULL"
+        "p_capabilities jsonb DEFAULT NULL",
+        "p_build jsonb DEFAULT NULL"
       ],
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261004000001_engine_build_ledger.sql"
     },
     {
       "name": "simulation_run_key",

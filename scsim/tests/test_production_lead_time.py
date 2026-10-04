@@ -3,7 +3,7 @@
 # release; see scsim/NOTICE.md for licensing, funding and citation.
 # Developed in part within the ACCURATE project (Horizon Europe, GA 101138269).
 
-"""P-P.13 production lead time — PLAN.md §25 WP 15.4, ADR 0003.
+"""P-P.13 production lead time — PLAN.md §26 WP 16.4, ADR 0003.
 
 Output started in week t completes in week t + L. Materials are consumed at the
 start, MTS completions replenish FG stock, MTO completions ship against demand

@@ -106,9 +106,9 @@ class SupplierLink(BaseModel):
         0.0, ge=0.0, le=1.0,
         json_schema_extra=_meta("-", "SM", "CV for normal/lognormal/gamma lead-time dists."),
     )
-    # PLAN.md §25 WP 15.1 — the bounded shapes (triangular, uniform). The link's
+    # PLAN.md §26 WP 16.1 — the bounded shapes (triangular, uniform). The link's
     # `lead_time_weeks` stays its PLANNING lead time and must lie inside the
-    # bounds; the mapper sets it to the bounds' mean (§25.2 rule 3).
+    # bounds; the mapper sets it to the bounds' mean (§26.2 rule 3).
     lead_time_min_weeks: Optional[float] = Field(
         None, ge=0, le=51,
         json_schema_extra=_meta("weeks", "SM", "Lower bound (triangular, uniform)."),
@@ -146,10 +146,10 @@ class SupplierLink(BaseModel):
 def check_lead_time_shape(label: str, d: LeadTimeDist, lo: Optional[float], mo: Optional[float],
                           hi: Optional[float], *, planning: int, planning_floor: int,
                           what: str) -> None:
-    """One validation for every lead-time shape (PLAN.md §25 WP 15.1 / 15.4): a
+    """One validation for every lead-time shape (PLAN.md §26 WP 16.1 / 15.4): a
     supplier link's and a product's production lead time. A bounded shape needs
     its bounds in order and its planning lead time inside them (the mapper
-    derives it as their mean, §25.2 rule 3); any other shape carries no bounds."""
+    derives it as their mean, §26.2 rule 3); any other shape carries no bounds."""
     if d == LeadTimeDist.TRIANGULAR:
         if lo is None or mo is None or hi is None:
             raise ValueError(f"{label}: a triangular lead time needs min, mode and max")
@@ -175,7 +175,7 @@ def check_lead_time_shape(label: str, d: LeadTimeDist, lo: Optional[float], mo: 
 
 def lead_time_bounds_mean(dist: LeadTimeDist, lo: float, mode: Optional[float],
                           hi: float) -> float:
-    """The mean of a bounded lead-time shape — its planning lead time (§25.2
+    """The mean of a bounded lead-time shape — its planning lead time (§26.2
     rule 3): (min + mode + max)/3 for triangular, (min + max)/2 for uniform."""
     if dist == LeadTimeDist.TRIANGULAR:
         return (lo + float(mode) + hi) / 3.0
@@ -334,7 +334,7 @@ class Product(BaseModel):
         None, ge=0, json_schema_extra=_meta(
             "units", "P", "FG opening stock (engine RFC 4). None = start at the policy target."),
     )
-    # P-P.13 production lead time (PLAN.md §25 WP 15.4, ADR 0003): output started
+    # P-P.13 production lead time (PLAN.md §26 WP 16.4, ADR 0003): output started
     # in week t completes in week t + L. 0 = same-week completion, today's
     # behaviour (W^FG = 0 by default). The same shapes as a supplier lead time,
     # drawn per (product, week) from their own world stream; a bounded shape's

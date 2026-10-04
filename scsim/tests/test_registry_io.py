@@ -476,7 +476,7 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         # The first override of a LANE column: one supplier × material link's
         # lead time over the uploaded `inbound_logistics.lead_time`.
         "lead_time_weeks": ("inbound_logistics.lead_time", "supplier"),
-        # PLAN.md §25 WP 15.2 — the lane's lead-time SPREAD, chosen like demand.
+        # PLAN.md §26 WP 16.2 — the lane's lead-time SPREAD, chosen like demand.
         "lane_lead_time_dist": ("inbound_logistics.lead_time_dist", "supplier"),
         "lane_lead_time_cv": ("inbound_logistics.lead_time_cv", "supplier"),
         "lane_lead_time_min_weeks": ("inbound_logistics.lead_time_min", "supplier"),
@@ -503,7 +503,7 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         "fg_initial_on_hand": ("products.fg_initial_on_hand", "plant"),
         # Whether the product holds FG stock at all — the Plant row's MTS / MTO.
         "fulfillment_mode": ("products.fulfillment_mode", "plant"),
-        # PLAN.md §25 WP 15.5 — the product's production lead time (P-P.13).
+        # PLAN.md §26 WP 16.5 — the product's production lead time (P-P.13).
         "prod_lead_time_weeks": ("products.production_lead_time", "plant"),
         "prod_lead_time_dist": ("products.production_lead_time_dist", "plant"),
         "prod_lead_time_cv": ("products.production_lead_time_cv", "plant"),
@@ -538,7 +538,7 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         ScenarioSettings, SupplierRow, SupplyArc, from_project_data,
     )
 
-    # WP 15.2 — a lane-spread key is read only where the shape reads it, so its
+    # WP 16.2 — a lane-spread key is read only where the shape reads it, so its
     # probe lane (S3) uploads the shape that key can perturb.
     lane_spread = {
         "lane_lead_time_dist": dict(lead_time_cv=0.2, lead_time_min=1, lead_time_mode=2,
@@ -552,7 +552,7 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
                                     lead_time_mode=2, lead_time_max=4),
     }
 
-    # WP 15.5 — likewise for a product's production lead-time keys (P1's master).
+    # WP 16.5 — likewise for a product's production lead-time keys (P1's master).
     product_lt = {
         "prod_lead_time_dist": dict(production_lead_time_min=1, production_lead_time_max=5),
         "prod_lead_time_cv": dict(production_lead_time_dist="normal", production_lead_time_cv=0.1,
@@ -617,6 +617,7 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "lane_lead_time_mode_weeks": 3, "lane_lead_time_max_weeks": 6,
         "sell_price": 7, "production_capacity": 66,
         "row_demand_mode": "model", "row_demand_distribution": "poisson", "row_demand_mean": 25,
+        "row_demand_schedule": [30, 0, 45],
         "row_demand_variation": 0.5, "row_demand_min": 5, "row_demand_max": 500,
         "backorder_allowed": True, "max_backorder_days": 21, "backorder_cost_per_day": 3,
         "row_priority": 4, "price": 55, "sla_fill_floor_pct": 70,

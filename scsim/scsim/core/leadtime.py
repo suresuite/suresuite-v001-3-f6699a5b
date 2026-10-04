@@ -5,7 +5,7 @@
 
 """Lead-time shapes — one implementation for every lead time the engine draws.
 
-PLAN.md §25 WP 15.1 (P-S.6 widened). A lead time is a planning value (the
+PLAN.md §26 WP 16.1 (P-S.6 widened). A lead time is a planning value (the
 link's ``lead_time_weeks``, whole weeks) plus an optional SHAPE:
 
 * deterministic — exactly the planning value;
@@ -13,13 +13,13 @@ link's ``lead_time_weeks``, whole weeks) plus an optional SHAPE:
   standardised variates on the world ``leadtime`` stream, unchanged);
 * normal — ``mean · (1 + cv · z)``, raised to 1 week and counted;
 * triangular (min, mode, max), uniform (min, max) — the distribution IS its
-  bounds, and the planning value is their mean (§25.2 rule 3).
+  bounds, and the planning value is their mean (§26.2 rule 3).
 
-The shapes added by WP 15.1 are drawn as standard uniforms ``u`` per
+The shapes added by WP 16.1 are drawn as standard uniforms ``u`` per
 (lane, week) before any policy acts, and turned into a lead time by the inverse
 CDF at use. A shipment whose lead time a policy changed (expediting) scales the
 draw by its own mean over the link's planning value, so the shape keeps its
-relative spread. Production lead times (P-P.13, WP 15.4) use the same functions.
+relative spread. Production lead times (P-P.13, WP 16.4) use the same functions.
 """
 from __future__ import annotations
 

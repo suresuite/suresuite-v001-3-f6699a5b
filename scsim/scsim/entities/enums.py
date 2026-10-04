@@ -67,7 +67,7 @@ class LeadTimeDist(str, Enum):
     LOGNORMAL = "lognormal"
     GAMMA = "gamma"
     EMPIRICAL = "empirical"
-    # PLAN.md §25 WP 15.1 (P-S.6 widened): the demand-style shapes. Drawn from
+    # PLAN.md §26 WP 16.1 (P-S.6 widened): the demand-style shapes. Drawn from
     # their own world stream, keyed per lane (`seeds.lane_leadtime_rng`), so the
     # lognormal/gamma draws above keep their stream and stay bit-identical.
     NORMAL = "normal"          # mean + CV, raised to 1 week and counted

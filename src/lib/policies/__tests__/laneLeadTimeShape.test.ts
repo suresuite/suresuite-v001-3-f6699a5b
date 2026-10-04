@@ -1,6 +1,6 @@
 /**
- * A Supplier row's lead-time SHAPE, chosen like demand — PLAN.md §25 WP 15.3,
- * §4 D291, blueprint P-S.6.
+ * A Supplier row's lead-time SHAPE, chosen like demand — PLAN.md §26 WP 16.3,
+ * §4 D299, blueprint P-S.6.
  *
  * The page-equals-run fixture proves value AND source for every lane cell. These
  * are the grid-side facts it cannot carry: which parameter cells a row SHOWS for
@@ -55,7 +55,7 @@ const shapeCols = (s: string, m: string, overrides: OverrideRow[] = [], draft?: 
 const sourcing = (target_key: string, patch: Row): OverrideRow =>
   ({ scope: "node", target_key, family: "sourcing", patch });
 
-describe("§25 WP 15.3 — the parameters follow the shape", () => {
+describe("§26 WP 16.3 — the parameters follow the shape", () => {
   it("a triangular row shows min, mode and max and nothing else", () => {
     expect(shapeCols("S2", "M1")).toEqual([
       "lane_lead_time_dist", "lane_lead_time_min_weeks", "lane_lead_time_mode_weeks", "lane_lead_time_max_weeks",
@@ -81,13 +81,13 @@ describe("§25 WP 15.3 — the parameters follow the shape", () => {
       masterRowById: masters, derived, defaults: DEFAULT_BUNDLE, overrides: [], scope: "node",
       familyDefault: () => undefined,
     });
-    // The material says 1.4; the engine bounds a CV at 1 and uses 1 (§4 D294).
+    // The material says 1.4; the engine bounds a CV at 1 and uses 1 (§4 D302).
     expect(cell.value).toBe(1);
     expect(cell.provenance).toBe("derived");
   });
 });
 
-describe("§25.2 rule 3 — a bounded row plans on its bounds' mean", () => {
+describe("§26.2 rule 3 — a bounded row plans on its bounds' mean", () => {
   const ltCol = masterColByField.get("lead_time_weeks")!;
   const ltCell = (s: string, m: string, overrides: OverrideRow[] = [], draft?: Row) =>
     resolveCell({
@@ -126,7 +126,7 @@ describe("§25.2 rule 3 — a bounded row plans on its bounds' mean", () => {
   });
 });
 
-describe("§25 WP 15.5 — the Plant row's production lead time, through the same helper", () => {
+describe("§26 WP 16.5 — the Plant row's production lead time, through the same helper", () => {
   const pspec = STAGE_TABLE_SPEC.plant;
   const pcols = new Map<string, ColSpec>(pspec.cols.filter((c) => c.master).map((c) => [c.field, c]));
   const products: Row[] = [

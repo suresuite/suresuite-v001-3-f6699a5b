@@ -189,7 +189,7 @@ def build_project_data(
                 fg_reorder_point=_num(r.get("fg_reorder_point")),
                 fg_cover_days=_num(r.get("fg_cover_days")),
                 fg_initial_on_hand=_num(r.get("fg_initial_on_hand")),
-                # WP 15.5 (§25, D292) — P-P.13 production lead time and its shape.
+                # WP 16.5 (§26, D300) — P-P.13 production lead time and its shape.
                 production_lead_time=_num(r.get("production_lead_time")),
                 production_lead_time_unit=r.get("production_lead_time_unit"),
                 production_lead_time_dist=r.get("production_lead_time_dist"),
@@ -206,7 +206,7 @@ def build_project_data(
                 unit_price=_num(r.get("unit_price")), lead_time=_num(r.get("lead_time")),
                 lead_time_unit=r.get("lead_time_unit"), time_unit=r.get("time_unit"),
                 volume=_num(r.get("volume")),
-                # WP 15.2 (§25, D291): the lane's own lead-time spread.
+                # WP 16.2 (§26, D299): the lane's own lead-time spread.
                 lead_time_dist=r.get("lead_time_dist"),
                 lead_time_cv=_num(r.get("lead_time_cv")),
                 lead_time_min=_num(r.get("lead_time_min")),

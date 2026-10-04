@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "033d06223a46";
+export const CONTRACT_VERSION = "c7c7da69c86d";
 export const ENGINE_VERSION = "0.8.0";
-export const LAST_MIGRATION = "20261003000004_production_lead_time.sql";
+export const LAST_MIGRATION = "20261004000004_production_lead_time.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 93,
-  "tablesDescribed": 76,
-  "columnsDescribed": 1007,
+  "tablesInSchema": 94,
+  "tablesDescribed": 77,
+  "columnsDescribed": 1024,
   "tablesUndescribed": 17
 } as const;
 
@@ -189,7 +189,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "graph_level_versions",
         "grain": "One row per (project, level, content): the FIRST time a project's product, process, firm or simulation level had that hash. Numbered per project PER LEVEL, so \"Product graph v3\" and \"Firm graph v5\" are both sentences the system can say, and a change to one level moves that level's number and no other. A snapshot (`dataset_versions`) names its level versions — its tuple.",
-        "columns": 9,
+        "columns": 10,
         "owner": "platform"
       },
       {
@@ -285,7 +285,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "model_validations",
         "grain": "One VALIDATED MODEL: a decision about how a project's model may be used, bound to the exact policy content, graph version and scenario world it was established on and stating the run protocol every decision-grade run must follow — how many seeds, the week steady state begins, horizon, analysis window, CI level and stopping rule — with who validated it and when. Immutable: only its lifecycle (status, supersession, revocation) changes. Matched by CONTENT, never by id (WP 10.2).",
-        "columns": 36,
+        "columns": 38,
         "owner": "policy-ui"
       },
       {
@@ -315,7 +315,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "policy_versions",
         "grain": "One saved snapshot of a project's whole policy bundle, with the bundle it replaced and the hash of both. The audit trail of the /policies grid: what the policies WERE at a moment somebody chose to record, which is what makes a simulation result reproducible from the policy side.",
-        "columns": 14,
+        "columns": 15,
         "owner": "policy-ui"
       },
       {
@@ -533,6 +533,12 @@ export const TIERS: GlanceTier[] = [
         "grain": "One country's current risk class, as one named publisher graded it in one named edition. NOT project-scoped: two projects sourcing from the same country see the same row, which is the point — a per-project copy drifts.",
         "columns": 9,
         "owner": "reference-data"
+      },
+      {
+        "table": "sim_engine_builds",
+        "grain": "One row per engine build that produced a result or was reported running, keyed by (engine, code_version). Append-only: `last_seen_at` moves forward, a part the row did not know is filled once, and a build found wrong is WITHDRAWN with a reason, never deleted. The CURRENT build is not stored here — it is `sim_engines.code_version`, which the worker's boot report authors.",
+        "columns": 13,
+        "owner": "engine"
       },
       {
         "table": "sim_engines",

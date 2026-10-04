@@ -1,6 +1,6 @@
 /**
- * FG INVENTORY, laid out like the Supplier stage's inventory band — PLAN.md §25
- * WP 15.6, §4 D293.
+ * FG INVENTORY, laid out like the Supplier stage's inventory band — PLAN.md §26
+ * WP 16.6, §4 D301.
  *
  * The Plant row: the MTS/MTO switch, the FG policy as the policy TYPE, ONE
  * "Replenishment parameters" cell holding only the levels the policy reads, then
@@ -22,7 +22,7 @@ import {
 
 const mts = (fg_policy?: string) => ({ resolved: { fulfillment_mode: "mts", fg_policy }, projectFulfillmentMode: "mto" as const });
 
-describe("§25 WP 15.6 — the FG inventory band", () => {
+describe("§26 WP 16.6 — the FG inventory band", () => {
   it("reads 'FG inventory', never 'FG stock'", () => {
     const fit = fitColsForStage("plant", [mts("min_max")]);
     const band = fit.filter((c) => c.bandLabel).map((c) => c.bandLabel);

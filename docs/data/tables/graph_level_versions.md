@@ -18,6 +18,7 @@
 | `project_id` + `level` + `level_hash` | UNIQUE constraint | `graph_level_versions_content_key` |
 | `project_id` + `level` + `version_no` | UNIQUE constraint | `graph_level_versions_number_key` |
 | `id` | column PRIMARY KEY | `graph_level_versions_pkey` |
+| `project_id` + `level` + `version_code` | UNIQUE constraint | `graph_level_versions_code_key` |
 
 **Natural key:** `project_id` + `level` + `level_hash` — the key this table's grain implies, and the
 database ENFORCES it: `graph_level_versions_content_key`. A re-upload of the same row updates
@@ -31,11 +32,13 @@ partially or get corrected — the write fails.
 | Constraint | Rule | Added by |
 |---|---|---|
 | `graph_level_versions_level_check` | `CHECK (level IN ('product', 'process', 'firm', 'simulation'))` | `20261001000019_graph_level_versions.sql` |
+| `graph_level_versions_version_code_check` | `CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')` | `20261004000002_version_codes.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
 | `graph_level_versions_content_key` | UNIQUE | `UNIQUE (project_id, level, level_hash)` |
 | `graph_level_versions_number_key` | UNIQUE | `UNIQUE (project_id, level, version_no)` |
+| `graph_level_versions_code_key` | UNIQUE | `UNIQUE (project_id, level, version_code)` |
 
 ## Governance
 
@@ -74,6 +77,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `first_dataset_version_id` | — | `uuid` | — | — | The snapshot that first carried this content — the frozen world a person can open to see it. NULL once that snapshot is deleted; the level version stays, because its content and number remain true of the project. |
 | `author_user_id` | — | `uuid` | — | — | Who froze the first snapshot — copied from it, not the session, so the backfill names the same person the live path would have. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the project's level first had this content — the first snapshot's `created_at`, so a backfilled row is dated by its history, not by the migration. |
+| `version_code` | — | `text` | — | — | "Data 20260915" for the `simulation` level — the code a person says. The UTC day this level first had this content (`YYYYMMDD`), and `-n` for the n-th content of the level first seen that day. Assigned by the numbering trigger, unique per project and level, and immutable once stored (a row that predates it learns it once, from the backfill). |
 
 ## Each column in full
 
@@ -205,8 +209,22 @@ When the project's level first had this content — the first snapshot's `create
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `version_code`
+
+"Data 20260915" for the `simulation` level — the code a person says. The UTC day this level first had this content (`YYYYMMDD`), and `-n` for the n-th content of the level first seen that day. Assigned by the numbering trigger, unique per project and level, and immutable once stored (a row that predates it learns it once, from the backfill).
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261004000002_version_codes.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ---
 
-*Generated from data contract `033d06223a46`, engine `0.8.0`,
+*Generated from data contract `c7c7da69c86d`, engine `0.8.0`,
 sidecar `supabase/contract/graph_level_versions.contract.yaml`, table created by `20261001000019_graph_level_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

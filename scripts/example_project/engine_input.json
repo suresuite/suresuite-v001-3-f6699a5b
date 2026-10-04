@@ -1,5 +1,6 @@
 {
  "engine_version": "0.8.0",
+ "engine_build": "scsim-0.0.0+000000000000",
  "scenario": {
   "name": "scenario",
   "network": {

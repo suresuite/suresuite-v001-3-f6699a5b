@@ -205,6 +205,22 @@ fields:
     ingest: {csv_header: null, required: false, validate: null}
     surfaces: []
     resolution: null
+  version_code:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      "Policy 20261004" — the code a person says. The UTC day this CONTENT was first saved
+      (`YYYYMMDD`), and `-n` for the n-th distinct content first saved that day. Rows of one
+      content share it, as they share `version_no`. Assigned by the numbering trigger and
+      STORED, so deleting an older same-day version never moves a surviving code; the suffix
+      is one past the highest ever stored that day (WP 10.5 follow-up, `20261004000002`).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
   notes:
     type: text
     unit: null
@@ -223,7 +239,7 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/usePolicies.tsx:510"
+    evidence: "src/hooks/usePolicies.tsx:514"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "table read"

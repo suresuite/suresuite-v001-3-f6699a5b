@@ -1,8 +1,8 @@
--- Phase 15 / WP 15.2 / §5 P-S.6 · §4 D291 · gates `normalize-at-promotion`,
+-- Phase 16 / WP 16.2 / §5 P-S.6 · §4 D299 · gates `normalize-at-promotion`,
 -- `natural-key`, `single-source`, `no-tier-skip`
 -- A LANE'S OWN LEAD-TIME SPREAD: THE DATA HALF.
 --
--- Engine 0.7.0 (WP 15.1) draws a supplier lead time as deterministic, normal,
+-- Engine 0.7.0 (WP 16.1) draws a supplier lead time as deterministic, normal,
 -- lognormal, gamma, triangular or uniform. Until now the only place a spread
 -- could be stated was the MATERIAL (`materials.lead_time_dist` / `lead_time_cv`),
 -- so every supplier of one material shared one distribution. This migration
@@ -13,7 +13,7 @@
 -- ── 1 · THE COLUMNS ──────────────────────────────────────────────────────────
 --
 -- All five are NULLABLE with no DEFAULT: an empty `lead_time_dist` means "the
--- material's spread, else deterministic" — the order the mapper reads (§25.2
+-- material's spread, else deterministic" — the order the mapper reads (§26.2
 -- rule 5) — never "deterministic" stamped onto every lane. `lead_time_cv` is a
 -- fraction (normal, lognormal, gamma) bounded 0–1 as the engine bounds it. The
 -- three bounds are DURATIONS in the lane's own `lead_time_unit` (blank = weeks),
@@ -49,16 +49,16 @@ ALTER TABLE public.inbound_logistics ADD CONSTRAINT inbound_logistics_lead_time_
 );
 
 COMMENT ON COLUMN public.inbound_logistics.lead_time_dist IS
-  'WP 15.2 · the lane''s own lead-time shape: deterministic, normal, lognormal, gamma, '
+  'WP 16.2 · the lane''s own lead-time shape: deterministic, normal, lognormal, gamma, '
   'triangular or uniform. NULL: the material''s shape, else deterministic.';
 COMMENT ON COLUMN public.inbound_logistics.lead_time_cv IS
-  'WP 15.2 · coefficient of variation (0–1) for normal, lognormal and gamma; ignored otherwise.';
+  'WP 16.2 · coefficient of variation (0–1) for normal, lognormal and gamma; ignored otherwise.';
 COMMENT ON COLUMN public.inbound_logistics.lead_time_min IS
-  'WP 15.2 · triangular and uniform: the lower bound, in `lead_time_unit`; weeks after promotion.';
+  'WP 16.2 · triangular and uniform: the lower bound, in `lead_time_unit`; weeks after promotion.';
 COMMENT ON COLUMN public.inbound_logistics.lead_time_mode IS
-  'WP 15.2 · triangular: the most likely lead time, in `lead_time_unit`; weeks after promotion.';
+  'WP 16.2 · triangular: the most likely lead time, in `lead_time_unit`; weeks after promotion.';
 COMMENT ON COLUMN public.inbound_logistics.lead_time_max IS
-  'WP 15.2 · triangular and uniform: the upper bound, in `lead_time_unit`; weeks after promotion.';
+  'WP 16.2 · triangular and uniform: the upper bound, in `lead_time_unit`; weeks after promotion.';
 
 -- ── 3 · the bounds normalize at promotion (I3) ──────────────────────────────
 CREATE OR REPLACE FUNCTION public.ingest_normalize_at_promotion(_target text)
@@ -86,13 +86,13 @@ COMMENT ON FUNCTION public.ingest_normalize_at_promotion(text) IS
   '`normalize_at_promotion`); restated here because SQL cannot import the '
   'generated module, and pinned to it by ingestSpecParity.test.ts. WP 14.2 added '
   'the outbound row''s demand_mean / demand_min / demand_max, rates in the same '
-  'time_unit as its volume; WP 15.2 the inbound lane''s lead_time_min / _mode / '
+  'time_unit as its volume; WP 16.2 the inbound lane''s lead_time_min / _mode / '
   '_max, durations in the same lead_time_unit as its lead_time.';
 
 -- ── 4 · the snapshot: the lane's spread joins the simulation scope ──────────
 --
--- The v2 body below is `20261003000002`'s with one addition, marked WP 15.2.
--- `rehearsal/820` proves a project with no spread keeps its snapshot text.
+-- The v2 body below is `20261003000002`'s with one addition, marked WP 16.2.
+-- `rehearsal/840` proves a project with no spread keeps its snapshot text.
 
 CREATE OR REPLACE FUNCTION public._build_dataset_snapshot_v2(p_project_id uuid)
 RETURNS jsonb
@@ -183,7 +183,7 @@ AS $$
           'time_unit', il.time_unit,
           'volume', il.volume
         )
-        -- WP 15.2 (§25, D291): the lane's own lead-time spread, only where a
+        -- WP 16.2 (§26, D299): the lane's own lead-time spread, only where a
         -- lane states one, so a project that sets none keeps its snapshot text
         -- and its `hash_inputs`.
         || jsonb_strip_nulls(jsonb_build_object(

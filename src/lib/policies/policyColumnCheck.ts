@@ -227,7 +227,7 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     savedTo: "override sourcing.lane_lead_time_dist (per row = per supplier × material lane — /policies never writes the lane)",
     engine: "override → the lane's uploaded shape → materials.lead_time_dist → deterministic; a shape missing a parameter runs deterministic (warn)",
     verdict: "works",
-    note: "PLAN.md §25 WP 15.3. On a triangular or uniform row the Lead time cell shows the bounds' mean, which is what the run plans on.",
+    note: "PLAN.md §26 WP 16.3. On a triangular or uniform row the Lead time cell shows the bounds' mean, which is what the run plans on.",
   },
   "supplier:lane_lead_time_cv": {
     shows: "your override → inbound_logistics.lead_time_cv → the material's CV (derived)",
@@ -389,7 +389,7 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     savedTo: "override production.prod_lead_time_weeks (per Plant row — /policies never writes the product master)",
     engine: "P-P.13: output started in a week completes this many weeks later; the plan starts that many weeks ahead (expected value only)",
     verdict: "works",
-    note: "PLAN.md §25 WP 15.5. 0 = completes in the week it starts.",
+    note: "PLAN.md §26 WP 16.5. 0 = completes in the week it starts.",
   },
   "plant:prod_lead_time_dist": {
     shows: "your override → products.production_lead_time_dist → empty (deterministic)",
@@ -430,7 +430,7 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     savedTo: "the individual fields below (Plant-row overrides of products)",
     engine: "see the individual fields",
     verdict: "info",
-    note: "PLAN.md §25 WP 15.6 — laid out like the Supplier stage's inventory band (§4 D293).",
+    note: "PLAN.md §26 WP 16.6 — laid out like the Supplier stage's inventory band (§4 D301).",
   },
   "plant:fulfillment_mode": {
     shows: "your override → products.fulfillment_mode → projects.supply_chain_model → MTO",
@@ -503,9 +503,15 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   },
   // PLAN.md §24 WP 14.2 — demand per customer × product row.
   "customer:row_demand_mode": {
-    shows: "your override, else empty — the engine's rule: the row's forecast when one is uploaded, else its model",
+    shows: "your override, else empty — the engine's rule: the row's delivery schedule when one is entered, else its forecast when one is uploaded, else its model",
     savedTo: "override demand.row_demand_mode (Customer row)",
-    engine: "'model' sets an uploaded forecast aside; 'forecast' without one is warned and ignored",
+    engine: "'model' sets an uploaded forecast aside; 'forecast' without one is warned and ignored; 'schedule' runs the row's requested delivery schedule exactly",
+    verdict: "works",
+  },
+  "customer:row_demand_schedule": {
+    shows: "the row's requested delivery schedule — units per week from week 1, typed here",
+    savedTo: "override demand.row_demand_schedule (Customer row, an array)",
+    engine: "CustomerLink.forecast with a deterministic draw and mean 0: the row's demand is exactly the schedule, and nothing past its end; its distribution and any uploaded forecast are set aside",
     verdict: "works",
   },
   "customer:row_forecast": {

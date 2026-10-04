@@ -170,7 +170,7 @@ class ProductRow:
     fg_reorder_point: Optional[float] = None   # s (units), min_max
     fg_cover_days: Optional[float] = None      # D (days), days_of_cover
     fg_initial_on_hand: Optional[float] = None  # FG opening stock (units), RFC 4
-    # P-P.13 production lead time (PLAN.md §25 WP 15.5): the lead time and its
+    # P-P.13 production lead time (PLAN.md §26 WP 16.5): the lead time and its
     # bounds in `production_lead_time_unit` (weeks after promotion).
     production_lead_time: Optional[float] = None
     production_lead_time_unit: Optional[str] = None
@@ -196,7 +196,7 @@ class SupplyArc:
     lead_time_unit: Optional[str] = None  # explicit override only
     time_unit: Optional[str] = None       # volume period
     volume: Optional[float] = None
-    # PLAN.md §25 WP 15.2 — the lane's own lead-time spread. The bounds are in
+    # PLAN.md §26 WP 16.2 — the lane's own lead-time spread. The bounds are in
     # `lead_time_unit` like `lead_time` (weeks after promotion).
     lead_time_dist: Optional[str] = None
     lead_time_cv: Optional[float] = None
@@ -554,13 +554,13 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
                      "row (`node:<supplier>::<material>`) -> inbound_logistics.lead_time x "
                      "lead_time_unit -> 2 weeks",
     },
-    # ── A lane's lead-time SPREAD (PLAN.md §25 WP 15.2, D291, blueprint P-S.6) ──
+    # ── A lane's lead-time SPREAD (PLAN.md §26 WP 16.2, D299, blueprint P-S.6) ──
     # Chosen like demand: a shape and only the parameters it reads, per Supplier
     # row, over the lane's own upload (`inbound_logistics`), else the material's
     # shape (`materials.lead_time_dist` / `lead_time_cv`), else deterministic.
     # Read per LANE exactly like `lead_time_weeks`. A bounded shape (triangular,
     # uniform) IS its bounds and its planning lead time is their mean, so on such
-    # a lane the row's `lead_time_weeks` is not read (§25.2 rule 3).
+    # a lane the row's `lead_time_weeks` is not read (§26.2 rule 3).
     {
         "key": "lane_lead_time_dist",
         "scopes": ("supplier",),
@@ -841,10 +841,31 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "family": "demand",
         "target": "CustomerLink.forecast",
         "catalog_ref": "P-C.4",
-        "transform": "empty = the engine's rule (forecast when the row has an uploaded "
+        "transform": "empty = the engine's rule (the row's requested delivery schedule "
+                     "when one is entered, else its forecast when it has an uploaded "
                      "series, else model). Enum — 'model' plans and draws on the row's mean even when a forecast "
                      "series is uploaded (the series is set aside); 'forecast' uses the "
-                     "series and is warned and ignored when the row has none",
+                     "series and is warned and ignored when the row has none; 'schedule' "
+                     "runs the row's requested delivery schedule (row_demand_schedule) "
+                     "exactly, and is warned and ignored when none is entered",
+    },
+    {
+        # The customer's REQUESTED DELIVERY SCHEDULE: quantities the customer has
+        # asked for, week by week, typed on /policies. Not a master override —
+        # nothing is uploaded for it — and not a forecast: it is firm, so the row
+        # draws nothing around it (deterministic) and is zero past its end.
+        "key": "row_demand_schedule",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.forecast",
+        "catalog_ref": "P-C.4",
+        "transform": "array of units per week, one per simulated week from week 1, each "
+                     ">= 0. Runs when row_demand_mode is 'schedule' or empty: the row's "
+                     "demand becomes exactly the schedule (deterministic, forecast = the "
+                     "schedule, mean 0 so a week past its end has no demand); the row's "
+                     "distribution, variation, bounds and any uploaded forecast are set "
+                     "aside. A non-array or a negative / non-numeric week is warned and "
+                     "the row keeps its forecast or model",
     },
     {
         "key": "row_demand_distribution",
@@ -1013,13 +1034,13 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
                      "no FG stock). Order: the Plant-stage row -> products.fulfillment_mode -> "
                      "projects.supply_chain_model -> mto",
     },
-    # ── P-P.13 production lead time (PLAN.md §25 WP 15.5, D292) ─────────────
+    # ── P-P.13 production lead time (PLAN.md §26 WP 16.5, D300) ─────────────
     # The Plant row's Production group, over the `products` master, chosen like a
     # lane's lead time (one grid helper, `leadTimeParamFor`). Named `prod_…`: the
     # legacy `production` family already carries an unread
     # `production_lead_time_min/max` in days with Zod defaults. A bounded shape's
     # planning lead time is its bounds' mean, so the row's lead time is then not
-    # read (§25.2 rule 3). A product that sets none completes in the week it starts.
+    # read (§26.2 rule 3). A product that sets none completes in the week it starts.
     {
         "key": "prod_lead_time_weeks",
         "scopes": ("plant",),
@@ -1420,7 +1441,7 @@ def _override_num(
     return n
 
 
-# ── A lane's lead-time spread (PLAN.md §25 WP 15.2, D291, blueprint P-S.6) ──
+# ── A lane's lead-time spread (PLAN.md §26 WP 16.2, D299, blueprint P-S.6) ──
 _LANE_LT_DISTS = ("deterministic", "normal", "lognormal", "gamma", "triangular", "uniform")
 _LT_SPREAD_KEYS = ("lane_lead_time_dist", "lane_lead_time_cv", "lane_lead_time_min_weeks",
                    "lane_lead_time_mode_weeks", "lane_lead_time_max_weeks")
@@ -1432,7 +1453,7 @@ def _lane_lead_time_spread(
     """The lane's lead-time SHAPE as the engine receives it, its planning lead
     time when the shape fixes one, and where every part came from.
 
-    Order (§25.2 rule 5), per part: the Supplier row (``row``, the lane's
+    Order (§26.2 rule 5), per part: the Supplier row (``row``, the lane's
     ``sourcing`` patch) → the lane's upload → (shape and CV only) the material's
     master → deterministic. A shape the row or the lane chose that lacks a
     parameter it reads is WARNED and the lane runs deterministic — never a
@@ -1440,10 +1461,10 @@ def _lane_lead_time_spread(
     (a missing CV is "no spread", silently), so a project that states no lane or
     row spread maps byte-identically — except that a material CV above the
     engine's bound of 1 is now clamped to 1 and warned instead of failing the
-    run (§4 D294).
+    run (§4 D302).
 
     Returns ``(link_fields, planning_weeks, resolved)``: ``planning_weeks`` is the
-    bounded shape's mean (§25.2 rule 3), else None (the lane's lead time stands);
+    bounded shape's mean (§26.2 rule 3), else None (the lane's lead time stands);
     ``resolved`` maps each lane column to ``(source, value)`` — the value each
     /policies cell must show (page-equals-run), whether or not the chosen shape
     reads it.
@@ -1491,7 +1512,7 @@ def _lane_lead_time_spread(
             w.append(MappingWarning(
                 "warn", ent, "lead_time_cv",
                 f"material lead-time CV {cv:g} is above the engine's bound of 1 → used as 1 "
-                f"(§4 D294)"))
+                f"(§4 D302)"))
             cv = 1.0
     src["lead_time_cv"] = cv_src
 
@@ -1552,7 +1573,7 @@ def _lane_lead_time_spread(
     return out, None, _resolved()
 
 
-# ── P-P.13 production lead time (PLAN.md §25 WP 15.5, D292) ───────────────────
+# ── P-P.13 production lead time (PLAN.md §26 WP 16.5, D300) ───────────────────
 
 def _product_lead_time(
     p: "ProductRow", row: dict, tally: "_SourceTally", w: list[MappingWarning],
@@ -1563,9 +1584,9 @@ def _product_lead_time(
     Order, per part: the Plant row → the product master (in
     `production_lead_time_unit`) → the default (0 weeks, deterministic). A shape
     lacking a parameter it reads runs deterministic, warned; a bounded shape plans
-    on its bounds' mean (§25.2 rule 3) and the row's lead time is then not read.
+    on its bounds' mean (§26.2 rule 3) and the row's lead time is then not read.
     Returns only the fields that differ from the entity defaults, so a product
-    that states nothing maps — and serializes — exactly as before Phase 15. The
+    that states nothing maps — and serializes — exactly as before Phase 16. The
     sources are counted in the run log only when the product states something.
     """
     ent = f"product:{p.id}"
@@ -2120,6 +2141,31 @@ def _tally_row_allocation(
             tally.value("customers.sla_fill_floor_pct", rid, None)
 
 
+def _row_schedule(raw: Any, ent: str, w: list[MappingWarning]) -> Optional[list[float]]:
+    """A Customer row's requested delivery schedule (`row_demand_schedule`):
+    units per week from week 1 — or None when there is none, or it is not one."""
+    if raw is None or raw == "" or raw == []:
+        return None
+    if not isinstance(raw, (list, tuple)):
+        w.append(MappingWarning("warn", ent, "row_demand_schedule",
+                                f"/policies delivery schedule {raw!r} is not a list of weekly "
+                                f"quantities — ignored"))
+        return None
+    out: list[float] = []
+    for i, v in enumerate(raw):
+        try:
+            n = 0.0 if v is None or v == "" else float(v)
+        except (TypeError, ValueError):
+            n = float("nan")
+        if not math.isfinite(n) or n < 0:
+            w.append(MappingWarning("warn", ent, "row_demand_schedule",
+                                    f"/policies delivery schedule week {i + 1} is {v!r}, not a "
+                                    f"quantity >= 0 — the schedule is ignored"))
+            return None
+        out.append(n)
+    return out
+
+
 def _apply_row_demand_overrides(
     row_spec: dict[tuple[str, str], dict[str, Any]], policies: dict,
     tally: "_SourceTally", w: list[MappingWarning],
@@ -2136,7 +2182,8 @@ def _apply_row_demand_overrides(
     overrides: dict[tuple[str, str], dict[str, Any]] = {}
     for key in sorted(k for k in policies if isinstance(k, str) and k.startswith("node:")):
         patch = (policies.get(key) or {}).get("demand") or {}
-        if not isinstance(patch, dict) or not any(f in patch for f in (*_ROW_OVERRIDE_FIELD, "row_demand_mode")):
+        if not isinstance(patch, dict) or not any(
+                f in patch for f in (*_ROW_OVERRIDE_FIELD, "row_demand_mode", "row_demand_schedule")):
             continue
         cid, sep, pid = key[len("node:"):].partition("::")
         if not sep or not cid or not pid:
@@ -2182,7 +2229,20 @@ def _apply_row_demand_overrides(
                 spec[field] = n
             src[field] = "override"
         mode = patch.get("row_demand_mode")
-        if mode == "model" and spec.get("forecast") is not None:
+        schedule = _row_schedule(patch.get("row_demand_schedule"), ent, w)
+        if mode == "schedule" and schedule is None:
+            w.append(MappingWarning("warn", ent, "row_demand_mode",
+                                    "/policies sets this row to a requested delivery schedule, "
+                                    "and none is entered — the row keeps its forecast or model"))
+        if schedule is not None and mode in (None, "", "schedule"):
+            # The requested delivery schedule IS the row's demand: firm, so no
+            # spread around it, and nothing past its end.
+            for f in ("demand_variation", "demand_min", "demand_max"):
+                spec.pop(f, None)
+            spec.update(demand_model="deterministic", forecast=schedule, demand_mean=0.0)
+            for f in _ROW_OVERRIDE_FIELD.values():
+                src[f] = "override"
+        elif mode == "model" and spec.get("forecast") is not None:
             spec.pop("forecast")
             if spec.get("demand_model") is None:
                 spec["demand_model"] = "deterministic"
@@ -2325,7 +2385,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
         if n is not None:
             row_lead[(sup_id, mat_id)] = n
     lt_source: dict[tuple[str, str], str] = {}
-    # The Supplier row's lead-time SPREAD cells (§25 WP 15.2), per lane, read
+    # The Supplier row's lead-time SPREAD cells (§26 WP 16.2), per lane, read
     # exactly like `lead_time_weeks` above — each by its literal key so the D90
     # gate sees the reads.
     row_sourcing: dict[tuple[str, str], dict[str, Any]] = {}
@@ -2371,7 +2431,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
             w.append(MappingWarning("warn", f"supply:{arc.supplier_id}->{arc.material_id}",
                                     "lead_time", "missing lead_time → defaulted to 2 weeks"))
         mrow = mat_lt_dist.get(arc.material_id)
-        # The lane's SHAPE (PLAN.md §25 WP 15.2): the row → the lane's upload →
+        # The lane's SHAPE (PLAN.md §26 WP 16.2): the row → the lane's upload →
         # the material → deterministic. A bounded shape fixes the planning lead
         # time at its bounds' mean, which then wins over the row's lead time.
         spread, planning_lt, spread_src = _lane_lead_time_spread(
@@ -2437,7 +2497,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
     # overrides none logs exactly as before the key existed.
     any_lead_override = "override" in lt_source.values()
     # The spread is counted only when some lane states one of its own (row or
-    # upload), so a project that sets none logs exactly as before Phase 15.
+    # upload), so a project that sets none logs exactly as before Phase 16.
     any_spread = any(sv[0] in ("override", "master")
                      for srcs in spread_source.values() for sv in srcs.values())
     for (sup_id, mat_id), link in sorted(links_by_key.items()):
@@ -2725,7 +2785,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
             w.append(MappingWarning("info", f"product:{p.id}", "fg_policy",
                                     "FG policy / levels are set but the product is MTO — an MTO "
                                     "product holds no finished-goods stock, so they are not read"))
-        # P-P.13 (§25 WP 15.5) — each override read as a literal (the D90 gate).
+        # P-P.13 (§26 WP 16.5) — each override read as a literal (the D90 gate).
         plt = _product_lead_time(p, {
             "prod_lead_time_weeks": prod_row.get("prod_lead_time_weeks"),
             "prod_lead_time_dist": prod_row.get("prod_lead_time_dist"),

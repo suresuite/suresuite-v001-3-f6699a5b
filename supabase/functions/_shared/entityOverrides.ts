@@ -38,7 +38,7 @@ export const ENUM_DOMAIN_VALUES: Record<EnumDomain, readonly string[]> = {
   fg_policy: ["base_stock", "min_max", "days_of_cover"],
   // Whether the product holds FG stock — `project_map._MODE_OVERRIDE_TOKENS`.
   fulfillment_mode: ["mts", "mto"],
-  // PLAN.md §25 WP 15.2 — a lane's lead-time shape, `project_map._LANE_LT_DISTS`.
+  // PLAN.md §26 WP 16.2 — a lane's lead-time shape, `project_map._LANE_LT_DISTS`.
   lead_time_distribution: ["deterministic", "normal", "lognormal", "gamma", "triangular", "uniform"],
 };
 export const isEnumDomain = (d: OverrideDomain): d is EnumDomain =>

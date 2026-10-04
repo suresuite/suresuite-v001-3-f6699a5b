@@ -19,6 +19,8 @@
 //      engine chip, started relative time, result/error, and per-row
 //      Cancel / View / Retry (queued rows also show their queue position).
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { engineDocHref } from "@/lib/sim/engineChanges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -308,10 +310,12 @@ function JobRow({
       </div>
 
       <div className="flex flex-col gap-0.5 min-w-[7rem]">
-        <Badge variant="outline" className={cn("text-[10px] w-fit", eng.cls)}>
-          <Server className="h-3 w-3 mr-1" />
-          {eng.label}
-        </Badge>
+        <Link to={engineDocHref(job.code_version)} title="What this engine version changed" className="w-fit">
+          <Badge variant="outline" className={cn("text-[10px] w-fit", eng.cls)}>
+            <Server className="h-3 w-3 mr-1" />
+            {eng.label}
+          </Badge>
+        </Link>
         <span className="text-[10px] text-muted-foreground">{relativeTime(job.started_at ?? job.created_at)}</span>
       </div>
 

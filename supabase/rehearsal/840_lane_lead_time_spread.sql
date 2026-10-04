@@ -1,7 +1,7 @@
--- Phase 15 / WP 15.2 · A LANE'S OWN LEAD-TIME SPREAD LANDS, NORMALIZES AND
+-- Phase 16 / WP 16.2 · A LANE'S OWN LEAD-TIME SPREAD LANDS, NORMALIZES AND
 -- REACHES THE SNAPSHOT.
 --
--- `20261003000003` gives the lane's lead-time shape a home on `inbound_logistics`.
+-- `20261004000003` gives the lane's lead-time shape a home on `inbound_logistics`.
 -- What only a database can say:
 --
 --   1. An inbound upload carrying the five headers lands and is promoted by the
@@ -63,7 +63,7 @@ BEGIN
   v_run := (v_res ->> 'run_id')::uuid;
   v_res := public.ingest_apply_run(v_run, v_user);
   IF (v_res ->> 'rows_promoted')::int <> 3 THEN
-    RAISE EXCEPTION 'WP 15.2: the inbound promotion moved % row(s), expected 3 — %',
+    RAISE EXCEPTION 'WP 16.2: the inbound promotion moved % row(s), expected 3 — %',
       v_res ->> 'rows_promoted', v_res::text;
   END IF;
 
@@ -73,14 +73,14 @@ BEGIN
      AND round(lead_time, 6) = 4 AND round(lead_time_min, 6) = 2
      AND round(lead_time_mode, 6) = 3 AND round(lead_time_max, 6) = 7;
   IF v_n <> 1 THEN
-    RAISE EXCEPTION 'WP 15.2: S1 did not land triangular 2 / 3 / 7 weeks (lead time 4) from days — the bounds were not normalized at promotion (I3)';
+    RAISE EXCEPTION 'WP 16.2: S1 did not land triangular 2 / 3 / 7 weeks (lead time 4) from days — the bounds were not normalized at promotion (I3)';
   END IF;
   SELECT count(*) INTO v_n FROM public.inbound_logistics
    WHERE project_id = v_project AND supplier_id = 'S3'
      AND lead_time_dist IS NULL AND lead_time_cv IS NULL AND lead_time_min IS NULL
      AND lead_time_mode IS NULL AND lead_time_max IS NULL;
   IF v_n <> 1 THEN
-    RAISE EXCEPTION 'WP 15.2: S3 stated no spread and holds one';
+    RAISE EXCEPTION 'WP 16.2: S3 stated no spread and holds one';
   END IF;
 
   -- ── 2 · re-promotion is idempotent ──────────────────────────────────────
@@ -92,11 +92,11 @@ BEGIN
    WHERE project_id = v_project AND supplier_id = 'S1'
      AND round(lead_time_min, 6) = 2 AND round(lead_time_max, 6) = 7;
   IF v_n <> 1 THEN
-    RAISE EXCEPTION 'WP 15.2: re-promoting the same file moved S1''s bounds — they were converted twice';
+    RAISE EXCEPTION 'WP 16.2: re-promoting the same file moved S1''s bounds — they were converted twice';
   END IF;
   SELECT count(*) INTO v_n FROM public.inbound_logistics WHERE project_id = v_project;
   IF v_n <> 3 THEN
-    RAISE EXCEPTION 'WP 15.2: re-promotion left % lanes, expected 3 (natural key upsert)', v_n;
+    RAISE EXCEPTION 'WP 16.2: re-promotion left % lanes, expected 3 (natural key upsert)', v_n;
   END IF;
 
   -- ── 3 · the CHECK refuses a bad ordering and an unknown shape ───────────
@@ -115,19 +115,19 @@ BEGIN
     v_failed := true;
   END;
   IF NOT v_failed THEN
-    RAISE EXCEPTION 'WP 15.2: a lane with min 6 > max 2 was promoted';
+    RAISE EXCEPTION 'WP 16.2: a lane with min 6 > max 2 was promoted';
   END IF;
   BEGIN
     UPDATE public.inbound_logistics SET lead_time_dist = 'weibull'
      WHERE project_id = v_project AND supplier_id = 'S3';
-    RAISE EXCEPTION 'WP 15.2: lead_time_dist = weibull was accepted';
+    RAISE EXCEPTION 'WP 16.2: lead_time_dist = weibull was accepted';
   EXCEPTION WHEN check_violation THEN
     NULL;
   END;
   BEGIN
     UPDATE public.inbound_logistics SET lead_time_cv = 1.5
      WHERE project_id = v_project AND supplier_id = 'S3';
-    RAISE EXCEPTION 'WP 15.2: lead_time_cv = 1.5 was accepted (the engine bounds it at 1, §4 D294)';
+    RAISE EXCEPTION 'WP 16.2: lead_time_cv = 1.5 was accepted (the engine bounds it at 1, §4 D302)';
   EXCEPTION WHEN check_violation THEN
     NULL;
   END;
@@ -137,12 +137,12 @@ BEGIN
   SELECT e INTO v_lane FROM jsonb_array_elements(v_snap -> 'inputs' -> 'inbound') e
    WHERE e ->> 'supplier_id' = 'S2';
   IF v_lane ->> 'lead_time_dist' IS DISTINCT FROM 'normal' OR (v_lane ->> 'lead_time_cv')::numeric <> 0.25 THEN
-    RAISE EXCEPTION 'WP 15.2: the snapshot does not carry S2''s spread — %', v_lane::text;
+    RAISE EXCEPTION 'WP 16.2: the snapshot does not carry S2''s spread — %', v_lane::text;
   END IF;
   SELECT e INTO v_lane FROM jsonb_array_elements(v_snap -> 'inputs' -> 'inbound') e
    WHERE e ->> 'supplier_id' = 'S3';
   IF v_lane ?| ARRAY['lead_time_dist', 'lead_time_cv', 'lead_time_min', 'lead_time_mode', 'lead_time_max'] THEN
-    RAISE EXCEPTION 'WP 15.2: a lane that states no spread carries spread keys — its hash would move: %', v_lane::text;
+    RAISE EXCEPTION 'WP 16.2: a lane that states no spread carries spread keys — its hash would move: %', v_lane::text;
   END IF;
 END
 $wp152$;

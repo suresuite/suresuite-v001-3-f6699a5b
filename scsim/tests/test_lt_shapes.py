@@ -3,7 +3,7 @@
 # release; see scsim/NOTICE.md for licensing, funding and citation.
 # Developed in part within the ACCURATE project (Horizon Europe, GA 101138269).
 
-"""Supplier lead-time shapes chosen like demand — PLAN.md §25 WP 15.1 (P-S.6).
+"""Supplier lead-time shapes chosen like demand — PLAN.md §26 WP 16.1 (P-S.6).
 
 normal (mean + CV, raised to 1 week and counted), triangular (min, mode, max)
 and uniform (min, max) join deterministic / lognormal / gamma. Their variates

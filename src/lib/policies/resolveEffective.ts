@@ -98,7 +98,7 @@ export interface DerivedMaps {
   /** `materials.cost`'s derived value WITH the step that answered (§23 WP 13.4),
    *  so a lane-derived cost is shown with its source. Optional, like the above. */
   materialCostVia?: Map<string, DerivedValue>;
-  /** PLAN.md §25 WP 15.2 — the material's lead-time shape under a lane that
+  /** PLAN.md §26 WP 16.2 — the material's lead-time shape under a lane that
    *  states none (`laneSpreadFromMaterials`), keyed `<supplier>::<material>`. */
   laneSpread?: Map<string, { lead_time_dist?: string; lead_time_cv?: number }>;
 }
@@ -175,7 +175,7 @@ export function derivedValueFor(
   // Nor does a lane's lead time: an empty one runs at the engine's declared 2
   // weeks, which the cell shows as that default — never an average of other
   // lanes (§4 D189 (a)).
-  // A lane's lead-time CV falls back to its MATERIAL's (§25 WP 15.2).
+  // A lane's lead-time CV falls back to its MATERIAL's (§26 WP 16.2).
   if (col.master.table === "inbound_logistics" && col.master.field === "lead_time_cv") {
     return derived.laneSpread?.get(masterIdOf(col, row))?.lead_time_cv;
   }
@@ -205,7 +205,7 @@ export function derivedValueFor(
 }
 
 /** `derivedValueFor` for any master — an enum token where the derived step is a
- *  shape (a lane's lead-time shape from its material, §25 WP 15.2). */
+ *  shape (a lane's lead-time shape from its material, §26 WP 16.2). */
 export function derivedRawFor(
   col: ColSpec,
   row: Record<string, unknown>,
@@ -220,14 +220,14 @@ export function derivedRawFor(
 /**
  * The planning lead time of a row whose lead-time shape is BOUNDED (triangular,
  * uniform) — the bounds' mean in the engine's whole weeks, or undefined. On such
- * a row the engine does not read the Lead time cell (§25.2 rule 3), so the cell
+ * a row the engine does not read the Lead time cell (§26.2 rule 3), so the cell
  * shows this, derived and read-only. `resolved` is the row's gate context (the
  * shape and bounds as the cells show them, drafts included).
  */
 export function rowBoundedLeadTime(
   ctx: ColSpecCtx | undefined,
   /** `lane` — a Supplier row's lead time (1–51 weeks); `prod` — a Plant row's
-   *  production lead time (0–26 weeks, PLAN.md §25 WP 15.5). */
+   *  production lead time (0–26 weeks, PLAN.md §26 WP 16.5). */
   which: "lane" | "prod" = "lane",
 ): number | undefined {
   const r = ctx?.resolved;
@@ -505,18 +505,32 @@ export function rowGateCtx(args: {
       defaults: args.defaults, overrides: args.overrides, scope: args.scope,
     });
   }
-  // The Customer row's demand mode, as the ENGINE resolves it: a draft or saved
-  // override of `row_demand_mode`, else `forecast` when the row has an uploaded
-  // series and `model` when it has none. `forecast` without a series is
-  // ignored by the engine (it runs the model), so it resolves to `model` here
-  // too — the cell must never claim a forecast the run does not have.
+  // The Customer row's demand mode, as the ENGINE resolves it
+  // (`project_map._apply_row_demand_overrides`): a draft or saved override of
+  // `row_demand_mode`, else `schedule` when the row has a requested delivery
+  // schedule entered, else `forecast` when it has an uploaded series, else
+  // `model`. `forecast` without a series is ignored by the engine (it runs the
+  // model), so it resolves to `model` here too — the cell must never claim a
+  // forecast the run does not have. `schedule` is always choosable: the
+  // schedule is typed here, and an empty one is what the pre-run gate refuses.
   if (row.customer_id != null && row.product_id != null) {
     const base = args.masterRowById.outbound_logistics?.get(`${String(row.customer_id)}::${String(row.product_id)}`);
     const hasForecast = base?.demand_mode === "forecast";
     const chosen = draft?.row_demand_mode ?? args.effective?.row_demand_mode;
-    const mode = chosen === "model" ? "model" : chosen === "forecast" || hasForecast ? "forecast" : "model";
+    const schedule = draft?.row_demand_schedule !== undefined
+      ? draft.row_demand_schedule
+      : args.effective?.row_demand_schedule;
+    const hasSchedule = Array.isArray(schedule) && schedule.length > 0;
     resolved.has_forecast = hasForecast;
-    resolved.row_demand_mode = hasForecast ? mode : "model";
+    resolved.has_schedule = hasSchedule;
+    resolved.row_demand_mode =
+      chosen === "schedule" || ((chosen == null || chosen === "") && hasSchedule)
+        ? "schedule"
+        : chosen === "model"
+          ? "model"
+          : hasForecast
+            ? "forecast"
+            : "model";
   }
   return {
     fulfillmentStrategy: args.fulfillmentStrategy,
@@ -558,7 +572,7 @@ export function resolveCell(args: {
   });
 
   // A BOUNDED lane's lead time is its bounds' mean and the engine reads no
-  // override or upload for it (§25.2 rule 3): the cell shows that, derived.
+  // override or upload for it (§26.2 rule 3): the cell shows that, derived.
   if ((col.field === "lead_time_weeks" || col.field === "prod_lead_time_weeks") && col.master) {
     const bounded = rowBoundedLeadTime(args.gate, col.field === "prod_lead_time_weeks" ? "prod" : "lane");
     if (bounded !== undefined) {

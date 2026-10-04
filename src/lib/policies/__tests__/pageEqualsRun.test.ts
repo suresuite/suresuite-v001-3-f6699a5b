@@ -70,7 +70,7 @@ const derived: DerivedMaps = {
   sellPrice: demandWeightedSellPrice(T.outbound),
   demandMean: weeklyDemand(T.outbound),
   productionCapacity: derivedProductionCapacity(T.products, T.outbound, defaults as unknown as Row, overrides as unknown as Row[]),
-  // PLAN.md §25 WP 15.3 — the material's lead-time shape under a lane with none.
+  // PLAN.md §26 WP 16.3 — the material's lead-time shape under a lane with none.
   laneSpread: laneSpreadFromMaterials(T.inbound, T.materials),
 };
 
@@ -103,7 +103,7 @@ function cells() {
         const engine = FX.engine[`${col.master!.table}.${col.master!.field}`]?.[id];
         const families = familiesForStage(stage) as PolicyFamily[];
         // The row's gate context, as the grid builds it — a bounded lane's
-        // Lead time depends on its shape and bounds (§25 WP 15.3).
+        // Lead time depends on its shape and bounds (§26 WP 16.3).
         const gate = rowGateCtx({
           rowKey: String(row.key), row, projectFulfillmentMode: "mto", families,
           masterColByField, masterRowById: masters, derived, defaults, overrides, scope: "node",

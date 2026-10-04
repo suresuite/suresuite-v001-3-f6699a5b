@@ -16,7 +16,7 @@ reference scenario's trace and per-item matrices into
 Values are rounded to 9 decimals before hashing — the guard is against
 behaviour, not against a different CPU's last ulp.
 
-A DELIBERATE change (an ENGINE_VERSION bump recorded in ADR 0002 and §16)
+A DELIBERATE change (an ENGINE_VERSION bump with its scsim/CHANGELOG.yaml entry)
 regenerates the file and names the scenarios that moved::
 
     SCSIM_WRITE_GOLDEN=1 python -m pytest tests/test_golden_digests.py
@@ -215,5 +215,5 @@ def test_golden_digest_unchanged(name):
     frozen = json.loads(DIGESTS.read_text())
     assert digest(SCENARIOS[name]) == frozen[name], (
         f"{name}: the engine's behaviour moved. If deliberate, bump ENGINE_VERSION, "
-        f"record it in ADR 0002 and PLAN.md §16, and regenerate with SCSIM_WRITE_GOLDEN=1."
+        f"add its entry to scsim/CHANGELOG.yaml (goldens_moved names this run), and regenerate with SCSIM_WRITE_GOLDEN=1."
     )

@@ -107,7 +107,11 @@ def _log_engine_mode() -> None:
         return
     from scsim import ENGINE_VERSION  # ImportError here must kill the worker
 
-    log.info("engine mode: scsim %s (SCSIM_ENGINE=1)", ENGINE_VERSION)
+    from sim_worker.build import code_version
+
+    # WP 15.1 — the build too, so a deploy log says exactly what runs.
+    log.info("engine mode: scsim %s (SCSIM_ENGINE=1) · build %s · commit %s",
+             ENGINE_VERSION, code_version(), os.environ.get("GIT_SHA") or "unknown")
 
 
 async def main() -> None:

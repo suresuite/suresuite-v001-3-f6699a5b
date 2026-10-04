@@ -1,7 +1,7 @@
--- Phase 15 / WP 15.5 · A PRODUCT'S PRODUCTION LEAD TIME LANDS, NORMALIZES AND
+-- Phase 16 / WP 16.5 · A PRODUCT'S PRODUCTION LEAD TIME LANDS, NORMALIZES AND
 -- REACHES THE SNAPSHOT.
 --
--- `20261003000004` gives P-P.13's production lead time and its shape a home on
+-- `20261004000004` gives P-P.13's production lead time and its shape a home on
 -- `products`. What only a database can say:
 --
 --   1. A products upload carrying the headers lands and is promoted by the
@@ -56,7 +56,7 @@ BEGIN
     'products.csv', 'ingest', 'p/wp155/p.csv', 'text/csv', 128, repeat('e', 64), v_rows);
   v_res := public.ingest_apply_run((v_res ->> 'run_id')::uuid, v_user);
   IF (v_res ->> 'rows_promoted')::int <> 3 THEN
-    RAISE EXCEPTION 'WP 15.5: the products promotion moved % row(s), expected 3 — %',
+    RAISE EXCEPTION 'WP 16.5: the products promotion moved % row(s), expected 3 — %',
       v_res ->> 'rows_promoted', v_res::text;
   END IF;
 
@@ -66,20 +66,20 @@ BEGIN
      AND round(production_lead_time_min, 6) = 1 AND round(production_lead_time_mode, 6) = 2
      AND round(production_lead_time_max, 6) = 4 AND production_lead_time_dist = 'triangular';
   IF v_n <> 1 THEN
-    RAISE EXCEPTION 'WP 15.5: P1 did not land 2 weeks, triangular 1 / 2 / 4 weeks from days (I3)';
+    RAISE EXCEPTION 'WP 16.5: P1 did not land 2 weeks, triangular 1 / 2 / 4 weeks from days (I3)';
   END IF;
   SELECT count(*) INTO v_n FROM public.products
    WHERE project_id = v_project AND product_id = 'P3'
      AND production_lead_time IS NULL AND production_lead_time_dist IS NULL;
   IF v_n <> 1 THEN
-    RAISE EXCEPTION 'WP 15.5: P3 stated no production lead time and holds one';
+    RAISE EXCEPTION 'WP 16.5: P3 stated no production lead time and holds one';
   END IF;
   -- The promotion states the canonical unit on every row of the run (I3), P3
   -- included — which is why the snapshot carries the unit only beside a duration (§4).
   SELECT count(*) INTO v_n FROM public.products
    WHERE project_id = v_project AND product_id = 'P3' AND production_lead_time_unit = 'week';
   IF v_n <> 1 THEN
-    RAISE EXCEPTION 'WP 15.5: the promotion did not stamp the canonical unit on P3 — the snapshot rule below is guarding nothing';
+    RAISE EXCEPTION 'WP 16.5: the promotion did not stamp the canonical unit on P3 — the snapshot rule below is guarding nothing';
   END IF;
 
   -- ── 2 · re-promotion is idempotent ──────────────────────────────────────
@@ -91,7 +91,7 @@ BEGIN
    WHERE project_id = v_project AND product_id = 'P1'
      AND round(production_lead_time, 6) = 2 AND round(production_lead_time_max, 6) = 4;
   IF v_n <> 1 THEN
-    RAISE EXCEPTION 'WP 15.5: re-promoting the same file moved P1''s production lead time — converted twice';
+    RAISE EXCEPTION 'WP 16.5: re-promoting the same file moved P1''s production lead time — converted twice';
   END IF;
 
   -- ── 3 · the CHECK refuses a bad ordering, a shape and a CV ──────────────
@@ -103,19 +103,19 @@ BEGIN
     v_failed := true;
   END;
   IF NOT v_failed THEN
-    RAISE EXCEPTION 'WP 15.5: a product with min 9 > max 2 was accepted';
+    RAISE EXCEPTION 'WP 16.5: a product with min 9 > max 2 was accepted';
   END IF;
   BEGIN
     UPDATE public.products SET production_lead_time_dist = 'weibull'
      WHERE project_id = v_project AND product_id = 'P3';
-    RAISE EXCEPTION 'WP 15.5: production_lead_time_dist = weibull was accepted';
+    RAISE EXCEPTION 'WP 16.5: production_lead_time_dist = weibull was accepted';
   EXCEPTION WHEN check_violation THEN
     NULL;
   END;
   BEGIN
     UPDATE public.products SET production_lead_time_cv = 1.2
      WHERE project_id = v_project AND product_id = 'P3';
-    RAISE EXCEPTION 'WP 15.5: production_lead_time_cv = 1.2 was accepted';
+    RAISE EXCEPTION 'WP 16.5: production_lead_time_cv = 1.2 was accepted';
   EXCEPTION WHEN check_violation THEN
     NULL;
   END;
@@ -126,14 +126,14 @@ BEGIN
    WHERE e ->> 'product_id' = 'P2';
   IF v_p ->> 'production_lead_time_dist' IS DISTINCT FROM 'normal'
      OR (v_p ->> 'production_lead_time')::numeric <> 3 THEN
-    RAISE EXCEPTION 'WP 15.5: the snapshot does not carry P2''s production lead time — %', v_p::text;
+    RAISE EXCEPTION 'WP 16.5: the snapshot does not carry P2''s production lead time — %', v_p::text;
   END IF;
   SELECT e INTO v_p FROM jsonb_array_elements(v_snap -> 'inputs' -> 'products') e
    WHERE e ->> 'product_id' = 'P3';
   IF v_p ?| ARRAY['production_lead_time', 'production_lead_time_unit', 'production_lead_time_dist',
                   'production_lead_time_cv', 'production_lead_time_min', 'production_lead_time_mode',
                   'production_lead_time_max'] THEN
-    RAISE EXCEPTION 'WP 15.5: a product that states no production lead time carries its keys — its hash would move: %', v_p::text;
+    RAISE EXCEPTION 'WP 16.5: a product that states no production lead time carries its keys — its hash would move: %', v_p::text;
   END IF;
 END
 $wp155$;

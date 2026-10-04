@@ -187,8 +187,8 @@ export function useDataMap(projectId: string | null | undefined) {
           ? { status: "default" as const, detail: `0/${inbound.length} lanes state a unit — lead time read as weeks` }
           : { status: "ok" as const, detail: `${set.length}/${inbound.length} lanes state a unit (${units.join(", ")}); the rest read as weeks` };
       })(),
-      // WP 15.2 — a lane with no spread of its own is not a gap: it runs on its
-      // material's shape, else deterministic, as every lane did before Phase 15.
+      // WP 16.2 — a lane with no spread of its own is not a gap: it runs on its
+      // material's shape, else deterministic, as every lane did before Phase 16.
       inbound_lead_time_spread: (() => {
         if (inbound.length === 0) return { status: "missing" as const, detail: "no lanes uploaded" };
         const set = inbound.filter((r) => (r.lead_time_dist ?? "") !== "").length;
@@ -254,7 +254,7 @@ export function useDataMap(projectId: string | null | undefined) {
         { status: "default", detail: "the Plant grid's line capacity if set, else max(2·demand, 1000) — capacity never binds" },
       ),
       product_fulfillment_mode: masterField(prods, "fulfillment_mode", { status: "default", detail: "projects.supply_chain_model, else MTO" }),
-      // WP 15.5 — a product with no production lead time completes in the week it starts.
+      // WP 16.5 — a product with no production lead time completes in the week it starts.
       product_production_lead_time: masterField(prods, "production_lead_time", { status: "default", detail: "0 weeks — completes in the week it starts" }),
       product_identity: (() => {
         if (prods.length === 0) return { status: "missing" as const, detail: "no product rows" };

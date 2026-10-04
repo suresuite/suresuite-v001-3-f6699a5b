@@ -198,7 +198,7 @@ export function MobileStagePolicyList({
       overrides,
       scope: spec.scope,
       familyDefault,
-      // A bounded lane's Lead time is its bounds' mean (PLAN.md §25 WP 15.3).
+      // A bounded lane's Lead time is its bounds' mean (PLAN.md §26 WP 16.3).
       gate,
     });
 

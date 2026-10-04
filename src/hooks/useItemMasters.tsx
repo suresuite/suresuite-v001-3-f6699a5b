@@ -56,7 +56,7 @@ export interface ProductRow extends RowSource {
   fg_reorder_point?: number | null; // s, units (min_max)
   fg_cover_days?: number | null; // D, days (days_of_cover)
   fg_initial_on_hand?: number | null; // units
-  // PLAN.md §25 WP 15.5 — P-P.13 production lead time (weeks after promotion).
+  // PLAN.md §26 WP 16.5 — P-P.13 production lead time (weeks after promotion).
   production_lead_time?: number | null;
   production_lead_time_unit?: string | null;
   production_lead_time_dist?: string | null;

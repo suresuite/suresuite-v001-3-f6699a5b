@@ -1,0 +1,198 @@
+# AUTHORED — the data contract's sidecar for `sim_engine_builds`.
+# PLAN.md §25 · WP 15.2 · §4 D292. Edit this file; docs/data/tables/*.md is generated from it.
+table: sim_engine_builds
+tier: reference
+schema_name: public
+grain: >-
+  One row per engine build that produced a result or was reported running, keyed
+  by (engine, code_version). Append-only: `last_seen_at` moves forward, a part the
+  row did not know is filled once, and a build found wrong is WITHDRAWN with a
+  reason, never deleted. The CURRENT build is not stored here — it is
+  `sim_engines.code_version`, which the worker's boot report authors.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "sim_engine_builds_pkey"
+  - source: "table constraint 20261004000001_engine_build_ledger.sql"
+    columns: [engine_id, code_version]
+    name: "sim_engine_builds_key"
+
+natural_key_intended: [engine_id, code_version]
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    A registry, like `sim_engines`: read by everyone through `sim_engine_builds_read`
+    (`USING (true)`, select only), written by no API role. Its one writer is
+    `_engine_build_record`, internal and service-only (D248), reached three ways:
+    the worker's boot report (`sim_engine_report`), an AFTER trigger on every run
+    row that names its build (the browser writes runs as anon), and the WP 15.2
+    backfill. The one human act, `sim_engine_build_withdraw`, is super-admin only
+    and records its actor in the row. Not audited: a reference table whose writers
+    name no person, with an append-only trigger instead of an audit trail.
+
+surfaces: []
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The build's id within the ledger. A run names its build by `(engine_id, code_version)`, the table's key, not by this id.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  engine_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The registered engine (`sim_engines`) the build belongs to.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  code_version:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The build, spelled exactly as a run's `code_version` is stamped. Since WP 15.1 it is `scsim-<ENGINE_VERSION>+<12 hex>`, a digest of scsim's source and the worker's compute path, so different code is a different build. A row from before WP 15.1 carries the bare label (`scsim-0.2.8`), which several builds shared; what ran under it is unknown, and the row says so by having no digests.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  scsim_digest:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      sha256 over scsim's source files, as the worker reported it. Filled once; NULL for a build no worker reported (a browser run, or history).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  sim_worker_digest:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      sha256 over the worker's compute-path modules (`sim_worker/build.py` `COMPUTE_MODULES`). Filled once; NULL as `scsim_digest`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  commit_sha:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The git commit of the first worker deploy that reported this build. Identical source from a later commit is the same build, so the first commit stands. NULL when no deploy stated one.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  image_digest:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The worker image (Fly) that first reported this build. Filled once.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  first_seen_by:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      How the ledger first learned of the build: `worker_report` (the boot report), `run` (a run row named it — the browser's builds arrive this way), or `backfill` (history, WP 15.2).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  first_seen_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the build was first recorded (for backfill, its earliest run).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  last_seen_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When a report or a run last named the build. Moves forward only.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  withdrawn_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When a super admin withdrew the build. NULL = not withdrawn. Never cleared.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  withdrawn_reason:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Why the build was withdrawn, as stated by the super admin. Shown wherever a result of the build is.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  withdrawn_by:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The super admin who withdrew the build (`approved_users`). Set to NULL if that user is later deleted.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

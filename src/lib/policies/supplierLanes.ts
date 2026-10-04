@@ -26,10 +26,10 @@ export function supplierLaneMasters(inbound: readonly Row[]): Map<string, Row> {
       supplier_id: link.supplier,
       material_id: link.material,
       // A bounded lane's planning lead time is DERIVED from its bounds, not the
-      // uploaded number (§25.2 rule 3) — the cell shows it as derived
+      // uploaded number (§26.2 rule 3) — the cell shows it as derived
       // (`rowBoundedLeadTime`), so the master slot is empty here.
       lead_time: link.leadSource === "master" ? link.leadWeeks : null,
-      // PLAN.md §25 WP 15.2 — the lane's own spread, in weeks.
+      // PLAN.md §26 WP 16.2 — the lane's own spread, in weeks.
       lead_time_dist: link.spread.dist,
       lead_time_cv: link.spread.cv,
       lead_time_min: link.spread.min,
@@ -44,7 +44,7 @@ export function supplierLaneMasters(inbound: readonly Row[]): Map<string, Row> {
  * The MATERIAL's lead-time shape under each lane that states none of its own —
  * the derived step of the lane spread chain (row → lane → material →
  * deterministic, `project_map._lane_lead_time_spread`). Keyed like the lanes.
- * A material CV above the engine's bound is shown as the 1 the run uses (§4 D294).
+ * A material CV above the engine's bound is shown as the 1 the run uses (§4 D302).
  */
 export function laneSpreadFromMaterials(
   inbound: readonly Row[],

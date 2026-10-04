@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 1007;
+export const REFERENCE_COLUMN_COUNT = 1024;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -3149,7 +3149,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc record_model_validation",
-        "evidence": "src/hooks/useModelValidation.tsx:513"
+        "evidence": "src/hooks/useModelValidation.tsx:547"
       },
       {
         "page": "DeveloperApi.tsx",
@@ -3164,12 +3164,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc record_validated_model (Save Validated Model, WP 10.3)",
-        "evidence": "src/hooks/useModelValidation.tsx:541"
+        "evidence": "src/hooks/useModelValidation.tsx:594"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc record_model_validation",
-        "evidence": "src/hooks/useModelValidation.tsx:513"
+        "evidence": "src/hooks/useModelValidation.tsx:547"
       }
     ],
     "governance": {
@@ -6813,7 +6813,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       "project_id",
       "level",
       "version_no",
-      "id"
+      "id",
+      "project_id",
+      "level",
+      "version_code"
     ],
     "naturalKeyIntended": [
       "project_id",
@@ -6824,6 +6827,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "graph_level_versions_level_check",
         "definition": "CHECK (level IN ('product', 'process', 'firm', 'simulation'))"
+      },
+      {
+        "name": "graph_level_versions_version_code_check",
+        "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')"
       }
     ],
     "ingestDataset": null,
@@ -7057,6 +7064,30 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the project's level first had this content — the first snapshot's `created_at`, so a backfilled row is dated by its history, not by the migration.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "version_code",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "\"Data 20260915\" for the `simulation` level — the code a person says. The UTC day this level first had this content (`YYYYMMDD`), and `-n` for the n-th content of the level first seen that day. Assigned by the numbering trigger, unique per project and level, and immutable once stored (a row that predates it learns it once, from the backfill).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -7547,7 +7578,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "lead_time_dist",
         "required": false,
         "validate": "one of deterministic, normal, lognormal, gamma, triangular, uniform — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "The SHAPE of this lane's lead time — deterministic, normal, lognormal, gamma, triangular or uniform (PLAN.md §25 WP 15.2, blueprint P-S.6). For deterministic, normal, lognormal and gamma, `lead_time` is the mean; a triangular or uniform lane IS its bounds, and its planning lead time is their mean. Blank: the material's shape (`materials.lead_time_dist`), else deterministic — how every lane ran before Phase 15.",
+        "meaning": "The SHAPE of this lane's lead time — deterministic, normal, lognormal, gamma, triangular or uniform (PLAN.md §26 WP 16.2, blueprint P-S.6). For deterministic, normal, lognormal and gamma, `lead_time` is the mean; a triangular or uniform lane IS its bounds, and its planning lead time is their mean. Blank: the material's shape (`materials.lead_time_dist`), else deterministic — how every lane ran before Phase 16.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -7584,7 +7615,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "lead_time_cv",
         "required": false,
         "validate": "numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "How much this lane's lead time varies, as a coefficient of variation — read by normal, lognormal and gamma only (PLAN.md §25 WP 15.2). Bounded 0–1, as the engine bounds it.",
+        "meaning": "How much this lane's lead time varies, as a coefficient of variation — read by normal, lognormal and gamma only (PLAN.md §26 WP 16.2). Bounded 0–1, as the engine bounds it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -7608,7 +7639,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "lead_time_min",
         "required": false,
         "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "A triangular or uniform lane's shortest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.2).",
+        "meaning": "A triangular or uniform lane's shortest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.2).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -7635,7 +7666,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "lead_time_mode",
         "required": false,
         "validate": "numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "A triangular lane's most likely lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular only (PLAN.md §25 WP 15.2).",
+        "meaning": "A triangular lane's most likely lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular only (PLAN.md §26 WP 16.2).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -7662,7 +7693,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "lead_time_max",
         "required": false,
         "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "A triangular or uniform lane's longest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.2).",
+        "meaning": "A triangular or uniform lane's longest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.2).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -10453,7 +10484,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "blank": "null",
         "engineField": "project_map.py::_map_supply -> SupplierLink.lead_time_dist",
         "engineMissingDefault": "deterministic",
-        "engineTransform": "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC. A lane's own shape (inbound_logistics.lead_time_dist) or the Supplier row's wins over it (PLAN.md §25 WP 15.2)",
+        "engineTransform": "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC. A lane's own shape (inbound_logistics.lead_time_dist) or the Supplier row's wins over it (PLAN.md §26 WP 16.2)",
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
@@ -10466,7 +10497,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unit": "coefficient of variation (dimensionless)",
         "csvHeader": "lead_time_cv",
         "required": false,
-        "validate": "numeric 0–1 — the engine's bound (§4 D294: a CV above 1 used to fail the run)",
+        "validate": "numeric 0–1 — the engine's bound (§4 D302: a CV above 1 used to fail the run)",
         "meaning": "How much the lead time varies, as a coefficient of variation. Read only when `lead_time_dist` is not deterministic: the engine skips sampling entirely when the distribution is deterministic or the CV is zero.",
         "primaryKey": false,
         "unique": false,
@@ -10479,7 +10510,7 @@ export const REFERENCE_TABLES: RefTable[] = [
             "visibleAs": null
           },
           {
-            "when": "above 1 (a value stored before the upload rule bounded it — §4 D294)",
+            "when": "above 1 (a value stored before the upload rule bounded it — §4 D302)",
             "value": "1.0, the engine's bound",
             "provenance": "default",
             "visibleAs": "MappingWarning on the run's mapping report"
@@ -10490,7 +10521,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "blank": "null",
         "engineField": "project_map.py::_map_supply -> SupplierLink.lead_time_cv",
         "engineMissingDefault": "0.0 — no variability, so no sampling",
-        "engineTransform": "float() when truthy, else 0.0; above 1 → 1, warned (§4 D294). A lane's own CV (inbound_logistics.lead_time_cv) or the Supplier row's wins over it (PLAN.md §25 WP 15.2)",
+        "engineTransform": "float() when truthy, else 0.0; above 1 → 1, warned (§4 D302). A lane's own CV (inbound_logistics.lead_time_cv) or the Supplier row's wins over it (PLAN.md §26 WP 16.2)",
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",
@@ -10966,6 +10997,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKey": [
       "id",
       "project_id",
+      "model_code",
+      "project_id",
       "policy_hash",
       "(COALESCE(hash_simulation, graph_hash))",
       "scenario_hash"
@@ -10999,6 +11032,14 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "model_validations_protocol_check",
         "definition": "CHECK (protocol IS NULL OR cardinality(public.validated_model_protocol_problems(protocol)) = 0)"
+      },
+      {
+        "name": "model_validations_planning_period_check",
+        "definition": "CHECK (planning_period IS NULL OR planning_period ~ '^[0-9]{4}Q[1-4]$')"
+      },
+      {
+        "name": "model_validations_model_code_check",
+        "definition": "CHECK ((planning_period IS NULL) = (model_code IS NULL) AND (model_code IS NULL OR model_code ~ ('^' || planning_period || '(-[0-9]+)?$')))"
       }
     ],
     "ingestDataset": null,
@@ -11006,12 +11047,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useModelValidation.tsx:333"
+        "evidence": "src/hooks/useModelValidation.tsx:366"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useModelValidation.tsx:333"
+        "evidence": "src/hooks/useModelValidation.tsx:366"
       }
     ],
     "governance": {
@@ -11932,6 +11973,54 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "planning_period",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The planning period the model is FOR (`2026Q3`), chosen by the modeller when the model is saved and never derived from a date — a model validated in October may be the Q3 model. CHECK `^[0-9]{4}Q[1-4]$`. Not part of `model_hash`: it names the model, it is not what the model is. NULL on a model saved before it existed, until it is set ONCE through `set_model_planning_period` (the immutability trigger's fill-once completion).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "model_code",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "\"2026Q3\", or \"2026Q3-2\" for the second model of that period in the project — the code a person says. Assigned by trigger whenever the period is set, unique per project, and never re-issued: the suffix is one past the highest stored for that period.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
         "computedBy": null
       }
     ]
@@ -16238,17 +16327,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:181"
+        "evidence": "src/hooks/usePolicies.tsx:185"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:181"
+        "evidence": "src/hooks/usePolicies.tsx:185"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:181"
+        "evidence": "src/hooks/usePolicies.tsx:185"
       }
     ],
     "governance": {
@@ -16661,17 +16750,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:182"
+        "evidence": "src/hooks/usePolicies.tsx:186"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:182"
+        "evidence": "src/hooks/usePolicies.tsx:186"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:182"
+        "evidence": "src/hooks/usePolicies.tsx:186"
       }
     ],
     "governance": {
@@ -17194,13 +17283,18 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "policy_versions_version_code_check",
+        "definition": "CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')"
+      }
+    ],
     "ingestDataset": null,
     "surfaces": [
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:510"
+        "evidence": "src/hooks/usePolicies.tsx:514"
       }
     ],
     "governance": {
@@ -17552,6 +17646,30 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "\"Policy v4\" — one number per CONTENT per project, in order of first appearance, assigned by a BEFORE INSERT trigger (so a direct insert numbers too). Rows saved before WP 10.2 that share a `policy_hash` share the number, because they are one model saved twice (§4 D241).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "version_code",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "\"Policy 20261004\" — the code a person says. The UTC day this CONTENT was first saved (`YYYYMMDD`), and `-n` for the n-th distinct content first saved that day. Rows of one content share it, as they share `version_no`. Assigned by the numbering trigger and STORED, so deleting an older same-day version never moves a surviving code; the suffix is one past the highest ever stored that day (WP 10.5 follow-up, `20261004000002`).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -18279,7 +18397,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "production_lead_time",
         "required": false,
         "validate": "numeric >= 0; blank lands nothing",
-        "meaning": "How long this product takes to make at the focal plant: output started in a week is finished stock L weeks later (P-P.13, PLAN.md §25 WP 15.5). A duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Empty is 0 — the product completes in the week it starts, which is how every product ran before Phase 15. For deterministic, normal, lognormal and gamma it is the mean; a triangular or uniform product plans on the mean of its bounds instead.",
+        "meaning": "How long this product takes to make at the focal plant: output started in a week is finished stock L weeks later (P-P.13, PLAN.md §26 WP 16.5). A duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Empty is 0 — the product completes in the week it starts, which is how every product ran before Phase 16. For deterministic, normal, lognormal and gamma it is the mean; a triangular or uniform product plans on the mean of its bounds instead.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -18313,7 +18431,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "production_lead_time_unit",
         "required": false,
         "validate": "one of the units public.unit_days() knows — enforced by the column's CHECK constraint",
-        "meaning": "The period `production_lead_time` and its bounds are quoted in — day, week, month, … (PLAN.md §25 WP 15.5). Blank means WEEKS, the convention `inbound_logistics.lead_time_unit` set. After promotion it reads `week`.",
+        "meaning": "The period `production_lead_time` and its bounds are quoted in — day, week, month, … (PLAN.md §26 WP 16.5). Blank means WEEKS, the convention `inbound_logistics.lead_time_unit` set. After promotion it reads `week`.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -18344,7 +18462,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "production_lead_time_dist",
         "required": false,
         "validate": "one of deterministic, normal, lognormal, gamma, triangular, uniform — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "The SHAPE of this product's production lead time — deterministic, normal, lognormal, gamma, triangular or uniform, chosen like a lane's lead time (PLAN.md §25 WP 15.5). Blank is deterministic.",
+        "meaning": "The SHAPE of this product's production lead time — deterministic, normal, lognormal, gamma, triangular or uniform, chosen like a lane's lead time (PLAN.md §26 WP 16.5). Blank is deterministic.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -18381,7 +18499,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "production_lead_time_cv",
         "required": false,
         "validate": "numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "How much the production lead time varies — read by normal, lognormal and gamma only (PLAN.md §25 WP 15.5). Bounded 0–1, as the engine bounds it.",
+        "meaning": "How much the production lead time varies — read by normal, lognormal and gamma only (PLAN.md §26 WP 16.5). Bounded 0–1, as the engine bounds it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -18405,7 +18523,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "production_lead_time_min",
         "required": false,
         "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "A triangular or uniform product's shortest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.5, P-P.13).",
+        "meaning": "A triangular or uniform product's shortest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.5, P-P.13).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -18432,7 +18550,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "production_lead_time_mode",
         "required": false,
         "validate": "numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "A triangular product's most likely production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular only (PLAN.md §25 WP 15.5, P-P.13).",
+        "meaning": "A triangular product's most likely production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular only (PLAN.md §26 WP 16.5, P-P.13).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -18459,7 +18577,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "production_lead_time_max",
         "required": false,
         "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
-        "meaning": "A triangular or uniform product's longest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.5, P-P.13).",
+        "meaning": "A triangular or uniform product's longest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.5, P-P.13).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -22995,6 +23113,395 @@ export const REFERENCE_TABLES: RefTable[] = [
     ]
   },
   {
+    "table": "sim_engine_builds",
+    "tier": "reference",
+    "tierName": "project-independent, versioned by vintage rather than by project",
+    "owner": "engine",
+    "grain": "One row per engine build that produced a result or was reported running, keyed by (engine, code_version). Append-only: `last_seen_at` moves forward, a part the row did not know is filled once, and a build found wrong is WITHDRAWN with a reason, never deleted. The CURRENT build is not stored here — it is `sim_engines.code_version`, which the worker's boot report authors.",
+    "naturalKey": [
+      "engine_id",
+      "code_version",
+      "id"
+    ],
+    "naturalKeyIntended": [
+      "engine_id",
+      "code_version"
+    ],
+    "checks": [
+      {
+        "name": "sim_engine_builds_withdrawal_whole",
+        "definition": "CHECK ((withdrawn_at IS NULL) = (withdrawn_reason IS NULL) AND (withdrawn_reason IS NULL OR btrim(withdrawn_reason) <> ''))"
+      },
+      {
+        "name": "sim_engine_builds_seen_order",
+        "definition": "CHECK (last_seen_at >= first_seen_at)"
+      },
+      {
+        "name": "sim_engine_builds_code_version_shape",
+        "definition": "CHECK (btrim(code_version) <> '' AND code_version = btrim(code_version))"
+      },
+      {
+        "name": "sim_engine_builds_scsim_digest_shape",
+        "definition": "CHECK (scsim_digest ~ '^[0-9a-f]{64}$')"
+      },
+      {
+        "name": "sim_engine_builds_worker_digest_shape",
+        "definition": "CHECK (sim_worker_digest ~ '^[0-9a-f]{64}$')"
+      },
+      {
+        "name": "sim_engine_builds_commit_shape",
+        "definition": "CHECK (commit_sha ~ '^[0-9a-f]{7,40}$')"
+      },
+      {
+        "name": "sim_engine_builds_first_seen_by",
+        "definition": "CHECK (first_seen_by IN ('worker_report', 'run', 'backfill'))"
+      }
+    ],
+    "ingestDataset": null,
+    "surfaces": [],
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 1
+    },
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The build's id within the ledger. A run names its build by `(engine_id, code_version)`, the table's key, not by this id.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "engine_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The registered engine (`sim_engines`) the build belongs to.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "sim_engines",
+          "columns": [
+            "id"
+          ],
+          "onDelete": null
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "code_version",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The build, spelled exactly as a run's `code_version` is stamped. Since WP 15.1 it is `scsim-<ENGINE_VERSION>+<12 hex>`, a digest of scsim's source and the worker's compute path, so different code is a different build. A row from before WP 15.1 carries the bare label (`scsim-0.2.8`), which several builds shared; what ran under it is unknown, and the row says so by having no digests.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "scsim_digest",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "sha256 over scsim's source files, as the worker reported it. Filled once; NULL for a build no worker reported (a browser run, or history).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "sim_worker_digest",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "sha256 over the worker's compute-path modules (`sim_worker/build.py` `COMPUTE_MODULES`). Filled once; NULL as `scsim_digest`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "commit_sha",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The git commit of the first worker deploy that reported this build. Identical source from a later commit is the same build, so the first commit stands. NULL when no deploy stated one.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "image_digest",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The worker image (Fly) that first reported this build. Filled once.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "first_seen_by",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "How the ledger first learned of the build: `worker_report` (the boot report), `run` (a run row named it — the browser's builds arrive this way), or `backfill` (history, WP 15.2).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "first_seen_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the build was first recorded (for backfill, its earliest run).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "last_seen_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When a report or a run last named the build. Moves forward only.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "withdrawn_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When a super admin withdrew the build. NULL = not withdrawn. Never cleared.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "withdrawn_reason",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Why the build was withdrawn, as stated by the super admin. Shown wherever a result of the build is.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "withdrawn_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The super admin who withdrew the build (`approved_users`). Set to NULL if that user is later deleted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "approved_users",
+          "columns": [
+            "id"
+          ],
+          "onDelete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      }
+    ]
+  },
+  {
     "table": "sim_engines",
     "tier": "reference",
     "tierName": "project-independent, versioned by vintage rather than by project",
@@ -26727,7 +27234,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc assign_material_supplier",
-        "evidence": "src/components/policies/StagePolicyTable.tsx:403"
+        "evidence": "src/components/policies/StagePolicyTable.tsx:406"
       },
       {
         "page": "SimulationLab.tsx",

@@ -36,14 +36,14 @@ _REALM_POLICY = 2
 
 _WORLD_DEMAND = 0
 _WORLD_LEADTIME = 1
-# PLAN.md §25 WP 15.1 — the demand-style lead-time shapes (normal, triangular,
+# PLAN.md §26 WP 16.1 — the demand-style lead-time shapes (normal, triangular,
 # uniform). One child stream PER LANE, keyed by a digest of `supplier::material`
 # rather than by the lane's position: the link order follows the chosen primary
 # (a policy), and a positional stream would hand a lane another lane's draws
 # under a different primary. A new key, so `_WORLD_LEADTIME` — and every
 # lognormal/gamma draw — is untouched.
 _WORLD_LEADTIME_LANE = 2
-# PLAN.md §25 WP 15.4 — a product's production lead time (P-P.13): one child
+# PLAN.md §26 WP 16.4 — a product's production lead time (P-P.13): one child
 # stream per PRODUCT, keyed by a digest of its id, for the same reason.
 _WORLD_PRODTIME = 3
 

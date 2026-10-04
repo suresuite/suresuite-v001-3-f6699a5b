@@ -32,7 +32,7 @@ export function useDerivedMaps(args: {
   /** RAW inbound lanes — which step of the cost chain answered (§23 WP 13.4). */
   inbound?: Record<string, unknown>[];
   /** The materials master — the derived step under a lane's lead-time shape
-   *  (PLAN.md §25 WP 15.2). Optional: a caller without it shows no material shape. */
+   *  (PLAN.md §26 WP 16.2). Optional: a caller without it shows no material shape. */
   materials?: Record<string, unknown>[];
   defaults: PolicyBundle;
   overrides: OverrideRow[];

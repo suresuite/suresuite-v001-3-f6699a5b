@@ -42,10 +42,15 @@ def engine_available() -> bool:
     return importlib.util.find_spec("scsim") is not None and importlib.util.find_spec("sim_worker") is not None
 
 
-def install_engine(api, quiet: bool = True) -> str:
+def install_engine(api, quiet: bool = True, version: Optional[str] = None) -> str:
     """Download the engine through the API (a key with read:data), check every
-    wheel's sha256, and pip-install it. Returns the engine version."""
-    info = api.engine()
+    wheel's sha256, and pip-install it. Returns the engine version.
+
+    ``version`` installs an EARLIER engine — ``"0.4.0"`` (the newest build of that
+    version) or the exact build a run recorded, ``run["code_version"]``
+    (``"scsim-0.4.0+<digest>"``) — so a stored result can be re-run on the engine
+    that produced it. Omit it for the engine the platform runs now."""
+    info = api.engine(version=version) if version else api.engine()
     with tempfile.TemporaryDirectory() as tmp:
         paths = []
         for w in info["wheels"]:
@@ -60,7 +65,8 @@ def install_engine(api, quiet: bool = True) -> str:
         cmd = [sys.executable, "-m", "pip", "install", "--upgrade", *(["-q"] if quiet else []), *paths]
         subprocess.check_call(cmd)
     importlib.invalidate_caches()
-    print(f"engine {info['engine_version']} installed ({len(paths)} wheels, sha256 checked)")
+    build = info.get("engine_build") or "build not named"
+    print(f"engine {info['engine_version']} ({build}) installed ({len(paths)} wheels, sha256 checked)")
     return info["engine_version"]
 
 

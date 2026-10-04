@@ -29,7 +29,12 @@ def test_the_boot_report_names_the_registered_engine_and_the_build_runs_carry():
     assert p["p_slug"] == "scsim"
     assert p["p_version"] == ENGINE_VERSION
     # Spelled exactly as a run is stamped, so the registry and the rows agree.
-    stamped = build_run_update({"source": "scsim", "engine_version": ENGINE_VERSION}, 1)
+    from sim_worker.build import code_version
+
+    stamped = build_run_update({"source": "scsim", "engine_version": ENGINE_VERSION,
+                                "engine_build": code_version()}, 1)
+    # WP 15.1 · §4 D293 — the BUILD, by content, not the version alone.
+    assert p["p_code_version"] == code_version() != f"scsim-{ENGINE_VERSION}"
     assert p["p_code_version"] == stamped["code_version"]
     legacy = engine_report_payload(False)
     assert legacy["p_slug"] == "legacy-worker" and legacy["p_code_version"] == "worker-legacy"
@@ -83,3 +88,36 @@ def test_a_failed_report_never_stops_the_worker(monkeypatch):
 
     asyncio.run(_worker(refuse)._report_engine())
     asyncio.run(_worker(explode)._report_engine())
+
+
+def test_the_report_carries_the_build_parts_for_the_ledger(monkeypatch):
+    # WP 15.2 · §4 D292 — the digests always; the commit and image when the deploy states them.
+    from sim_worker.build import engine_build
+
+    monkeypatch.setenv("GIT_SHA", "ABCDEF1234567")
+    monkeypatch.setenv("FLY_IMAGE_REF", "registry.fly.io/w:deployment-1")
+    b = engine_report_payload(True)["p_build"]
+    assert b["scsim_digest"] == engine_build()["scsim_digest"]
+    assert b["sim_worker_digest"] == engine_build()["sim_worker_digest"]
+    assert b["commit"] == "abcdef1234567" and b["image_digest"] == "registry.fly.io/w:deployment-1"
+    monkeypatch.delenv("GIT_SHA")
+    monkeypatch.delenv("FLY_IMAGE_REF")
+    assert "commit" not in engine_report_payload(True)["p_build"]  # unknown, not guessed
+
+
+def test_a_registry_without_the_ledger_still_gets_the_build(monkeypatch):
+    # The deploy window: the worker is live before `20261004000001`. PostgREST
+    # answers 404 for the five-argument call; the worker reports without p_build.
+    monkeypatch.setenv("SCSIM_ENGINE", "1")
+    bodies: list[dict] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        body = json.loads(req.content)
+        bodies.append(body)
+        if "p_build" in body:
+            return httpx.Response(404, json={"code": "PGRST202"})
+        return httpx.Response(200, json="00000000-0000-0000-0000-000000000000")
+
+    asyncio.run(_worker(handler)._report_engine())
+    assert len(bodies) == 2 and "p_build" in bodies[0] and "p_build" not in bodies[1]
+    assert bodies[1]["p_code_version"] == bodies[0]["p_code_version"]

@@ -703,7 +703,7 @@ export function ReplenishmentCell({
 }: {
   policyType: string;
   /** The parameters to show, in order, with their symbols — the FG twin of
-   *  `POLICY_PARAMS` for the Plant row (PLAN.md §25 WP 15.6). Defaults to the
+   *  `POLICY_PARAMS` for the Plant row (PLAN.md §26 WP 16.6). Defaults to the
    *  Supplier stage's `POLICY_PARAMS[policyType]`. */
   paramSpec?: Array<{ field: string; symbol: string }>;
   /** What an empty parameter list says (default: MRP's "from the plan"). */
@@ -723,7 +723,7 @@ export function ReplenishmentCell({
     /** §23 WP 13.4 — the engine does not read this parameter on this stage. */
     notSimulated?: string;
     /** Where the value came from, for a master-backed parameter (the FG levels
-     *  over `products`, WP 15.6) — the same dot every other grid cell carries. */
+     *  over `products`, WP 16.6) — the same dot every other grid cell carries. */
     source?: Provenance;
     /** The source dot's hover. */
     sourceTitle?: string;

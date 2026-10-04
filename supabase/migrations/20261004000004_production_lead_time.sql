@@ -1,8 +1,8 @@
--- Phase 15 / WP 15.5 / §5 P-P.13 · §4 D292 · gates `normalize-at-promotion`,
+-- Phase 16 / WP 16.5 / §5 P-P.13 · §4 D300 · gates `normalize-at-promotion`,
 -- `single-source`, `page-equals-run`
 -- A PRODUCT'S PRODUCTION LEAD TIME: THE DATA HALF.
 --
--- Engine 0.8.0 (WP 15.4) completes a product's output L weeks after it starts
+-- Engine 0.8.0 (WP 16.4) completes a product's output L weeks after it starts
 -- (P-P.13), L = 0 by default. This migration gives L and its shape a home on
 -- `products` — the product master, keyed (project_id, product_id) — and puts them
 -- in the snapshot a run computes from (the simulation scope, `hash_inputs`).
@@ -53,21 +53,21 @@ ALTER TABLE public.products ADD CONSTRAINT products_production_lead_time_check C
 );
 
 COMMENT ON COLUMN public.products.production_lead_time IS
-  'WP 15.5 · P-P.13: weeks from the start of production to the finished good, in '
+  'WP 16.5 · P-P.13: weeks from the start of production to the finished good, in '
   '`production_lead_time_unit`; weeks after promotion. NULL = 0 (completes in the week it starts).';
 COMMENT ON COLUMN public.products.production_lead_time_unit IS
-  'WP 15.5 · the unit of production_lead_time and its bounds (day, week, …). NULL = weeks.';
+  'WP 16.5 · the unit of production_lead_time and its bounds (day, week, …). NULL = weeks.';
 COMMENT ON COLUMN public.products.production_lead_time_dist IS
-  'WP 15.5 · the production lead time''s shape: deterministic, normal, lognormal, gamma, '
+  'WP 16.5 · the production lead time''s shape: deterministic, normal, lognormal, gamma, '
   'triangular or uniform. NULL = deterministic.';
 COMMENT ON COLUMN public.products.production_lead_time_cv IS
-  'WP 15.5 · coefficient of variation (0–1) for normal, lognormal and gamma.';
+  'WP 16.5 · coefficient of variation (0–1) for normal, lognormal and gamma.';
 COMMENT ON COLUMN public.products.production_lead_time_min IS
-  'WP 15.5 · triangular and uniform: the lower bound, in production_lead_time_unit.';
+  'WP 16.5 · triangular and uniform: the lower bound, in production_lead_time_unit.';
 COMMENT ON COLUMN public.products.production_lead_time_mode IS
-  'WP 15.5 · triangular: the most likely value, in production_lead_time_unit.';
+  'WP 16.5 · triangular: the most likely value, in production_lead_time_unit.';
 COMMENT ON COLUMN public.products.production_lead_time_max IS
-  'WP 15.5 · triangular and uniform: the upper bound, in production_lead_time_unit.';
+  'WP 16.5 · triangular and uniform: the upper bound, in production_lead_time_unit.';
 
 -- ── 3 · the durations normalize at promotion (I3) ───────────────────────────
 CREATE OR REPLACE FUNCTION public.ingest_normalize_at_promotion(_target text)
@@ -99,14 +99,14 @@ COMMENT ON FUNCTION public.ingest_normalize_at_promotion(text) IS
   '`normalize_at_promotion`); restated here because SQL cannot import the '
   'generated module, and pinned to it by ingestSpecParity.test.ts. WP 14.2 added '
   'the outbound row''s demand_mean / demand_min / demand_max, rates in the same '
-  'time_unit as its volume; WP 15.2 the inbound lane''s lead_time_min / _mode / '
-  '_max, durations in the same lead_time_unit as its lead_time; WP 15.5 the '
+  'time_unit as its volume; WP 16.2 the inbound lane''s lead_time_min / _mode / '
+  '_max, durations in the same lead_time_unit as its lead_time; WP 16.5 the '
   'product''s production_lead_time and its bounds, in production_lead_time_unit.';
 
 -- ── 4 · the snapshot: the production lead time joins the simulation scope ───
 --
--- The v2 body below is `20261003000003`'s with one addition, marked WP 15.5.
--- `rehearsal/830` proves a product with none keeps its snapshot text.
+-- The v2 body below is `20261004000003`'s with one addition, marked WP 16.5.
+-- `rehearsal/850` proves a product with none keeps its snapshot text.
 
 CREATE OR REPLACE FUNCTION public._build_dataset_snapshot_v2(p_project_id uuid)
 RETURNS jsonb
@@ -162,7 +162,7 @@ AS $$
           'fg_reorder_point', p.fg_reorder_point,
           'fg_cover_days', p.fg_cover_days,
           'fg_initial_on_hand', p.fg_initial_on_hand,
-          -- WP 15.5 (§25, D292): the production lead time and its shape, only
+          -- WP 16.5 (§26, D300): the production lead time and its shape, only
           -- where a product states them — no existing hash moves.
           'production_lead_time', p.production_lead_time,
           -- The unit only beside a duration it qualifies: the promotion stamps the
@@ -212,7 +212,7 @@ AS $$
           'time_unit', il.time_unit,
           'volume', il.volume
         )
-        -- WP 15.2 (§25, D291): the lane's own lead-time spread, only where a
+        -- WP 16.2 (§26, D299): the lane's own lead-time spread, only where a
         -- lane states one, so a project that sets none keeps its snapshot text
         -- and its `hash_inputs`.
         || jsonb_strip_nulls(jsonb_build_object(

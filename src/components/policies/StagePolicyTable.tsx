@@ -105,6 +105,8 @@ import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { customerRowMasters, demandCellNote, fulfillmentCellNote } from "@/lib/policies/customerRows";
+import { horizonWeeksOf } from "@/lib/policies/deliverySchedule";
+import { DeliveryScheduleCell } from "./DeliveryScheduleEditor";
 import { supplierLaneMasters } from "@/lib/policies/supplierLanes";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
@@ -497,6 +499,8 @@ export function StagePolicyTable({
   // The project's own MTS / MTO — the engine's fallback for a product that
   // states none (`projects.supply_chain_model`, §4 D197).
   const projectFulfillmentMode = projectFulfillmentModeOf(selectedProject?.supply_chain_model);
+  // The run's length in weeks — the delivery-schedule editor's default size.
+  const scheduleHorizonWeeks = horizonWeeksOf(selectedProject?.simulation_start, selectedProject?.simulation_end);
 
   // Build the per-row ColSpecCtx once, then compute the union for the header.
   // `resolved` carries the master-backed gate fields AS THE CELL SHOWS THEM
@@ -838,7 +842,7 @@ export function StagePolicyTable({
     for (const c of vectorParamCols(stageKey)) m.set(c.field, c);
     return m;
   }, [stageKey]);
-  // The FG levels grouped into the Plant row's vector cell (WP 15.6).
+  // The FG levels grouped into the Plant row's vector cell (WP 16.6).
   const fgParamColByField = useMemo(() => {
     const m = new Map<string, ColSpec>();
     for (const c of fgVectorParamCols(stageKey)) m.set(c.field, c);
@@ -864,7 +868,9 @@ export function StagePolicyTable({
         label: o,
         title: o === "forecast"
           ? "Forecast — the row plans week by week on its uploaded series; the distribution adds spread around it"
-          : "Model — a constant mean per week, drawn from the distribution below",
+          : o === "schedule"
+            ? "Schedule — the customer's requested delivery schedule: you enter the quantity for each week, and the run uses it exactly"
+            : "Model — a constant mean per week, drawn from the distribution below",
       }));
     }
     if (col.field === "fulfillment_mode") {
@@ -991,8 +997,8 @@ export function StagePolicyTable({
   };
 
   /**
-   * The Plant row's FG "Replenishment parameters" cell (PLAN.md §25 WP 15.6,
-   * §4 D293) — the Supplier stage's layout for the FG policy: only the levels
+   * The Plant row's FG "Replenishment parameters" cell (PLAN.md §26 WP 16.6,
+   * §4 D301) — the Supplier stage's layout for the FG policy: only the levels
    * the row's FG policy reads (`FG_POLICY_PARAMS`, gated like `fgPolicyIn`).
    * Each level is still the master-backed cell it was: its value and source
    * come from the one resolver, a typed value saves as this row's override, and
@@ -1351,7 +1357,7 @@ export function StagePolicyTable({
         onClick: () => {
           void (async () => {
             try {
-              if (saveSnapshot) await saveSnapshot(`Grid edits — ${new Date().toLocaleString()}`);
+              if (saveSnapshot) await saveSnapshot("Grid edits");
               toast.success("Version saved", TOAST);
             } catch (e) {
               toast.error(errMsg(e, "Failed to save version"), TOAST);
@@ -1957,7 +1963,7 @@ export function StagePolicyTable({
               </td>
             );
           }
-          // The Plant row's FG "Replenishment parameters" cell (WP 15.6).
+          // The Plant row's FG "Replenishment parameters" cell (WP 16.6).
           if (col.synthetic && col.field === "__fg_inv_params") {
             return (
               <td
@@ -1966,6 +1972,36 @@ export function StagePolicyTable({
                 style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
               >
                 {renderFgInvParamsCell(rowKey, r, rowCtx, fc.paramW)}
+              </td>
+            );
+          }
+          // The Customer row's requested delivery schedule: an array, edited in
+          // its own dialog (one input per week), saved as the row's override.
+          if (col.field === "row_demand_schedule") {
+            const draftSched = rowDraft[col.field];
+            const schedEdited = draftSched !== undefined;
+            const saved = overrides.some(
+              (o) => o.target_key === rowKey && o.family === "demand" && col.field in (o.patch ?? {}),
+            );
+            return (
+              <td
+                key={col.field}
+                className="relative overflow-hidden border-b px-1 py-[3px] align-middle group-hover:bg-[#fafafa]"
+                style={{
+                  width,
+                  minWidth: width,
+                  ...cellDivider(isLastCol),
+                  ...(schedEdited ? { background: "rgba(17,17,17,0.04)" } : {}),
+                }}
+              >
+                <ProvenanceDot p={schedEdited ? "edited" : saved ? "override" : "default"} />
+                <DeliveryScheduleCell
+                  value={schedEdited ? draftSched : eff?.row_demand_schedule}
+                  horizonWeeks={scheduleHorizonWeeks}
+                  weekOneStart={selectedProject?.simulation_start}
+                  rowLabel={`${String(r.customer_id ?? "")} · ${String(r.product_id ?? "")}`}
+                  onCommit={(v) => onCellChange(rowKey, col.field, v)}
+                />
               </td>
             );
           }
@@ -2002,7 +2038,7 @@ export function StagePolicyTable({
             overrides,
             scope: spec.scope,
             familyDefault: getDefault,
-            // A bounded lane's Lead time is its bounds' mean (PLAN.md §25 WP 15.3).
+            // A bounded lane's Lead time is its bounds' mean (PLAN.md §26 WP 16.3).
             gate: rowCtxByKey.get(rowKey),
           });
           const {
@@ -2024,7 +2060,7 @@ export function StagePolicyTable({
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);
-          // A bounded lane's Lead time is its bounds' mean (§25.2 rule 3): the
+          // A bounded lane's Lead time is its bounds' mean (§26.2 rule 3): the
           // engine reads no typed value there, so the cell is not an input.
           const kind =
             resolved.derivedVia?.via === "lead_time_bounds_mean"

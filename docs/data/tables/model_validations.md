@@ -16,6 +16,7 @@
 | Columns | Source | Constraint |
 |---|---|---|
 | `id` | column PRIMARY KEY | `model_validations_pkey` |
+| `project_id` + `model_code` | UNIQUE constraint | `model_validations_model_code_key` |
 | `project_id` + `policy_hash` + `(COALESCE(hash_simulation, graph_hash))` + `scenario_hash` | partial UNIQUE index | `model_validations_active_content_uq` |
 
 ## Constraints
@@ -32,10 +33,13 @@ partially or get corrected — the write fails.
 | `model_validations_basis_check` | `CHECK (basis IN ('statistical', 'face'))` | `20260710000001_model_validations.sql` |
 | `model_validations_status_check` | `CHECK (status IN ('active', 'superseded', 'revoked'))` | `20260710000001_model_validations.sql` |
 | `model_validations_protocol_check` | `CHECK (protocol IS NULL OR cardinality(public.validated_model_protocol_problems(protocol)) = 0)` | `20261001000008_validated_model.sql` |
+| `model_validations_planning_period_check` | `CHECK (planning_period IS NULL OR planning_period ~ '^[0-9]{4}Q[1-4]$')` | `20261004000002_version_codes.sql` |
+| `model_validations_model_code_check` | `CHECK ((planning_period IS NULL) = (model_code IS NULL) AND (model_code IS NULL OR model_code ~ ('^' \|\| planning_period \|\| '(-[0-9]+)?$')))` | `20261004000002_version_codes.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
 | `model_validations_engine_id_fkey` | FOREIGN KEY | `FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)` |
+| `model_validations_model_code_key` | UNIQUE | `UNIQUE (project_id, model_code)` |
 
 ## Governance
 
@@ -48,7 +52,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 1 — **1 with no predicate** |
 
-Tier 4 — a DECISION. Readable by every API role (`model_validations_read_all`, D28's pinned list); written only through SECURITY DEFINER functions: `record_validated_model` (Save Validated Model — authenticates the actor through the shared preamble and enforces the adoption rule: every selected KPI passed, or a recorded face-validation statement), the legacy `record_model_validation` (its agent caller), and `revoke_model_validation`; all three reach one insert path. Audited at statement grain since WP 10.3. A BEFORE UPDATE trigger refuses every change but the lifecycle.
+Tier 4 — a DECISION. Readable by every API role (`model_validations_read_all`, D28's pinned list); written only through SECURITY DEFINER functions: `record_validated_model` (Save Validated Model — authenticates the actor through the shared preamble and enforces the adoption rule: every selected KPI passed, or a recorded face-validation statement), the legacy `record_model_validation` (its agent caller), and `revoke_model_validation`; all three reach one insert path. Audited at statement grain since WP 10.3. A BEFORE UPDATE trigger refuses every change but the lifecycle — and three fill-once completions: the engine id, the simulation hash (WP 11.2), and the planning period with its code, set by `set_model_planning_period` (same writer gate as saving the model) on a model saved without one (WP 10.5 follow-up).
 
 > **What the database actually permits is wider than the row above.**
 > 1 policy here grants access with
@@ -73,8 +77,8 @@ Tier 4 — a DECISION. Readable by every API role (`model_validations_read_all`,
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `SimulationLab.tsx` | table read | `src/hooks/useModelValidation.tsx:333` | yes |
-| `ProjectPolicies.tsx` | table read | `src/hooks/useModelValidation.tsx:333` | yes |
+| `SimulationLab.tsx` | table read | `src/hooks/useModelValidation.tsx:366` | yes |
+| `ProjectPolicies.tsx` | table read | `src/hooks/useModelValidation.tsx:366` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -125,6 +129,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `revoke_reason` | — | `text` | — | — | Why, in their words. |
 | `hash_simulation` | — | `text` | — | — | The hash of what the ENGINE reads — the simulation scope, the `inputs` domain of the snapshot it was validated on (WP 11.2, §4 D259). The model is stale when THIS moves, not when the composite does; the supersede, the active-model unique key, dispatch stamping and inheritance all compare it. NULL on a card whose snapshot cannot be read (no `dataset_version_id`), which keeps the composite rule — said, not defaulted. |
 | `simulation_version_id` | — | `uuid` | — | — | The simulation scope's level version ("simulation inputs v4") — `graph_level_versions`, from the same snapshot. NULL exactly where `hash_simulation` is. |
+| `planning_period` | — | `text` | — | — | The planning period the model is FOR (`2026Q3`), chosen by the modeller when the model is saved and never derived from a date — a model validated in October may be the Q3 model. CHECK `^[0-9]{4}Q[1-4]$`. Not part of `model_hash`: it names the model, it is not what the model is. NULL on a model saved before it existed, until it is set ONCE through `set_model_planning_period` (the immutability trigger's fill-once completion). |
+| `model_code` | — | `text` | — | — | "2026Q3", or "2026Q3-2" for the second model of that period in the project — the code a person says. Assigned by trigger whenever the period is set, unique per project, and never re-issued: the suffix is one past the highest stored for that period. |
 
 ## Each column in full
 
@@ -638,6 +644,34 @@ The simulation scope's level version ("simulation inputs v4") — `graph_level_v
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `planning_period`
+
+The planning period the model is FOR (`2026Q3`), chosen by the modeller when the model is saved and never derived from a date — a model validated in October may be the Q3 model. CHECK `^[0-9]{4}Q[1-4]$`. Not part of `model_hash`: it names the model, it is not what the model is. NULL on a model saved before it existed, until it is set ONCE through `set_model_planning_period` (the immutability trigger's fill-once completion).
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261004000002_version_codes.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `model_code`
+
+"2026Q3", or "2026Q3-2" for the second model of that period in the project — the code a person says. Assigned by trigger whenever the period is set, unique per project, and never re-issued: the suffix is one past the highest stored for that period.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261004000002_version_codes.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -647,6 +681,6 @@ The simulation scope's level version ("simulation inputs v4") — `graph_level_v
 
 ---
 
-*Generated from data contract `033d06223a46`, engine `0.8.0`,
+*Generated from data contract `c7c7da69c86d`, engine `0.8.0`,
 sidecar `supabase/contract/model_validations.contract.yaml`, table created by `20260710000001_model_validations.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

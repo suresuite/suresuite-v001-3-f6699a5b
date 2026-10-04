@@ -6,14 +6,15 @@
 // and what is said about it cannot differ by platform (D224's rule). Every
 // figure on it is a field of the chosen model, of its version rows, of the
 // engine registry, or a declared estimate with its basis (T1).
-import { useId } from "react";
+import { useId, useState } from "react";
 import { cn } from "@/lib/utils";
 import { LAYER, tint } from "@/components/intelligence/piUi";
 import type { Credibility, ModelValidationCard } from "@/hooks/useModelValidation";
 import type { SimEngine } from "@/hooks/useSimEngines";
-import { useVersionRefs } from "@/hooks/useModelVersionRefs";
+import { useModelCodes, useVersionRefs } from "@/hooks/useModelVersionRefs";
 import { modelOptionLabel, type Deviation } from "@/lib/sim/labModel";
-import { driftReasons, noteReasons, protocolLine } from "@/lib/sim/validatedModel";
+import { modelStatusText, noteReasons, protocolLine } from "@/lib/sim/validatedModel";
+import { engineLabel, modelRef, planningPeriodOptions, quarterOf } from "@/lib/versions/versionLabels";
 
 const SELECT =
   "h-7 min-h-11 w-full min-w-0 rounded-sm border border-[#d4d4d8] bg-white px-2 text-[12.5px] text-[#18181b] " +
@@ -45,51 +46,83 @@ export interface LabModelStepProps {
    *  replays its own versions, or the user runs current data as exploratory. */
   modelMoved?: { note: string; replayable: boolean } | null;
   onRunCurrent?: () => void;
+  /** Give a model saved without a planning period its period — once. */
+  onSetPeriod?: (validationId: string, period: string) => Promise<void>;
 }
 
-function ChosenFacts({ card, credibility }: { card: ModelValidationCard; credibility: Credibility | null }) {
+function ChosenFacts({
+  card,
+  credibility,
+  supersededBy,
+  onSetPeriod,
+}: {
+  card: ModelValidationCard;
+  credibility: Credibility | null;
+  supersededBy: string | null;
+  onSetPeriod?: (period: string) => Promise<void>;
+}) {
   const refs = useVersionRefs(card);
-  const status =
-    card.status === "revoked"
-      ? "revoked — not usable"
-      : card.status === "superseded"
-        ? "superseded — a newer model is in force"
-        : credibility?.state === "stale" && credibility.drift.every((d) => d === "data")
-          ? "data changed since validation → a run replays the validated data"
-          : credibility?.state === "stale"
-          ? `${driftReasons(credibility.drift).join(" · ") || "stale"} → re-validate`
-          : credibility?.state === "validated"
-            ? "in force"
-            : "not matched";
+  const status = modelStatusText(card, credibility, supersededBy);
   // WP 11.3 — shown, never a reason to re-validate (the simulation does not read it).
   const notes = credibility && credibility.state !== "unvalidated" ? noteReasons(credibility.notes) : [];
   const stale = card.status !== "active" || credibility?.state === "stale";
-  const unmatched = card.status === "active" && credibility?.state !== "stale" && credibility?.state !== "validated";
+  // The snapshot, the hashes and the validation date are secondary — on hover.
   const snapshot = `snapshot ${refs.graphVersionNo != null ? `v${refs.graphVersionNo}` : card.graph_hash.slice(0, 7)}`;
-  const validated = `validated ${new Date(card.validated_at).toLocaleDateString()}`;
+  const title = [
+    `data ${card.hash_simulation ? card.hash_simulation.slice(0, 7) : "not recorded"}`,
+    `policy ${card.policy_hash.slice(0, 7)}`,
+    snapshot,
+    `validated ${new Date(card.validated_at).toLocaleDateString()}`,
+  ].join(" · ");
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-[#52525b]" data-testid="model-facts">
-      {/* WP 11.3 · §4 D259 — what the model binds: the simulation's inputs; the
-          snapshot it was validated on is secondary. */}
-      {/* The snapshot and the validation date are secondary — on hover. */}
-      <span title={`simulation inputs · ${snapshot} · ${validated}`}>
-        {card.hash_simulation
-          ? `inputs ${refs.simulationVersionNo != null ? `v${refs.simulationVersionNo}` : card.hash_simulation.slice(0, 7)}`
-          : "inputs not recorded"}
-      </span>
-      <span title="model_validations.policy_version_id → policy_versions.version_no">
-        policy {refs.policyVersionNo != null ? `v${refs.policyVersionNo}` : card.policy_hash.slice(0, 7)}
-      </span>
-      <span
-        style={{ color: stale ? LAYER.firm : LAYER.process }}
-        title={unmatched ? "not matched to the live policy, simulation inputs and scenario" : undefined}
-      >
+      <span title={title} style={{ color: stale ? LAYER.firm : LAYER.process }}>
         {status}
       </span>
       {notes.length > 0 ? (
         <span className="text-[#71717a]" data-testid="model-notes">{notes.join(" · ")}</span>
       ) : null}
+      {!card.model_code && onSetPeriod ? <SetPeriod onSetPeriod={onSetPeriod} /> : null}
     </div>
+  );
+}
+
+/** A model saved before periods existed is given one, once (`set_model_planning_period`). */
+function SetPeriod({ onSetPeriod }: { onSetPeriod: (period: string) => Promise<void> }) {
+  const [period, setPeriod] = useState(() => quarterOf(new Date()));
+  const [busy, setBusy] = useState(false);
+  return (
+    <span className="flex items-center gap-1.5" data-testid="model-set-period">
+      <span className="text-[#71717a]">no period —</span>
+      <select
+        className="h-6 min-h-11 rounded-sm border border-[#d4d4d8] bg-white px-1 font-mono text-[11px] md:min-h-0"
+        value={period}
+        onChange={(e) => setPeriod(e.target.value)}
+        aria-label="Planning period"
+      >
+        {planningPeriodOptions().map((q) => (
+          <option key={q} value={q}>
+            {q}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onSetPeriod(period);
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className="min-h-11 text-[11.5px] text-[#18181b] underline underline-offset-2 disabled:opacity-50 md:min-h-0"
+        title="A period is set once; it names the model and does not change what it is"
+      >
+        Set period
+      </button>
+    </span>
   );
 }
 
@@ -98,6 +131,13 @@ export function LabModelStep(p: LabModelStepProps) {
   const offeredHasChosen = !!p.chosen && p.models.some((m) => m.id === p.chosen!.id);
   const protocol = p.chosen?.protocol ?? null;
   const usingModel = !!p.chosen && !p.exploratory;
+  const codes = useModelCodes(p.chosen && !offeredHasChosen ? [p.chosen, ...p.models] : p.models);
+  const supersededBy = p.chosen?.superseded_by
+    ? (() => {
+        const next = p.models.find((m) => m.id === p.chosen!.superseded_by);
+        return next ? modelRef(next) : null;
+      })()
+    : null;
 
   return (
     <section
@@ -135,16 +175,23 @@ export function LabModelStep(p: LabModelStepProps) {
             aria-label="Validated Model"
           >
             {!offeredHasChosen && p.chosen ? (
-              <option value={p.chosen.id}>{modelOptionLabel(p.chosen)} ({p.chosen.status})</option>
+              <option value={p.chosen.id}>{modelOptionLabel(p.chosen, codes[p.chosen.id])} ({p.chosen.status})</option>
             ) : null}
             {p.models.map((m) => (
               <option key={m.id} value={m.id}>
-                {modelOptionLabel(m)}
+                {modelOptionLabel(m, codes[m.id])}
               </option>
             ))}
           </select>
         )}
-        {p.chosen && !p.exploratory ? <ChosenFacts card={p.chosen} credibility={p.credibility} /> : null}
+        {p.chosen && !p.exploratory ? (
+          <ChosenFacts
+            card={p.chosen}
+            credibility={p.credibility}
+            supersededBy={supersededBy}
+            onSetPeriod={p.onSetPeriod ? (period) => p.onSetPeriod!(p.chosen!.id, period) : undefined}
+          />
+        ) : null}
         {p.canExplore ? (
           <label
             className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-[12px] text-[#52525b] md:min-h-0"
@@ -183,13 +230,14 @@ export function LabModelStep(p: LabModelStepProps) {
             onChange={(e) => p.onEngine(e.target.value)}
             aria-label="Engine"
           >
-            {p.engines.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-                {e.version ? ` · ${e.version}` : ""}
-                {e.code_version ? ` · ${e.code_version}` : " · build ?"}
-              </option>
-            ))}
+            {p.engines.map((e) => {
+              const l = engineLabel(e);
+              return (
+                <option key={e.id} value={e.id} title={l.title}>
+                  {l.label}
+                </option>
+              );
+            })}
           </select>
         )}
       </div>

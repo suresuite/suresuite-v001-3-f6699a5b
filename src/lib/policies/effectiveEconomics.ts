@@ -105,7 +105,7 @@ export const REDUCER_LABEL: Record<string, string> = {
   twice_demand_floor_1000:
     "the engine's no-capacity default, max(2 × demand, 1 000) — chosen so " +
     "capacity never binds, so this run cannot tell you whether it would",
-  // PLAN.md §25 WP 15.2/15.3 — the lane lead-time spread.
+  // PLAN.md §26 WP 16.2/15.3 — the lane lead-time spread.
   lead_time_bounds_mean:
     "the mean of this row's lead-time bounds — a triangular or uniform lane " +
     "plans on (min + mode + max) / 3 or (min + max) / 2, so the lead time is not typed here",

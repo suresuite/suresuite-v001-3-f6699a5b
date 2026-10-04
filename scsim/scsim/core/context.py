@@ -129,7 +129,7 @@ class CompiledModel:
         # Products.
         self.unit_price = np.array([p.unit_price for p in net.products])
         self.capacity = np.array([p.production_capacity for p in net.products])
-        # P-P.13 production lead time (PLAN.md §25 WP 15.4). `prod_lt` is the
+        # P-P.13 production lead time (PLAN.md §26 WP 16.4). `prod_lt` is the
         # PLANNING lead time per product (whole weeks, 0 = same-week completion);
         # the shape and bounds feed the per-(product, week) draw. `has_prod_lt`
         # False — every product 0 and deterministic — keeps the engine on its
@@ -221,7 +221,7 @@ class CompiledModel:
         self.link_cost = np.array([l.cost for l in links])
         self.link_moq = np.array([l.moq for l in links])
         self.link_lt_dist = [l.lead_time_dist for l in links]
-        # The bounded shapes (triangular, uniform; PLAN.md §25 WP 15.1) carry
+        # The bounded shapes (triangular, uniform; PLAN.md §26 WP 16.1) carry
         # their bounds, shifted by the lane's transit leg exactly as the planning
         # lead time is; NaN where a link has none. Their CV is the shape's own
         # σ/μ, which is what P-P.3's King formula reads for a lognormal or gamma
@@ -772,7 +772,7 @@ class WeeklyTrace:
     # rule ("level"/"flow"/"ratio") a lie about half its rows.
     prod_cap_bound: np.ndarray = field(init=False)
     sup_cap_bound: np.ndarray = field(init=False)
-    # Work in progress (P-P.13, PLAN.md §25 WP 15.4): units started and not yet
+    # Work in progress (P-P.13, PLAN.md §26 WP 16.4): units started and not yet
     # completed, and their material value, after each week's completions. All
     # zero for a run with no production lead time. Deliberately NOT weekly
     # series: publishing one would move every golden digest for a quantity that
@@ -869,7 +869,7 @@ class SimContext:
                 self.lt_variates[k] = streams.leadtime.standard_normal(T)
             elif dist == LeadTimeDist.GAMMA:
                 self.lt_variates[k] = streams.leadtime.gamma(1.0 / (cv * cv), 1.0, T)
-        # The demand-style shapes (normal, triangular, uniform — PLAN.md §25 WP
+        # The demand-style shapes (normal, triangular, uniform — PLAN.md §26 WP
         # 15.1): standard uniforms from each lane's OWN world stream, so neither
         # the loop above nor the other lanes nor the chosen primary moves them.
         # Drawn after the loop above and from different streams, so a project
@@ -965,7 +965,7 @@ class SimContext:
         self.gross_requirements = np.zeros((model.n_mats, H))
         self.overtime_extra = np.zeros(model.n_prods)
         self.production_output = np.zeros(model.n_prods)
-        # P-P.13 (PLAN.md §25 WP 15.4): what the line STARTED this week (it is
+        # P-P.13 (PLAN.md §26 WP 16.4): what the line STARTED this week (it is
         # what consumed materials and capacity). `production_output` is what
         # COMPLETED — the supply fulfillment ships and FG stock receives. The two
         # are one array's value whenever no product has a production lead time.
@@ -1006,7 +1006,7 @@ class SimContext:
         # Draws bounded to the in-transit ring, per link (audit F-36). A draw
         # longer than the ring used to wrap and land EARLY with no symptom.
         self.lt_truncated = np.zeros(model.n_links, dtype=int)
-        # Normal lead-time draws below one week, raised to one (PLAN.md §25 WP
+        # Normal lead-time draws below one week, raised to one (PLAN.md §26 WP
         # 15.1) — counted like the ring bound, so the shift is stated.
         self.lt_floor_raised = np.zeros(model.n_links, dtype=int)
         # P-S.4 early_warning_failover: monitored detection lag. None → the

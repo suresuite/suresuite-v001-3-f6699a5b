@@ -216,7 +216,7 @@ def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
     # MTO: produce to order (D + backlog). MTS step ②: replenish toward last
     # week's S^FG plus any backlog PH-30 could not serve from stock.
     want_mto = ctx.demand + ctx.backlog
-    # P-P.13 (PLAN.md §25 WP 15.4): a start this week completes at t + L, so it is
+    # P-P.13 (PLAN.md §26 WP 16.4): a start this week completes at t + L, so it is
     # planned against the requirement THEN, net of the work in progress that
     # completes before it — offset by the EXPECTED (planning) L only, never by a
     # drawn one (gate `plan-from-demand`). Every product with L = 0 keeps the
@@ -277,7 +277,7 @@ def _mech_production_execute(model: CompiledModel, ctx: SimContext) -> None:
 
 
 def _production_completions(model: CompiledModel, ctx: SimContext, Q: np.ndarray) -> np.ndarray:
-    """P-P.13 (PLAN.md §25 WP 15.4): put this week's starts in the production
+    """P-P.13 (PLAN.md §26 WP 16.4): put this week's starts in the production
     pipeline at t + L and take out what completes this week.
 
     L is the product's planning lead time, or — for a product with a shape — a
@@ -301,7 +301,7 @@ def _production_completions(model: CompiledModel, ctx: SimContext, Q: np.ndarray
     done = ctx.prod_pipeline[:, t % W].copy()
     ctx.prod_pipeline[:, t % W] = 0.0
     # Work in progress after this week's completions: traced in units and at
-    # material value (COGS) — and charged NO holding cost (§25.2 rule 8: the page
+    # material value (COGS) — and charged NO holding cost (§26.2 rule 8: the page
     # shows no WIP rate, so the engine charges none).
     wip = ctx.prod_pipeline.sum(axis=1)
     ctx.trace.wip_units[t] = float(wip.sum())
@@ -448,7 +448,7 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
                 lo=None if np.isnan(lo) else lo, mode=None if np.isnan(mo) else mo,
                 hi=None if np.isnan(hi) else hi, nominal=float(model.link_lt[link]))
             # A normal draw below one week is raised to one (the arrival floor
-            # below) — counted so the shift is stated (PLAN.md §25 WP 15.1).
+            # below) — counted so the shift is stated (PLAN.md §26 WP 16.1).
             if raw < 1:
                 ctx.lt_floor_raised[link] += 1
             lt[i] = raw
@@ -473,7 +473,7 @@ def _lt_from_variate(dist: LeadTimeDist, mean: float, cv: float, v: float,
                      rounded: bool = True) -> float:
     """A lead time with the link's distribution and the shipment's mean, from a
     variate pre-drawn for this (link, week) (audit F-24). The one implementation
-    is ``core/leadtime.from_variate`` (PLAN.md §25 WP 15.1); this is its CV-shape
+    is ``core/leadtime.from_variate`` (PLAN.md §26 WP 16.1); this is its CV-shape
     entry, kept for the callers that have always used it."""
     return lt_from_variate(dist, mean, cv, v, rounded=rounded)
 
@@ -863,11 +863,11 @@ class ScenarioResult:
     # Empty when no draw was bounded — the common case.
     lead_time_truncations: list = field(default_factory=list)
     # Normal (or zero-floored bounded) lead-time draws below one week, raised to
-    # one (PLAN.md §25 WP 15.1): [{"supplier_id", "material_id", "draws",
+    # one (PLAN.md §26 WP 16.1): [{"supplier_id", "material_id", "draws",
     # "replications"}]. Empty when nothing was raised — always, for a project
     # with no shaped lead time.
     lead_time_floor_raises: list = field(default_factory=list)
-    # P-P.13 production lead time (PLAN.md §25 WP 15.4). `work_in_progress`:
+    # P-P.13 production lead time (PLAN.md §26 WP 16.4). `work_in_progress`:
     # None when no product has one; else {"mean_units", "mean_value",
     # "by_product": [{"product_id", "mean_units"}], "replications"} over the
     # analysis window — units started and not yet completed, at material value,

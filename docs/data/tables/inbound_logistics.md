@@ -30,7 +30,7 @@ partially or get corrected — the write fails.
 | Constraint | Rule | Added by |
 |---|---|---|
 | `inbound_logistics_lead_time_unit_known` | `CHECK (lead_time_unit IS NULL OR public.unit_days(lead_time_unit) IS NOT NULL)` | `20260915000002_lead_time_unit.sql` |
-| `inbound_logistics_lead_time_spread_check` | `CHECK ( (lead_time_dist IS NULL OR lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (lead_time_cv IS NULL OR (lead_time_cv >= 0 AND lead_time_cv <= 1)) AND (lead_time_min IS NULL OR lead_time_min >= 0) AND (lead_time_mode IS NULL OR lead_time_mode >= 0) AND (lead_time_max IS NULL OR lead_time_max >= 0) AND (lead_time_min IS NULL OR lead_time_mode IS NULL OR lead_time_min <= lead_time_mode) AND (lead_time_mode IS NULL OR lead_time_max IS NULL OR lead_time_mode <= lead_time_max) AND (lead_time_min IS NULL OR lead_time_max IS NULL OR lead_time_min <= lead_time_max) )` | `20261003000003_lane_lead_time_spread.sql` |
+| `inbound_logistics_lead_time_spread_check` | `CHECK ( (lead_time_dist IS NULL OR lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (lead_time_cv IS NULL OR (lead_time_cv >= 0 AND lead_time_cv <= 1)) AND (lead_time_min IS NULL OR lead_time_min >= 0) AND (lead_time_mode IS NULL OR lead_time_mode >= 0) AND (lead_time_max IS NULL OR lead_time_max >= 0) AND (lead_time_min IS NULL OR lead_time_mode IS NULL OR lead_time_min <= lead_time_mode) AND (lead_time_mode IS NULL OR lead_time_max IS NULL OR lead_time_mode <= lead_time_max) AND (lead_time_min IS NULL OR lead_time_max IS NULL OR lead_time_min <= lead_time_max) )` | `20261004000003_lane_lead_time_spread.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -107,11 +107,11 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `lead_time_unit` | `lead_time_unit` | `text` | — | no | The period `lead_time` is quoted in — day, week, month, quarter or year. Blank means WEEKS, which is what the engine assumed before this column existed. Distinct from `time_unit`, which is the period `volume` is quoted over and has never applied to the lead time. |
 | `ingest_run_id` | — | `uuid` | — | — | The ingestion run that last wrote this row (WP 3.3), and through it the project, the source kind and who approved the promotion. NULL for every row that predates the CSV landing path, and for rows whose run has since been deleted — a null here means the provenance is UNKNOWN, never that there was none. Set by `ingest_apply_run` and by nothing else. |
 | `source_row_id` | — | `uuid` | — | — | The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the line rather than told a file name — which is what extends A4 down to the source. `ON DELETE SET NULL` and DEFERRABLE: staging is deleted with its run, and a canonical row belongs to the project rather than to the run that last wrote it. |
-| `lead_time_dist` | `lead_time_dist` | `text` | — | no | The SHAPE of this lane's lead time — deterministic, normal, lognormal, gamma, triangular or uniform (PLAN.md §25 WP 15.2, blueprint P-S.6). For deterministic, normal, lognormal and gamma, `lead_time` is the mean; a triangular or uniform lane IS its bounds, and its planning lead time is their mean. Blank: the material's shape (`materials.lead_time_dist`), else deterministic — how every lane ran before Phase 15. |
-| `lead_time_cv` | `lead_time_cv` | `numeric` | `coefficient of variation (dimensionless)` | no | How much this lane's lead time varies, as a coefficient of variation — read by normal, lognormal and gamma only (PLAN.md §25 WP 15.2). Bounded 0–1, as the engine bounds it. |
-| `lead_time_min` | `lead_time_min` | `numeric` | `weeks` *(from `lead_time_unit`)* | no | A triangular or uniform lane's shortest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.2). |
-| `lead_time_mode` | `lead_time_mode` | `numeric` | `weeks` *(from `lead_time_unit`)* | no | A triangular lane's most likely lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular only (PLAN.md §25 WP 15.2). |
-| `lead_time_max` | `lead_time_max` | `numeric` | `weeks` *(from `lead_time_unit`)* | no | A triangular or uniform lane's longest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.2). |
+| `lead_time_dist` | `lead_time_dist` | `text` | — | no | The SHAPE of this lane's lead time — deterministic, normal, lognormal, gamma, triangular or uniform (PLAN.md §26 WP 16.2, blueprint P-S.6). For deterministic, normal, lognormal and gamma, `lead_time` is the mean; a triangular or uniform lane IS its bounds, and its planning lead time is their mean. Blank: the material's shape (`materials.lead_time_dist`), else deterministic — how every lane ran before Phase 16. |
+| `lead_time_cv` | `lead_time_cv` | `numeric` | `coefficient of variation (dimensionless)` | no | How much this lane's lead time varies, as a coefficient of variation — read by normal, lognormal and gamma only (PLAN.md §26 WP 16.2). Bounded 0–1, as the engine bounds it. |
+| `lead_time_min` | `lead_time_min` | `numeric` | `weeks` *(from `lead_time_unit`)* | no | A triangular or uniform lane's shortest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.2). |
+| `lead_time_mode` | `lead_time_mode` | `numeric` | `weeks` *(from `lead_time_unit`)* | no | A triangular lane's most likely lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular only (PLAN.md §26 WP 16.2). |
+| `lead_time_max` | `lead_time_max` | `numeric` | `weeks` *(from `lead_time_unit`)* | no | A triangular or uniform lane's longest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.2). |
 
 ## Each column in full
 
@@ -438,14 +438,14 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ### `lead_time_dist`
 
-The SHAPE of this lane's lead time — deterministic, normal, lognormal, gamma, triangular or uniform (PLAN.md §25 WP 15.2, blueprint P-S.6). For deterministic, normal, lognormal and gamma, `lead_time` is the mean; a triangular or uniform lane IS its bounds, and its planning lead time is their mean. Blank: the material's shape (`materials.lead_time_dist`), else deterministic — how every lane ran before Phase 15.
+The SHAPE of this lane's lead time — deterministic, normal, lognormal, gamma, triangular or uniform (PLAN.md §26 WP 16.2, blueprint P-S.6). For deterministic, normal, lognormal and gamma, `lead_time` is the mean; a triangular or uniform lane IS its bounds, and its planning lead time is their mean. Blank: the material's shape (`materials.lead_time_dist`), else deterministic — how every lane ran before Phase 16.
 
 | | |
 |---|---|
 | Type | `text` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261003000003_lane_lead_time_spread.sql` |
+| Added by | `20261004000003_lane_lead_time_spread.sql` |
 | Read by the engine | `project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_dist` |
 | Transform | lower-cased; an unknown value, or a shape missing a parameter it needs, is warned and the lane runs deterministic |
 | When NULL, the engine uses | the material's lead_time_dist, else deterministic |
@@ -462,14 +462,14 @@ for one you did.
 
 ### `lead_time_cv`
 
-How much this lane's lead time varies, as a coefficient of variation — read by normal, lognormal and gamma only (PLAN.md §25 WP 15.2). Bounded 0–1, as the engine bounds it.
+How much this lane's lead time varies, as a coefficient of variation — read by normal, lognormal and gamma only (PLAN.md §26 WP 16.2). Bounded 0–1, as the engine bounds it.
 
 | | |
 |---|---|
 | Type | `numeric` |
 | Grain | `level` |
 | Unit | `coefficient of variation (dimensionless)` — fixed |
-| Added by | `20261003000003_lane_lead_time_spread.sql` |
+| Added by | `20261004000003_lane_lead_time_spread.sql` |
 | Read by the engine | `project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_cv` |
 | Transform | float(); the row's CV on /policies wins |
 | Validated at ingest | numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing |
@@ -477,14 +477,14 @@ How much this lane's lead time varies, as a coefficient of variation — read by
 
 ### `lead_time_min`
 
-A triangular or uniform lane's shortest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.2).
+A triangular or uniform lane's shortest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.2).
 
 | | |
 |---|---|
 | Type | `numeric` |
 | Grain | `level` |
 | Unit | `weeks` — column, named by `lead_time_unit` |
-| Added by | `20261003000003_lane_lead_time_spread.sql` |
+| Added by | `20261004000003_lane_lead_time_spread.sql` |
 | Read by the engine | `project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_min_weeks` |
 | Transform | _duration_to_weeks(lead_time_min, lead_time_unit); the row's bound on /policies wins |
 | Validated at ingest | numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing |
@@ -492,14 +492,14 @@ A triangular or uniform lane's shortest lead time — a duration in the lane's `
 
 ### `lead_time_mode`
 
-A triangular lane's most likely lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular only (PLAN.md §25 WP 15.2).
+A triangular lane's most likely lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular only (PLAN.md §26 WP 16.2).
 
 | | |
 |---|---|
 | Type | `numeric` |
 | Grain | `level` |
 | Unit | `weeks` — column, named by `lead_time_unit` |
-| Added by | `20261003000003_lane_lead_time_spread.sql` |
+| Added by | `20261004000003_lane_lead_time_spread.sql` |
 | Read by the engine | `project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_mode_weeks` |
 | Transform | _duration_to_weeks(lead_time_mode, lead_time_unit); the row's bound on /policies wins |
 | Validated at ingest | numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing |
@@ -507,14 +507,14 @@ A triangular lane's most likely lead time — a duration in the lane's `lead_tim
 
 ### `lead_time_max`
 
-A triangular or uniform lane's longest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.2).
+A triangular or uniform lane's longest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.2).
 
 | | |
 |---|---|
 | Type | `numeric` |
 | Grain | `level` |
 | Unit | `weeks` — column, named by `lead_time_unit` |
-| Added by | `20261003000003_lane_lead_time_spread.sql` |
+| Added by | `20261004000003_lane_lead_time_spread.sql` |
 | Read by the engine | `project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_max_weeks` |
 | Transform | _duration_to_weeks(lead_time_max, lead_time_unit); the row's bound on /policies wins |
 | Validated at ingest | numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing |
@@ -530,6 +530,6 @@ A triangular or uniform lane's longest lead time — a duration in the lane's `l
 
 ---
 
-*Generated from data contract `033d06223a46`, engine `0.8.0`,
+*Generated from data contract `c7c7da69c86d`, engine `0.8.0`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

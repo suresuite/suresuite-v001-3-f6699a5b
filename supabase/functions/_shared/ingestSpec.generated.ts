@@ -643,7 +643,7 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
           "max": 1,
           "blank": "null"
         },
-        "validate": "numeric 0–1 — the engine's bound (§4 D294: a CV above 1 used to fail the run)"
+        "validate": "numeric 0–1 — the engine's bound (§4 D302: a CV above 1 used to fail the run)"
       }
     ],
     "normalize": []

@@ -19,6 +19,7 @@ import {
   staleMessage,
   validatedModelLines,
 } from "@/lib/sim/validatedModel";
+import { dataRef, modelCodeLine, policyRef } from "@/lib/versions/versionLabels";
 
 export function ValidatedModelSummary({
   card,
@@ -39,8 +40,10 @@ export function ValidatedModelSummary({
       <div className="flex flex-wrap items-center gap-2 border-b border-[--hair-border] bg-[#fafafa] px-2.5 py-1.5">
         <StatusDot ok={credibility.state === "validated"} pending={credibility.state !== "validated"} />
         <span className="text-[12.5px] font-medium">
-          {card.name ?? "Validated model"}
-          {card.version_no != null ? ` · v${card.version_no}` : ""}
+          {modelCodeLine(card, {
+            data: dataRef({ version_code: refs.simulationCode, version_no: refs.simulationVersionNo }),
+            policy: policyRef({ version_code: refs.policyCode, version_no: refs.policyVersionNo }),
+          })}
         </span>
         {card.model_hash && (
           <span className="font-mono text-[10.5px] text-muted-foreground" title="model_validations.model_hash">

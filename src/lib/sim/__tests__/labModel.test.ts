@@ -50,8 +50,12 @@ describe("the model choice", () => {
     expect(defaultModel([older, newer], "nope")?.id).toBe("b");
     expect(defaultModel([gone], null)).toBeNull();
   });
-  it("labels a model by name, number and protocol line", () => {
-    expect(modelOptionLabel(newer)).toBe("Baseline v2 · 30 seeds · steady from wk 12 · 52 wks");
+  it("labels a model by its code, its data and policy codes, and its name (WP 10.5 follow-up)", () => {
+    expect(modelOptionLabel({ ...newer, model_code: "2026Q3" }, { data: "Data 20260915", policy: "Policy 20261004" })).toBe(
+      "2026Q3 - Data 20260915 - Policy 20261004 · Baseline",
+    );
+    // A model saved before periods existed says so — no code is invented for it.
+    expect(modelOptionLabel(newer)).toBe("v2 · no period · Baseline");
   });
 });
 

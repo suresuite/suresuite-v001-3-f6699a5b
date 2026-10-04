@@ -1234,11 +1234,11 @@ def test_mrp_reaches_the_engine_as_the_project_type_and_per_material():
     assert pol["material_overrides"]["m1"]["policy_type"] == "mrp"
 
 
-# ── A lane's lead-time SPREAD — PLAN.md §25 WP 15.2, §4 D291 / D294 ────────────
+# ── A lane's lead-time SPREAD — PLAN.md §26 WP 16.2, §4 D299 / D302 ────────────
 #
 # Order, per part: the Supplier row → the lane's upload → (shape and CV only)
 # the material → deterministic. A bounded shape's planning lead time is its
-# bounds' mean (§25.2 rule 3).
+# bounds' mean (§26.2 rule 3).
 
 def _link(res, sup, mat="m1"):
     return next(l for l in res.scenario.network.supplier_links
@@ -1317,12 +1317,12 @@ def test_an_unknown_shape_on_the_row_is_ignored_with_a_warning():
 
 
 def test_a_material_cv_above_one_is_clamped_not_a_failed_run():
-    # §4 D294: before Phase 15 this raised a ValidationError while the network was built.
+    # §4 D302: before Phase 16 this raised a ValidationError while the network was built.
     d = _base()
     d.materials[0].lead_time_dist, d.materials[0].lead_time_cv = "lognormal", 1.5
     res = from_project_data(d)
     assert _link(res, "s1").lead_time_cv == 1.0
-    assert any(w.field == "lead_time_cv" and "D294" in w.reason for w in res.warnings)
+    assert any(w.field == "lead_time_cv" and "D302" in w.reason for w in res.warnings)
 
 
 def test_without_any_spread_the_run_log_is_unchanged():
@@ -1332,7 +1332,7 @@ def test_without_any_spread_the_run_log_is_unchanged():
     assert all(l.lead_time_dist.value == "deterministic" for l in res.scenario.network.supplier_links)
 
 
-# ── A product's production lead time — PLAN.md §25 WP 15.5, §4 D292 ───────────
+# ── A product's production lead time — PLAN.md §26 WP 16.5, §4 D300 ───────────
 
 def _prod(res):
     return res.scenario.network.products[0]

@@ -17,6 +17,7 @@
 //     be "any one KPI passed" (§4 D244).
 import { mser5, welchWarmup } from "./validationStats";
 import type { ModelValidationCard } from "@/hooks/useModelValidation";
+import { dataRef, modelCodeLine, policyRef, protocolText } from "@/lib/versions/versionLabels";
 
 export type StoppingRule = "fixed_horizon" | "ci_halfwidth";
 
@@ -132,12 +133,7 @@ export function protocolProblems(p: Partial<ValidatedModelProtocol> | null | und
 
 /** The protocol in one line, as the Lab's model header shows it. */
 export function protocolLine(p: Pick<ValidatedModelProtocol, "replications" | "warmup_week" | "horizon_weeks">): string {
-  const part = (v: number | null | undefined, f: (x: number) => string) => (v == null ? "?" : f(v));
-  return [
-    part(p.replications, (x) => `${x} seeds`),
-    part(p.warmup_week, (x) => `steady from wk ${x}`),
-    part(p.horizon_weeks, (x) => `${x} wks`),
-  ].join(" · ");
+  return protocolText(p);
 }
 
 // ── warm-up across KPIs ──────────────────────────────────────────────────────
@@ -255,19 +251,35 @@ export function noteReasons(notes: string[] | undefined): string[] {
   return (notes ?? []).map((n) => (n === "network" ? "the deep tier changed — not read by the simulation" : n));
 }
 
-/** What the Lab says about the model a `?model=` link opened: its name and
- *  number, its protocol in one line, and whether it is still the model in force
- *  (status) and still current (derived drift — never stored). */
+/** A model's state in one phrase — the Lab's pill and the opened-model line say
+ *  the same words. "valid" is the model's own word; a policy version that equals the
+ *  live policies is "live", never this (the two used to share "in force"). */
+export function modelStatusText(
+  card: { status: "active" | "superseded" | "revoked" },
+  credibility: { state: "validated" | "stale" | "unvalidated"; drift?: string[]; notes?: string[] } | null,
+  supersededBy?: string | null,
+): string {
+  if (card.status === "revoked") return "revoked — not usable";
+  if (card.status === "superseded") return supersededBy ? `superseded by ${supersededBy}` : "superseded by a newer model";
+  if (credibility?.state === "stale" && (credibility.drift ?? []).every((d) => d === "data"))
+    return "data changed since validation → a run replays the validated data";
+  if (credibility?.state === "stale") return `${driftReasons(credibility.drift ?? []).join(" · ") || "stale"} → re-validate`;
+  if (credibility?.state === "validated") return "valid";
+  return "not matched to the live policy, data and scenario";
+}
+
+/** What the Lab says about the model a `?model=` link opened: its code, its
+ *  protocol in one line, and its state (status, and derived drift — never stored). */
 export function openedModelLine(
   card: {
     name?: string | null;
     version_no?: number | null;
+    model_code?: string | null;
     status: "active" | "superseded" | "revoked";
     protocol?: Partial<ValidatedModelProtocol> | null;
   },
   credibility: { state: "validated" | "stale" | "unvalidated"; drift?: string[]; notes?: string[] },
 ): string {
-  const head = `${card.name ?? "Validated model"}${card.version_no != null ? ` v${card.version_no}` : ""}`;
   const proto = card.protocol
     ? protocolLine({
         replications: card.protocol.replications as number,
@@ -275,18 +287,12 @@ export function openedModelLine(
         horizon_weeks: card.protocol.horizon_weeks as number,
       })
     : "no protocol recorded";
-  let state: string;
-  if (card.status === "revoked") state = "revoked — not usable";
-  else if (card.status === "superseded") state = "superseded — a newer model is in force";
-  else if (credibility.state === "stale") {
-    state = `${driftReasons(credibility.drift ?? []).join(" · ") || "stale"} → re-validate`;
-  } else if (credibility.state === "unvalidated") {
-    state = "not matched to the live policy, graph and scenario";
-  } else {
+  let state = modelStatusText(card, credibility);
+  if (state === "valid") {
     const notes = noteReasons(credibility.notes);
-    state = notes.length ? `in force (${notes.join("; ")})` : "in force";
+    if (notes.length) state = `valid (${notes.join("; ")})`;
   }
-  return `Model ${head} · ${proto} · ${state}`;
+  return `Model ${modelCodeLine(card)} · ${proto} · ${state}`;
 }
 
 // ── the summary card's lines (T1: no number without a source) ────────────────
@@ -306,6 +312,9 @@ export interface VersionRefs {
   policyVersionNo: number | null;
   /** WP 11.3 — the simulation scope's level version, "simulation inputs v4". */
   simulationVersionNo?: number | null;
+  /** WP 10.5 follow-up — the stored codes, "Policy 20261004" / "Data 20260915". */
+  policyCode?: string | null;
+  simulationCode?: string | null;
 }
 
 export const shortHash = (h: string | null | undefined) => (h ? h.slice(0, 7) : null);
@@ -337,13 +346,13 @@ export function validatedModelLines(card: ModelValidationCard, refs: VersionRefs
     // WP 11.3 · §4 D259 — what the model BINDS first: the simulation's inputs, the
     // scope the engine reads. The snapshot it was validated on is kept, second.
     {
-      label: "Simulation inputs",
+      label: "Data (simulation inputs)",
       value: card.hash_simulation
-        ? refs.simulationVersionNo != null
-          ? `Simulation inputs v${refs.simulationVersionNo} · ${short(card.hash_simulation)}`
-          : `${short(card.hash_simulation)} (version number not loaded)`
+        ? refs.simulationVersionNo != null || refs.simulationCode
+          ? `${dataRef({ version_code: refs.simulationCode, version_no: refs.simulationVersionNo })} · ${short(card.hash_simulation)}`
+          : `${short(card.hash_simulation)} (version not loaded)`
         : null,
-      source: "model_validations.simulation_version_id → graph_level_versions.version_no · hash_simulation",
+      source: "model_validations.simulation_version_id → graph_level_versions.version_code · hash_simulation",
       reason: "not recorded — the model has no snapshot to read its simulation inputs from, so it is matched on its snapshot",
     },
     {
@@ -360,12 +369,12 @@ export function validatedModelLines(card: ModelValidationCard, refs: VersionRefs
     {
       label: "Policy",
       value:
-        refs.policyVersionNo != null
-          ? `Policy v${refs.policyVersionNo} · ${short(card.policy_hash)}`
+        refs.policyVersionNo != null || refs.policyCode
+          ? `${policyRef({ version_code: refs.policyCode, version_no: refs.policyVersionNo })} · ${short(card.policy_hash)}`
           : card.policy_hash
-            ? `${short(card.policy_hash)} (version number not loaded)`
+            ? `${short(card.policy_hash)} (version not loaded)`
             : null,
-      source: "model_validations.policy_version_id → policy_versions.version_no · policy_hash",
+      source: "model_validations.policy_version_id → policy_versions.version_code · policy_hash",
       reason: "no policy hash on this model",
     },
     {
@@ -375,7 +384,7 @@ export function validatedModelLines(card: ModelValidationCard, refs: VersionRefs
       reason: "not recorded — the evidence run carried no code_version",
     },
     fromProtocol("Run", "replications", (v: number) =>
-      `${v} seeds${p?.root_seed != null ? ` · root seed ${p.root_seed}` : ""}${p?.crn != null ? ` · CRN ${p.crn ? "on" : "off"}` : ""}`,
+      `${v} ${v === 1 ? "replication" : "replications"}${p?.root_seed != null ? ` · root seed ${p.root_seed}` : ""}${p?.crn != null ? ` · CRN ${p.crn ? "on" : "off"}` : ""}`,
     ),
     fromProtocol("Steady state from", "warmup_week", (v: number) => `week ${v}`),
     fromProtocol("Horizon", "horizon_weeks", (v: number) => `${v} weeks`),
@@ -412,9 +421,15 @@ export function validatedModelLines(card: ModelValidationCard, refs: VersionRefs
 }
 
 /** "newer graph/policy exists → re-validate", from the derived drift (never stored). */
-export function staleMessage(credibility: { state: string; drift?: string[]; card?: unknown }): string | null {
+export function staleMessage(
+  credibility: { state: string; drift?: string[]; card?: unknown; engineChange?: string },
+): string | null {
   if (credibility.state !== "stale") return null;
-  const parts = driftReasons(credibility.drift ?? []);
+  // WP 15.6 · §4 D297 — "the engine changed" says WHAT changed when the change
+  // record can. Never a reason to stay validated: an engine change still re-validates (O3).
+  const parts = driftReasons(credibility.drift ?? []).map((p) =>
+    p === "the engine changed" && credibility.engineChange ? `the engine changed (${credibility.engineChange})` : p,
+  );
   return parts.length ? `${parts.join(" · ")} → re-validate` : null;
 }
 
