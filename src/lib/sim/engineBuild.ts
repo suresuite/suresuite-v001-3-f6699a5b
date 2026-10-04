@@ -1,5 +1,5 @@
 /**
- * The engine a run names, read from its `code_version` — PLAN.md §25 · WP 15.1 · §4 D292.
+ * The engine a run names, read from its `code_version` — PLAN.md §25 · WP 15.1 · §4 D293.
  *
  * Since WP 15.1 a run records the BUILD that computed it, by content:
  * `scsim-0.6.1+ce3483abda4e` (version + a digest of the engine's source and the
@@ -41,7 +41,7 @@ export function engineLabelText(codeVersion: string | null | undefined): string 
  * Why two runs' engines differ, in words — or null when they are the same build.
  *
  * Three cases a user has to tell apart: different versions; the same version
- * built from different code (D292, live on `main` for a day); and a run from
+ * built from different code (D293, live on `main` for a day); and a run from
  * before WP 15.1, whose build nobody can know.
  */
 export function engineDifference(

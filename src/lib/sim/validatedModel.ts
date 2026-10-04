@@ -416,7 +416,7 @@ export function staleMessage(
   credibility: { state: string; drift?: string[]; card?: unknown; engineChange?: string },
 ): string | null {
   if (credibility.state !== "stale") return null;
-  // WP 15.6 · §4 D296 — "the engine changed" says WHAT changed when the change
+  // WP 15.6 · §4 D297 — "the engine changed" says WHAT changed when the change
   // record can. Never a reason to stay validated: an engine change still re-validates (O3).
   const parts = driftReasons(credibility.drift ?? []).map((p) =>
     p === "the engine changed" && credibility.engineChange ? `the engine changed (${credibility.engineChange})` : p,

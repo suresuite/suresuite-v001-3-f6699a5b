@@ -53,7 +53,7 @@ export function parseEngineIndex(raw: unknown): EngineIndex {
   };
 }
 
-/** WP 15.3 · §4 D294 — `engine/versions.json`: every build ever published, newest first. */
+/** WP 15.3 · §4 D295 — `engine/versions.json`: every build ever published, newest first. */
 export function parseEngineVersions(raw: unknown): EngineIndex[] {
   const list = (raw as { versions?: unknown })?.versions;
   if (!Array.isArray(list)) throw new Error("engine versions: a `versions` list is required");

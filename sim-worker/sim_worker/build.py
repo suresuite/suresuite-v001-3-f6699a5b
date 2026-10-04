@@ -1,4 +1,4 @@
-"""The build a platform run names — PLAN.md §25 · WP 15.1 · §4 D292 · gate `engine-ledger` rule 5.
+"""The build a platform run names — PLAN.md §25 · WP 15.1 · §4 D293 · gate `engine-ledger` rule 5.
 
 A platform run's numbers are decided by TWO packages: scsim, and the part of
 sim_worker that turns frozen inputs into the engine's input and its result into

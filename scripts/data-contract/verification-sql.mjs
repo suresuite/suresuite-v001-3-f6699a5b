@@ -5280,7 +5280,7 @@ async function phase15EngineLedger() {
         from public.simulation_runs group by 1, 2 order by max(created_at) desc nulls last`),
     (rows) => { out("**(0) engine labels on runs (`names_a_build` is true for every run computed since WP 15.1 deployed):**"); out(...table(rows)); });
 
-  report("(1) D291 — every engine label a run carries has its ledger row",
+  report("(1) D292 — every engine label a run carries has its ledger row",
     await tryQ(`
       select count(distinct r.code_version) as labels_on_runs,
              count(distinct r.code_version) filter (where b.id is null) as labels_missing_from_ledger
@@ -5292,7 +5292,7 @@ async function phase15EngineLedger() {
          and coalesce(r.engine_id, public._engine_for_code_version(r.code_version)) is not null`),
     (rows) => { out("**(1) labels on runs vs the ledger (`labels_missing_from_ledger` must be 0 — the backfill and the run trigger record every one):**"); out(...table(rows)); });
 
-  report("(2) D291 — the ledger by how each build was first seen",
+  report("(2) D292 — the ledger by how each build was first seen",
     await tryQ(`
       select first_seen_by, count(*) as builds,
              count(*) filter (where position('+' in code_version) > 0) as content_named,
@@ -5301,7 +5301,7 @@ async function phase15EngineLedger() {
         from public.sim_engine_builds group by 1 order by 1`),
     (rows) => { out("**(2) the ledger (`backfill` rows are history and carry no digests; a `worker_report` row after the merge carries digests, commit and image):**"); out(...table(rows)); });
 
-  report("(3) D292 — the registry's current build and its ledger row",
+  report("(3) D293 — the registry's current build and its ledger row",
     await tryQ(`
       select e.slug, e.status, e.code_version, e.reported_at,
              b.first_seen_by, b.commit_sha, b.image_digest is not null as has_image, b.withdrawn_at
@@ -5318,7 +5318,7 @@ async function phase15EngineLedger() {
        group by 1, 2 order by 1, 2`),
     (rows) => { out("**(4) runs since the first non-backfill build (every completed one names a build):**"); out(...table(rows)); });
 
-  report("(5) D294 — the engine bucket: the two indexes and the archived wheels",
+  report("(5) D295 — the engine bucket: the two indexes and the archived wheels",
     await tryQ(`
       select count(*) filter (where name = 'index.json') as index_json,
              count(*) filter (where name = 'versions.json') as versions_json,

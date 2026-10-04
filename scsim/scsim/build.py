@@ -5,11 +5,11 @@
 
 """The engine BUILD: what actually ran, identified by its content.
 
-PLAN.md §25 · WP 15.1 · §4 D292, D293 · gate ``engine-ledger`` rule 5.
+PLAN.md §25 · WP 15.1 · §4 D293, D294 · gate ``engine-ledger`` rule 5.
 
 ``ENGINE_VERSION`` is a number a person sets. Two builds with different code
 and the same number were one engine to the RunKey, to reuse and to
-comparability (D292), and `main` shipped exactly that: the browser ran a
+comparability (D293), and `main` shipped exactly that: the browser ran a
 different 0.6.1 from the worker for a day (§16 · WP 15.4). A build is
 therefore named by a DIGEST OF ITS SOURCE:
 

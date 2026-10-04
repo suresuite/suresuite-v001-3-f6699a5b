@@ -41,7 +41,7 @@ def build_run_update(kpis: dict[str, Any], n_reps: int, ended_at: Any = None) ->
         **({"stopping_rule": kpis["stopping_rule"]} if kpis.get("stopping_rule") else {}),
     }
     if kpis.get("source") == "scsim":
-        # WP 15.1 · §4 D292 — the BUILD that ran (`scsim-0.6.1+<digest>`), named by
+        # WP 15.1 · §4 D293 — the BUILD that ran (`scsim-0.6.1+<digest>`), named by
         # its content; a payload from an older wheel carries only the version.
         code_version = kpis.get("engine_build") or f"scsim-{kpis.get('engine_version', 'unknown')}"
     else:

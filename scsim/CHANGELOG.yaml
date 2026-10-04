@@ -90,6 +90,13 @@
         (`scsim-0.6.1+<digest>` over scsim and the worker's compute path), the package
         version is ENGINE_VERSION (the wheel is scsim-0.6.1), and the version line no longer
         carries a comment. No result changes; every frozen reference run kept its digest.
+    - date: 2026-10-04
+      commit: "14a97c45"
+      tier: 2
+      summary: >-
+        A Customer row's demand can be the customer's requested delivery schedule
+        (`row_demand_schedule`, typed week by week on /policies), run exactly as firm demand
+        with nothing past its end. Neutral for a project that sets none (D291).
   backfilled: true
   unrecorded_changes: 0
 

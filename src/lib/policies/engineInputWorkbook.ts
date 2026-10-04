@@ -376,7 +376,7 @@ export function buildEngineInputWorkbook(d: EngineInputExportData): XLSX.WorkBoo
     ["Scenario", d.scenarioReason],
     ["Project fulfillment default", d.projectModel ?? "(not set — make-to-order)"],
     ["Engine", `scsim ${d.engine.engine_version}`],
-    // WP 15.1 · §4 D292 — the build by content, which two different 0.6.1s do not share.
+    // WP 15.1 · §4 D293 — the build by content, which two different 0.6.1s do not share.
     ["Engine build", d.engine.engine_build ?? "(not recorded — the engine predates build identity)"],
     ["Generated", d.generatedAt],
     [],

@@ -1,5 +1,5 @@
 # AUTHORED — the data contract's sidecar for `sim_engine_builds`.
-# PLAN.md §25 · WP 15.2 · §4 D291. Edit this file; docs/data/tables/*.md is generated from it.
+# PLAN.md §25 · WP 15.2 · §4 D292. Edit this file; docs/data/tables/*.md is generated from it.
 table: sim_engine_builds
 tier: reference
 schema_name: public

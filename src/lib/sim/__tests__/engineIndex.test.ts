@@ -58,7 +58,7 @@ describe("engine distribution index", () => {
   });
 });
 
-// PLAN.md §25 · WP 15.3 · §4 D294 — every build ever published stays installable by version.
+// PLAN.md §25 · WP 15.3 · §4 D295 — every build ever published stays installable by version.
 describe("engine archive: versions.json", () => {
   const w = (n: string) => ({ file: `scsim-${n}-py3-none-any.whl`, sha256: n.replace(/\D/g, "").padEnd(64, "a").slice(0, 64), bytes: 10 });
   const v040 = { engine_version: "0.4.0", engine_build: "scsim-0.4.0+aaaaaaaaaaaa", commit: "a", published_at: "2026-10-01", wheels: [w("0.4.0")] };

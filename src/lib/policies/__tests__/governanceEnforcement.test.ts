@@ -142,7 +142,7 @@ describe("D28 — the truth table of what is actually unconditional", () => {
    * organization's capacity pool. The plan, not tenant data: a percentage per role,
    * no project id. SELECT only; the one writer is the super admin's
    * `admin_set_role_allowance`. (`run_usage`, the ledger, has RLS and NO policy.)
-   * AND `sim_engine_builds` — WP 15.2 (§4 D291): the engine build ledger, read the same
+   * AND `sim_engine_builds` — WP 15.2 (§4 D292): the engine build ledger, read the same
    * way and for the same reason as `sim_engines`. Which builds produced results, and
    * which were withdrawn, is what a result's reader needs to see; it names no project
    * and no person, and no API role can write it (§16 · WP 15.2).

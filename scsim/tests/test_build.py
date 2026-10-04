@@ -1,4 +1,4 @@
-"""The engine's version and build identity — PLAN.md §25 · WP 15.1 · §4 D292, D293."""
+"""The engine's version and build identity — PLAN.md §25 · WP 15.1 · §4 D293, D294."""
 from __future__ import annotations
 
 from importlib.metadata import version as dist_version
@@ -9,7 +9,7 @@ from scsim.build import compose, digest_files, engine_build, source_digest, vers
 
 
 def test_one_version_number():
-    # §4 D293 — the package version was 0.2.0 through eleven engine versions.
+    # §4 D294 — the package version was 0.2.0 through eleven engine versions.
     assert scsim.__version__ == ENGINE_VERSION
     assert dist_version("scsim") == ENGINE_VERSION
 

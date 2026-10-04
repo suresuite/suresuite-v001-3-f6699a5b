@@ -103,7 +103,7 @@ export type Credibility =
       card: ModelValidationCard;
       drift: DriftComponent[];
       notes?: CredibilityNote[];
-      /** WP 15.6 · §4 D296 — what lies between the model's engine and the run's, in words
+      /** WP 15.6 · §4 D297 — what lies between the model's engine and the run's, in words
        *  (from the change record). Present only with `engine` drift. It never clears it. */
       engineChange?: string;
     };

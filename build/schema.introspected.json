@@ -19981,7 +19981,7 @@
         "determinate": true
       },
       "replica_identity": null,
-      "comment": "WP 15.2 · §4 D291 — the engine build ledger: one row per (engine, code_version) that produced a result or was reported running. Append-only; a build is withdrawn, never deleted.",
+      "comment": "WP 15.2 · §4 D292 — the engine build ledger: one row per (engine, code_version) that produced a result or was reported running. Append-only; a build is withdrawn, never deleted.",
       "natural_key_unique": [
         {
           "source": "UNIQUE constraint",

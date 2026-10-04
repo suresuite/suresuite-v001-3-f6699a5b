@@ -33,7 +33,7 @@ def test_the_boot_report_names_the_registered_engine_and_the_build_runs_carry():
 
     stamped = build_run_update({"source": "scsim", "engine_version": ENGINE_VERSION,
                                 "engine_build": code_version()}, 1)
-    # WP 15.1 · §4 D292 — the BUILD, by content, not the version alone.
+    # WP 15.1 · §4 D293 — the BUILD, by content, not the version alone.
     assert p["p_code_version"] == code_version() != f"scsim-{ENGINE_VERSION}"
     assert p["p_code_version"] == stamped["code_version"]
     legacy = engine_report_payload(False)
@@ -91,7 +91,7 @@ def test_a_failed_report_never_stops_the_worker(monkeypatch):
 
 
 def test_the_report_carries_the_build_parts_for_the_ledger(monkeypatch):
-    # WP 15.2 · §4 D291 — the digests always; the commit and image when the deploy states them.
+    # WP 15.2 · §4 D292 — the digests always; the commit and image when the deploy states them.
     from sim_worker.build import engine_build
 
     monkeypatch.setenv("GIT_SHA", "ABCDEF1234567")

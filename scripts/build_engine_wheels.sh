@@ -59,7 +59,7 @@ if [[ "$MODE" == "--check" ]]; then
   fi
   diff_wheel_source "$committed_scsim" "$fresh_scsim" "scsim" || rc=1
   diff_wheel_source "$committed_worker" "$fresh_worker" "sim_worker" || rc=1
-  # WP 15.1 · §4 D292 — the manifest names the BUILD the committed wheels are, and
+  # WP 15.1 · §4 D293 — the manifest names the BUILD the committed wheels are, and
   # it is the build this source names: the browser and the worker run the same
   # code exactly when these agree (gate `engine-ledger` rule 5).
   want_build="$(python scripts/engine_build_id.py --source)"
@@ -119,7 +119,7 @@ if [[ -z "$SCSIM_VER" || "$SCSIM_VER" == "unknown" ]]; then
   echo "❌ scsim.ENGINE_VERSION resolved to \"$SCSIM_VER\" — refusing to write the manifest." >&2
   exit 1
 fi
-# WP 15.1 · §4 D292 — the build these wheels ARE (by content), and each file's sha256,
+# WP 15.1 · §4 D293 — the build these wheels ARE (by content), and each file's sha256,
 # so a result computed in the browser names the same build the worker would.
 ENGINE_BUILD="$(python scripts/engine_build_id.py "$OUT/$SCSIM_WHL" "$OUT/$WORKER_WHL")"
 SHA_SCSIM="$(python -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$OUT/$SCSIM_WHL")"

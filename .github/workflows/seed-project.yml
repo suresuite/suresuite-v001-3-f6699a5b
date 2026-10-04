@@ -250,7 +250,7 @@ jobs:
         if: steps.params.outputs.verify == 'true'
         run: |
           set -o pipefail
-          # WP 15.1 · §4 D292 — the exact BUILD of this ref (version + source digest,
+          # WP 15.1 · §4 D293 — the exact BUILD of this ref (version + source digest,
           # stdlib only), so a worker running other code under the same version fails
           # here instead of passing on its version number alone.
           EXPECTED_CODE_VERSION="$(python3 scripts/engine_build_id.py --source)" node scripts/verify_sim_e2e.mjs 2>&1 | tee /tmp/verify.log

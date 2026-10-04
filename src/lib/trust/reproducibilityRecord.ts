@@ -381,7 +381,7 @@ export function bindingsOf(input: ReproducibilityRecordInput): Binding[] {
       "the engine that produced the figure is unrecorded, so a later engine cannot be " +
         "compared against it",
     ),
-    // WP 15.1 / 15.6 · §4 D292, D296 — the build by content, and what its version changed.
+    // WP 15.1 / 15.6 · §4 D293, D297 — the build by content, and what its version changed.
     bind(
       "engine.build",
       "Engine build",

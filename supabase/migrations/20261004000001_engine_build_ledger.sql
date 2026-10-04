@@ -1,8 +1,8 @@
 -- ============================================================================
--- Phase 15 / WP 15.2 · §4 D291 · gate `engine-ledger` · blueprint G21
+-- Phase 15 / WP 15.2 · §4 D292 · gate `engine-ledger` · blueprint G21
 -- THE ENGINE BUILD LEDGER: every build that produced a result, recorded once.
 --
--- D291: `sim_engines` holds one row per engine and the worker's boot report
+-- D292: `sim_engines` holds one row per engine and the worker's boot report
 -- OVERWRITES its `version` and `code_version`, so the registry could say which
 -- build runs now and not which builds ran. Nine engine versions reported into
 -- one row in four days, and since WP 15.1 every engine commit is a new build.
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS public.sim_engine_builds (
   CONSTRAINT sim_engine_builds_seen_order CHECK (last_seen_at >= first_seen_at)
 );
 COMMENT ON TABLE public.sim_engine_builds IS
-  'WP 15.2 · §4 D291 — the engine build ledger: one row per (engine, code_version) that produced a result or was reported running. Append-only; a build is withdrawn, never deleted.';
+  'WP 15.2 · §4 D292 — the engine build ledger: one row per (engine, code_version) that produced a result or was reported running. Append-only; a build is withdrawn, never deleted.';
 
 ALTER TABLE public.sim_engine_builds ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sim_engine_builds_read ON public.sim_engine_builds;
@@ -190,7 +190,7 @@ BEGIN
   IF v_id IS NULL THEN
     RAISE EXCEPTION 'engine % is not in the registry', p_slug USING ERRCODE = 'no_data_found';
   END IF;
-  -- WP 15.2 · §4 D291 — the registry row says what runs NOW; the ledger keeps it.
+  -- WP 15.2 · §4 D292 — the registry row says what runs NOW; the ledger keeps it.
   PERFORM public._engine_build_record(v_id, p_code_version, 'worker_report', p_build);
   RETURN v_id;
 END;

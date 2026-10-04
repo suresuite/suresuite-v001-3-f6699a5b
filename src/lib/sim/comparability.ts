@@ -78,8 +78,8 @@ export function comparabilityFailures(a: ComparableSide, b: ComparableSide): str
     );
   }
 
-  // WP 15.1 · §4 D292 — says HOW the engines differ: version, build, or unknowable;
-  // WP 15.6 · §4 D296 — and what the change record says lies between them.
+  // WP 15.1 · §4 D293 — says HOW the engines differ: version, build, or unknowable;
+  // WP 15.6 · §4 D297 — and what the change record says lies between them.
   const engines = engineDifference(a.run.code_version, b.run.code_version);
   if (engines) {
     const between = engineChangeSummary(a.run.code_version, b.run.code_version);

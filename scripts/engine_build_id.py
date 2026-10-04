@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Name an engine build without installing it — PLAN.md §25 · WP 15.1 · §4 D292.
+"""Name an engine build without installing it — PLAN.md §25 · WP 15.1 · §4 D293.
 
     python scripts/engine_build_id.py --source                         # this checkout
     python scripts/engine_build_id.py <scsim.whl> <sim_worker.whl>     # two wheels

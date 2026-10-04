@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { engineDifference, engineLabelText, parseCodeVersion } from "../engineBuild";
 
-// PLAN.md §25 · WP 15.1 · §4 D292 — a run's code_version names its BUILD.
+// PLAN.md §25 · WP 15.1 · §4 D293 — a run's code_version names its BUILD.
 describe("engineBuild", () => {
   it("reads version and build from a WP 15.1 label, and only the version from an older one", () => {
     expect(parseCodeVersion("scsim-0.6.1+ce3483abda4e")).toEqual({ slug: "scsim", version: "0.6.1", build: "ce3483abda4e" });

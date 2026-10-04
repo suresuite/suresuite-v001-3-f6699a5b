@@ -13,7 +13,7 @@ import {
 } from "../engineChanges";
 import { comparabilityFailures } from "../comparability";
 
-// PLAN.md §25 · WP 15.6 · §4 D296 — every surface that names an engine reads the
+// PLAN.md §25 · WP 15.6 · §4 D297 — every surface that names an engine reads the
 // change record through these, so "the engine changed" can say WHAT changed.
 describe("engineChanges", () => {
   it("orders versions semantically", () => {

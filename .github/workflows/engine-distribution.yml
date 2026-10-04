@@ -47,7 +47,7 @@ jobs:
       - name: The index the wheels produce
         run: node scripts/publish_engine_wheels.mjs --dry-run
 
-      # PLAN.md §25 · WP 15.3 · §4 D294 — every version gets a tag at the commit that
+      # PLAN.md §25 · WP 15.3 · §4 D295 — every version gets a tag at the commit that
       # set it, read from scsim/CHANGELOG.yaml. A tag that already exists is NEVER
       # moved: if it points elsewhere, say so and leave it (a moved tag would make
       # "engine 0.4.0" mean two things).

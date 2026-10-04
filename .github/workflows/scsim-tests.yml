@@ -96,7 +96,7 @@ jobs:
         run: python -m pytest tests -q
         working-directory: scsim
 
-      # PLAN.md §25 · WP 15.4 · gate `engine-ledger` (§4 D295): ENGINE_VERSION has
+      # PLAN.md §25 · WP 15.4 · gate `engine-ledger` (§4 D296): ENGINE_VERSION has
       # its entry in scsim/CHANGELOG.yaml; a moved frozen digest is a bump whose
       # entry names exactly the moved runs; a contract change is Tier 3 with an
       # ADR; an unbumped engine change appends an amendment; nothing published

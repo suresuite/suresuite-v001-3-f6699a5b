@@ -23,10 +23,10 @@ must be flagged in any UI (Part IX §9.5).
 #   Tier 3 (new phase / contract change)            -> minor or major + ADR
 # WHAT each version changed is authored once, in scsim/CHANGELOG.yaml (PLAN.md
 # §25, gate `engine-ledger`) — not in a comment here, which the next bump would
-# overwrite (§4 D295). A bump without an entry fails CI.
+# overwrite (§4 D296). A bump without an entry fails CI.
 ENGINE_VERSION = "0.6.1"
 
-# WP 15.1 · §4 D293 — ONE version number. The package version IS the engine
+# WP 15.1 · §4 D294 — ONE version number. The package version IS the engine
 # version (pyproject reads it), so `scsim-0.6.1-py3-none-any.whl` and `pip show
 # scsim` name the engine inside. It was "0.2.0" through eleven engine versions.
 __version__ = ENGINE_VERSION

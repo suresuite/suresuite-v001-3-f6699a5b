@@ -1,4 +1,4 @@
-"""The build a run names — PLAN.md §25 · WP 15.1 · §4 D292 · gate `engine-ledger` rule 5.
+"""The build a run names — PLAN.md §25 · WP 15.1 · §4 D293 · gate `engine-ledger` rule 5.
 
 A run records the BUILD that computed it, by content: `scsim-<version>+<digest>`
 over scsim's source and the worker's compute path. These tests hold the three
@@ -58,7 +58,7 @@ def test_the_committed_browser_wheels_name_their_manifest_build():
     manifest = json.loads((ROOT / "public" / "engine" / "manifest.json").read_text())
     scsim_whl, worker_whl = (ROOT / "public" / "engine" / w for w in manifest["wheels"])
     assert engine_build_id.from_wheels(scsim_whl, worker_whl)["code_version"] == manifest["engine_build"]
-    # One version number (§4 D293): the wheel is named after the engine inside it.
+    # One version number (§4 D294): the wheel is named after the engine inside it.
     assert scsim_whl.name.startswith(f"scsim-{manifest['engine_version']}-")
 
 

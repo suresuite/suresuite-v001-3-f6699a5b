@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scsim"
-# WP 15.1 · §4 D293 — the package version is ENGINE_VERSION, read from source.
+# WP 15.1 · §4 D294 — the package version is ENGINE_VERSION, read from source.
 dynamic = ["version"]
 description = "Resilience-grade 3-echelon supply chain simulator (SCSIM)"
 readme = "README.md"

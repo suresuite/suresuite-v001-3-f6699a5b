@@ -1,4 +1,4 @@
--- §4 D291 · THE ENGINE BUILD LEDGER (Phase 15 / WP 15.2, `20261004000001`).
+-- §4 D292 · THE ENGINE BUILD LEDGER (Phase 15 / WP 15.2, `20261004000001`).
 --
 -- §1 a boot report records its build: the same build twice is ONE row whose
 --    last_seen_at moves; a new build is a second row, and the first survives.
@@ -52,7 +52,7 @@ BEGIN
   PERFORM public.sim_engine_report('scsim', '9.9.1', k_b, NULL, NULL);
   IF NOT EXISTS (SELECT 1 FROM public.sim_engine_builds WHERE engine_id = v_scsim AND code_version = k_a)
      OR NOT EXISTS (SELECT 1 FROM public.sim_engine_builds WHERE engine_id = v_scsim AND code_version = k_b) THEN
-    RAISE EXCEPTION 'R820 §1: a new build overwrote the old one — the D291 defect';
+    RAISE EXCEPTION 'R820 §1: a new build overwrote the old one — the D292 defect';
   END IF;
   IF (SELECT code_version FROM public.sim_engines WHERE id = v_scsim) <> k_b THEN
     RAISE EXCEPTION 'R820 §1: the registry does not say the newest report is current';

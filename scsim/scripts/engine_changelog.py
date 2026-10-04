@@ -5,7 +5,7 @@
 
 """The engine's change record: its gate and its generated views.
 
-PLAN.md §25 (Phase 15) · WP 15.4 · §4 D295 · gate ``engine-ledger``.
+PLAN.md §25 (Phase 15) · WP 15.4 · §4 D296 · gate ``engine-ledger``.
 
 ``scsim/CHANGELOG.yaml`` is the ONE place an engine version's meaning is
 authored. This script holds it to the rules its header states, and renders the

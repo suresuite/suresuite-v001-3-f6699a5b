@@ -1047,7 +1047,7 @@ const getPolicyVersion: Handler = async (ctx) => {
 // Every fetch is a logged request naming the key — and, for a personal key, the
 // person. The browser engine still loads the same wheels publicly (§4 D274).
 
-// WP 15.3 · §4 D294 — `?version=0.4.0` (the newest build of that version) or
+// WP 15.3 · §4 D295 — `?version=0.4.0` (the newest build of that version) or
 // `?version=scsim-0.4.0+<digest>` (exactly that build) installs an EARLIER engine,
 // from `engine/versions.json`, so a stored result can be re-run on the engine
 // that produced it. With no version, the latest — `index.json`, as before.

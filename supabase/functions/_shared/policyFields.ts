@@ -53,6 +53,8 @@ export const MAX_OVERRIDE_ROWS = 200;
 export const MAX_PATCH_PROPERTIES = 40;
 export const MAX_TARGET_KEY_LEN = 200;
 export const MAX_SCOPE_LEN = 40;
+/** A requested delivery schedule's length cap: ten years of weeks. */
+export const MAX_SCHEDULE_WEEKS = 520;
 
 interface RegistryParamProp {
   type?: string;
@@ -89,6 +91,7 @@ export type FieldValueKind =
   | "boolean"
   | "enum"
   | "enum_array" // recovery.response
+  | "number_array" // demand.row_demand_schedule (units per week, one per week)
   | "ratio_map"; // sourcing.ratios / fulfillment.tier_overrides (id → 0..1)
 
 export interface PolicyFieldSpec {
@@ -271,7 +274,9 @@ export const FAMILY_FIELDS: Record<PolicyFamily, Record<string, PolicyFieldSpec>
   demand: {
     // Customer-row demand (PLAN.md §24 WP 14.2), editable on /policies — added
     // in WP 14.3, which found the agent surface did not know them.
-    row_demand_mode: en(["forecast", "model"], true),
+    row_demand_mode: en(["forecast", "model", "schedule"], true),
+    // The customer's requested delivery schedule — units per week from week 1.
+    row_demand_schedule: { kind: "number_array", min: 0, editable: true },
     row_demand_distribution: en(["deterministic", "normal", "triangular", "triangular_av", "poisson"], true),
     row_demand_mean: n(0, undefined, true),
     row_demand_variation: n(0, undefined, true),
@@ -387,6 +392,18 @@ function checkValue(family: PolicyFamily, field: string, value: unknown): string
       for (const v of value) {
         if (typeof v !== "string" || !spec.enum!.includes(v)) {
           return `${family}.${field}: "${String(v)}" is not allowed — accepted: ${spec.enum!.join(", ")}`;
+        }
+      }
+      return null;
+    }
+    case "number_array": {
+      if (!Array.isArray(value)) return `${family}.${field}: expected an array of numbers`;
+      if (value.length > MAX_SCHEDULE_WEEKS) {
+        return `${family}.${field}: ${value.length} values — at most ${MAX_SCHEDULE_WEEKS} weeks`;
+      }
+      for (const [i, v] of value.entries()) {
+        if (typeof v !== "number" || !Number.isFinite(v) || (spec.min != null && v < spec.min)) {
+          return `${family}.${field}: week ${i + 1} is ${JSON.stringify(v)} — expected a number ≥ ${spec.min ?? 0}`;
         }
       }
       return null;

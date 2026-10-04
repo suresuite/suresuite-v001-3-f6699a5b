@@ -292,7 +292,7 @@ if (run?.status === "done") {
   // Optional exact-BUILD pin: proves the worker runs the engine at THIS ref
   // (a stale worker silently ignores newly added mapping fields). Since WP 15.1
   // the expected value is `scsim-<version>+<source digest>`, so a worker built
-  // from other code under the same version fails too (§4 D292).
+  // from other code under the same version fails too (§4 D293).
   const expected = process.env.EXPECTED_CODE_VERSION || "";
   if (expected) {
     cv === expected

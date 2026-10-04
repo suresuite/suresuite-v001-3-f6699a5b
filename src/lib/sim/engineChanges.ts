@@ -1,5 +1,5 @@
 /**
- * What an engine version changed, for every surface that names one — PLAN.md §25 · WP 15.6 · §4 D296.
+ * What an engine version changed, for every surface that names one — PLAN.md §25 · WP 15.6 · §4 D297.
  *
  * Reads the change record (`scsim/CHANGELOG.yaml`, through its generated module)
  * and the release reports (`scsim/docs/releases/<version>.json`, WP 15.5). Both

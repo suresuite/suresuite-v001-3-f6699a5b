@@ -84,8 +84,8 @@ def engine_report_payload(scsim_on: bool) -> dict[str, Any]:
 
         from sim_worker.build import code_version, engine_build
 
-        # WP 15.1 · §4 D292 — the build, by content (`scsim-0.6.1+<digest>`).
-        # WP 15.2 · §4 D291 — and its parts, for the build ledger. The commit and
+        # WP 15.1 · §4 D293 — the build, by content (`scsim-0.6.1+<digest>`).
+        # WP 15.2 · §4 D292 — and its parts, for the build ledger. The commit and
         # image are the deploy's (`GIT_SHA` is a build arg, `FLY_IMAGE_REF` is set
         # by Fly); absent, the ledger records them as unknown rather than guessed.
         b = engine_build()

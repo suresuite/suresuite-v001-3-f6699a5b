@@ -89,7 +89,7 @@ export function RunProgressPanel({ run, reps, versionLabel, credibility, onCance
                   {versionLabel}
                 </Badge>
               )}
-              {/* WP 15.6 · §4 D296 — the badge opens what this engine version changed. */}
+              {/* WP 15.6 · §4 D297 — the badge opens what this engine version changed. */}
               <Link to={engineDocHref(run.code_version)} title="What this engine version changed">
                 <Badge variant="outline" className={`text-[10px] ${engine.cls}`}>
                   {engine.label}

@@ -3864,7 +3864,17 @@
         "customer"
       ],
       "target": "CustomerLink.forecast",
-      "transform": "empty = the engine's rule (forecast when the row has an uploaded series, else model). Enum \u2014 'model' plans and draws on the row's mean even when a forecast series is uploaded (the series is set aside); 'forecast' uses the series and is warned and ignored when the row has none"
+      "transform": "empty = the engine's rule (the row's requested delivery schedule when one is entered, else its forecast when it has an uploaded series, else model). Enum \u2014 'model' plans and draws on the row's mean even when a forecast series is uploaded (the series is set aside); 'forecast' uses the series and is warned and ignored when the row has none; 'schedule' runs the row's requested delivery schedule (row_demand_schedule) exactly, and is warned and ignored when none is entered"
+    },
+    {
+      "catalog_ref": "P-C.4",
+      "family": "demand",
+      "key": "row_demand_schedule",
+      "scopes": [
+        "customer"
+      ],
+      "target": "CustomerLink.forecast",
+      "transform": "array of units per week, one per simulated week from week 1, each >= 0. Runs when row_demand_mode is 'schedule' or empty: the row's demand becomes exactly the schedule (deterministic, forecast = the schedule, mean 0 so a week past its end has no demand); the row's distribution, variation, bounds and any uploaded forecast are set aside. A non-array or a negative / non-numeric week is warned and the row keeps its forecast or model"
     },
     {
       "catalog_ref": null,

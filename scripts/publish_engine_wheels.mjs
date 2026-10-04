@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Publish the engine wheels to the PRIVATE `engine` storage bucket — Phase 12 · WP 12.4,
-// and keep every build installable by version — Phase 15 · WP 15.3 · §4 D294.
+// and keep every build installable by version — Phase 15 · WP 15.3 · §4 D295.
 //
 // `GET /v1/engine` hands an API key short-lived signed URLs to these files, so a
 // user's `suresuite.install_engine()` installs exactly the engine the platform
@@ -15,7 +15,7 @@
 //
 // Before WP 15.3 only `index.json` existed and it was upserted to the latest build,
 // so a wheel published last week was still in the bucket and nobody could find it
-// without already knowing its hash (D294). `versions.json` is append-only: a build
+// without already knowing its hash (D295). `versions.json` is append-only: a build
 // already listed keeps its first publication.
 //
 // Usage:
