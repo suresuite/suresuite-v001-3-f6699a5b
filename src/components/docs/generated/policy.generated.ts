@@ -1191,7 +1191,37 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → CustomerLink.forecast (P-C.4). Transform: empty = the engine's rule (forecast when the row has an uploaded series, else model). Enum — 'model' plans and draws on the row's mean even when a forecast series is uploaded (the series is set aside); 'forecast' uses the series and is warned and ignored when the row has none",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → CustomerLink.forecast (P-C.4). Transform: empty = the engine's rule (the row's requested delivery schedule when one is entered, else its forecast when it has an uploaded series, else model). Enum — 'model' plans and draws on the row's mean even when a forecast series is uploaded (the series is set aside); 'forecast' uses the series and is warned and ignored when the row has none; 'schedule' runs the row's requested delivery schedule (row_demand_schedule) exactly, and is warned and ignored when none is entered",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "customer",
+    "field": "row_demand_schedule",
+    "family": "demand",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the customer grid as `row_demand_schedule` (family `demand`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → CustomerLink.forecast (P-C.4). Transform: array of units per week, one per simulated week from week 1, each >= 0. Runs when row_demand_mode is 'schedule' or empty: the row's demand becomes exactly the schedule (deterministic, forecast = the schedule, mean 0 so a week past its end has no demand); the row's distribution, variation, bounds and any uploaded forecast are set aside. A non-array or a negative / non-numeric week is warned and the row keeps its forecast or model",
         "evidence": null
       }
     ],
@@ -4202,5 +4232,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 46;
+export const CHAIN_COUNT = 47;
 export const BROKEN_COUNT = 2;

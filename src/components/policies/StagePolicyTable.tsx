@@ -102,6 +102,8 @@ import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { customerRowMasters, demandCellNote, fulfillmentCellNote } from "@/lib/policies/customerRows";
+import { horizonWeeksOf } from "@/lib/policies/deliverySchedule";
+import { DeliveryScheduleCell } from "./DeliveryScheduleEditor";
 import { supplierLaneMasters } from "@/lib/policies/supplierLanes";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
@@ -493,6 +495,8 @@ export function StagePolicyTable({
   // The project's own MTS / MTO — the engine's fallback for a product that
   // states none (`projects.supply_chain_model`, §4 D197).
   const projectFulfillmentMode = projectFulfillmentModeOf(selectedProject?.supply_chain_model);
+  // The run's length in weeks — the delivery-schedule editor's default size.
+  const scheduleHorizonWeeks = horizonWeeksOf(selectedProject?.simulation_start, selectedProject?.simulation_end);
 
   // Build the per-row ColSpecCtx once, then compute the union for the header.
   // `resolved` carries the master-backed gate fields AS THE CELL SHOWS THEM
@@ -854,7 +858,9 @@ export function StagePolicyTable({
         label: o,
         title: o === "forecast"
           ? "Forecast — the row plans week by week on its uploaded series; the distribution adds spread around it"
-          : "Model — a constant mean per week, drawn from the distribution below",
+          : o === "schedule"
+            ? "Schedule — the customer's requested delivery schedule: you enter the quantity for each week, and the run uses it exactly"
+            : "Model — a constant mean per week, drawn from the distribution below",
       }));
     }
     if (col.field === "fulfillment_mode") {
@@ -1897,6 +1903,36 @@ export function StagePolicyTable({
                 title="Not applicable for the current policy choice"
               >
                 —
+              </td>
+            );
+          }
+          // The Customer row's requested delivery schedule: an array, edited in
+          // its own dialog (one input per week), saved as the row's override.
+          if (col.field === "row_demand_schedule") {
+            const draftSched = rowDraft[col.field];
+            const schedEdited = draftSched !== undefined;
+            const saved = overrides.some(
+              (o) => o.target_key === rowKey && o.family === "demand" && col.field in (o.patch ?? {}),
+            );
+            return (
+              <td
+                key={col.field}
+                className="relative overflow-hidden border-b px-1 py-[3px] align-middle group-hover:bg-[#fafafa]"
+                style={{
+                  width,
+                  minWidth: width,
+                  ...cellDivider(isLastCol),
+                  ...(schedEdited ? { background: "rgba(17,17,17,0.04)" } : {}),
+                }}
+              >
+                <ProvenanceDot p={schedEdited ? "edited" : saved ? "override" : "default"} />
+                <DeliveryScheduleCell
+                  value={schedEdited ? draftSched : eff?.row_demand_schedule}
+                  horizonWeeks={scheduleHorizonWeeks}
+                  weekOneStart={selectedProject?.simulation_start}
+                  rowLabel={`${String(r.customer_id ?? "")} · ${String(r.product_id ?? "")}`}
+                  onCommit={(v) => onCellChange(rowKey, col.field, v)}
+                />
               </td>
             );
           }

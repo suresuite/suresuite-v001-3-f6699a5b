@@ -575,6 +575,7 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "lead_time_weeks": 5,
         "sell_price": 7, "production_capacity": 66,
         "row_demand_mode": "model", "row_demand_distribution": "poisson", "row_demand_mean": 25,
+        "row_demand_schedule": [30, 0, 45],
         "row_demand_variation": 0.5, "row_demand_min": 5, "row_demand_max": 500,
         "backorder_allowed": True, "max_backorder_days": 21, "backorder_cost_per_day": 3,
         "row_priority": 4, "price": 55, "sla_fill_floor_pct": 70,
