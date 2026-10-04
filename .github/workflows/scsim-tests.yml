@@ -154,6 +154,10 @@ jobs:
     timeout-minutes: 20   # measured ~30s
     steps:
       - uses: actions/checkout@v4
+        with:
+          # PLAN.md §25 · WP 15.5 — the release report installs the PREVIOUS
+          # version's archived wheels, read from git at the commit that set it.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -178,3 +182,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python ../scsim/scripts/study_demand_driven_planning.py --check
         working-directory: sim-worker
+
+      # PLAN.md §25 · WP 15.5 · gate `engine-ledger` rule 8 — this build against the
+      # previous version's ARCHIVED build, on the reference set, same seeds. The
+      # committed report (scsim/docs/releases/<version>.{md,json}) must be what this
+      # build produces, and the change record may not understate it (rule 8, in the
+      # `scsim` job's change-record step). Measured ~20 s plus a cold venv.
+      - name: Release report — this build against the previous version is current
+        if: ${{ !cancelled() }}
+        run: python ../scsim/scripts/release_report.py --check
+        working-directory: sim-worker
+

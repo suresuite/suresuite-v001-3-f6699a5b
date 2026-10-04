@@ -42,6 +42,10 @@
 #   6 engine source changed with no bump ⇒ the current entry gained an amendment.
 #   7 append-only: an entry on the base branch is unchanged here, except for
 #     amendments appended to it.
+#   8 the record does not understate its measured effect: against
+#     docs/releases/<version>.json (release_report.py, WP 15.5), `identical` only
+#     when no KPI changed on the reference set, and a `changed-for` entry names
+#     every KPI that moved beyond noise.
 
 - version: "0.6.1"
   date: 2026-10-03

@@ -248,3 +248,55 @@ def test_rule_7_completing_a_null_commit_is_allowed():
     head = copy.deepcopy(base)
     head[0]["commit"] = "abcdef12"
     assert _history(head, head_version="0.6.2", base_version="0.6.2", base_entries=base) == []
+
+
+# ── rule 8: the record does not understate its measured effect (WP 15.5) ─────
+
+_RR = importlib.util.spec_from_file_location(
+    "release_report", Path(__file__).resolve().parents[1] / "scripts" / "release_report.py")
+rr = importlib.util.module_from_spec(_RR)
+_RR.loader.exec_module(rr)
+
+
+def _report(version, changed=(), moved=()):
+    return {"version": version, "previous_version": "0.0.1", "changed": list(changed), "moved": list(moved)}
+
+
+def test_rule_8_identical_while_the_report_shows_a_change_fails():
+    e = _new_entry("0.6.2", comparable="identical", policies=[], kpis=[])
+    assert any("rule 8" in x for x in ec.check_release(e, _report("0.6.2", changed=["fill_rate"])))
+
+
+def test_rule_8_a_moved_kpi_the_entry_does_not_name_fails():
+    e = _new_entry("0.6.2", kpis=["fill_rate"])
+    errs = ec.check_release(e, _report("0.6.2", changed=["fill_rate", "revenue"], moved=["fill_rate", "revenue"]))
+    assert any("revenue" in x and "understates" in x for x in errs)
+
+
+def test_rule_8_holds_when_the_entry_names_what_moved_or_says_not_comparable():
+    rep = _report("0.6.2", changed=["revenue"], moved=["revenue"])
+    assert ec.check_release(_new_entry("0.6.2", kpis=["revenue"]), rep) == []
+    assert ec.check_release(_new_entry("0.6.2", comparable="not-comparable"), rep) == []
+
+
+def test_rule_8_a_report_for_another_version_fails():
+    assert any("rule 8" in x for x in ec.check_release(_new_entry("0.6.2"), _report("0.6.1")))
+
+
+def test_the_committed_report_and_record_agree():
+    rel = ec.RELEASES / f"{ENGINE_VERSION}.json"
+    assert rel.exists(), "every version from 0.6.1 on has a release report (WP 15.5)"
+    assert ec.check_release(ENTRIES[0], json.loads(rel.read_text())) == []
+
+
+def test_the_report_tells_identical_moved_and_noise_apart():
+    same = [{"fill_rate": 0.9}, {"fill_rate": 0.8}, {"fill_rate": 0.85}]
+    assert rr.compare(same, same, "fill_rate")["verdict"] == "identical"
+    shifted = [{"fill_rate": x["fill_rate"] + 0.05} for x in same]
+    assert rr.compare(same, shifted, "fill_rate")["verdict"] == "moved"
+    noisy = [{"fill_rate": 0.9 + d} for d in (0.01, -0.012, 0.004)]
+    assert rr.compare(same[:1] * 3, noisy, "fill_rate")["verdict"] == "within noise"
+    # A KPI one side could not measure (None) is dropped pairwise, never read as 0.
+    gaps = rr.compare([{"ttr_weeks": None}, {"ttr_weeks": 3.0}], [{"ttr_weeks": 4.0}, {"ttr_weeks": 3.0}], "ttr_weeks")
+    assert gaps["n"] == 1 and gaps["verdict"] == "identical"
+

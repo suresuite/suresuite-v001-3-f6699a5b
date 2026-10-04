@@ -23579,6 +23579,39 @@ build names and WP 15.4's change record (whose `commit` fields are what the tags
 clean, notebooks 22 and `--check` clean, the backfill dry run lists 46 builds, `deno check
 api/index.ts` clean, and the workflow YAML parses.
 
+### WP 15.5 — The release quality report · 2026-10-04 · no migration
+
+**Promised by the plan (§25)**: a CRN-paired report of each new version against the previous
+build on a reference set (12 golden scenarios, two datasets, the `page_equals_run` project),
+regenerated and byte-compared in CI, and a gate refusing a change record that understates its
+effect. **Preconditions held?** Yes: WP 15.3 makes the previous build installable from its
+archived wheels, and WP 15.4 is the record the gate compares against.
+
+**What changed.**
+- `scsim/scripts/release_report.py` and `scsim/docs/releases/0.6.1.{md,json}`.
+- Rule 8 (`check_release`) in `engine_changelog.py`, with six tests in `test_changelog.py`
+  (four on the rule; two on the verdict logic and the committed report).
+- `scsim-tests.yml`: the `sim-worker` job checks out full history and runs
+  `release_report.py --check`.
+
+**Discovered.**
+- **The scsim golden scenarios cannot be replayed on an older engine.** They are Python `Scenario`
+  objects built with today's fields. `run_from_snapshots` is the stable interface between builds
+  (WP 12.1), so the reference set is the worker's frozen runs, which go through it. §25 records
+  the deviation.
+- **0.6.1 against 0.6.0 is identical on the reference set, and that is the right answer.**
+  0.6.1's change acts only on typed replenishment levels, which none of the three runs sets. The
+  report says so in its own text: it measures what the reference set exercises, and the record
+  says who else is affected.
+- **The report changes with every build**, because it names the current build. Like the demo
+  fixture (WP 15.1), it is regenerated with any engine or compute-path change. That is the cost
+  of a measured release, and it costs about 20 s.
+
+**Gap check.** `test_changelog.py` 35 passed (6 new), `release_report.py --check` holds, and the
+change record check (rules 1–4, 6–8) holds. **Not covered**: the reference set exercises no MRP,
+row demand or typed level, so a regression there moves no KPI in this report. The golden digests
+and the Phase 14 honesty tests still guard those, and growing the set is a later package.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -23598,7 +23631,7 @@ api/index.ts` clean, and the workflow YAML parses.
 | **12** | **12.1 – 12.7** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2 ✅** the snapshot read API (largest production snapshot 592 KB — one gzipped response, no cap). **12.3 ✅** personal keys (`20261002000001`, `rehearsal/700`). **12.4 ✅** the engine through `GET /v1/engine`, private bucket, content-addressed (D274 recorded). **12.5 ✅** the `suresuite` package (a local run equals the platform's, in a clean venv). **12.6 ✅** notebook 05 — simulate on your own machine (renumbered **03** when the series was trimmed to four, §16 · 2026-10-02). **12.7 ✅** every user may mint a personal, read-only key (`20261002000005`, `rehearsal/730`). **PHASE COMPLETE**; push-back (upload, client-computed runs badged until verified) is the next phase, not started |
 | **13** | **13.1 – 13.5** | **what you see on /policies is what runs: /policies writes overrides and never the item masters, the worker reads the frozen versions, the Validated Model binds both, every cell reaches the engine or says it does not** | — | **13.1 ✅** /policies writes overrides and never the masters (`20261002000008`, `rehearsal/760`; D281 closed — a save replaced a row's whole patch). **13.2 ✅** the worker computes through `run_from_snapshots` from the run's frozen dataset and policy versions; the browser too; D282 closed. **13.3 ✅** a Validated Model binds its evidence run's two versions, a model run replays them, the database refuses a model run on other data (`20261002000009`, `rehearsal/770`). **13.4 ✅** D204 (a)(b) closed (`20261002000010`, `rehearsal/780`), one capacity per row, gate `page-equals-run` (`pageEqualsRun.test.ts`, zero differing cells, mutation-tested). **13.5 ✅** the gate row in CLAUDE.md, the tests wired into `data-contract.yml`, the manual's callout removed, D280 closed. **PHASE COMPLETE.** Nothing reaches production until merge; the after-merge §15 reading is owed (D153)
 | **14** | **14.0 – 14.8** | **demand-driven planning: demand per customer × product row, planned production = min(requirement, capacity) with FG policies, MRP for materials, per-row fulfillment; multi-stage later** | — | **14.0 ✅** the planning baseline pinned, the shared allocation helper (`core/allocation.py`) with P-C.2 delegating, ADR 0002, and frozen golden digests (engine + worker) that make "byte-identical" checkable. Registered 2026-10-02 (§24, D284); prompts in `docs/design/demand-driven-planning-prompts.md`. **14.1 ✅** demand per customer × product row in the engine (engine 0.3.0): row specs and forecasts, a real `normal` clipped at 0 and counted, the plan's projected-demand view, projection-error KPIs. **14.2 ✅** demand per row from the data: per-row specs on `outbound_logistics`, a `demand_forecasts` table spread evenly at promotion, both in the snapshot's simulation scope, the Customer table's demand cells as row overrides, and a pre-run finding per missing parameter. **14.3 ✅** per-row fulfillment (engine 0.4.0): backorder, window, cost and fill rate per customer × product row, one allocation rule per project with per-row priority / price / service target, `revenue_max` real, the customers' contracted floor consumed and uploadable. **14.4 ✅** planned production over a horizon = min(requirement, capacity) with fulfillment's own row step for the carry-forward (engine 0.5.0), base-stock / min-max / days-of-cover FG policies and FG opening stock on `products` (RFC 4 closed), Plant cells as overrides. **14.5 ✅** MRP for materials (engine 0.6.0): `policy_type = "mrp"` orders BOM × planned production over the lead time, net of stock and the pipeline, ≥ MOQ; golden #7 exact; late-receipt and shortage KPIs; the MRP record in inspection runs; ≈ +12–16 % per replication at TRON scale. **14.6 ✅** the CRN-paired MRP-vs-reorder-point study, regenerated and byte-compared in CI (`docs/research/mrp-vs-reorder-point.md`), gate `plan-from-demand` in CLAUDE.md, G20 closed in the blueprint for planning, the manual's "How planning works" page. **PHASE COMPLETE (14.7 excluded by design — multi-stage waits for the owner)**. **14.8 ✅** /policies follow-up: each Plant row's own MTS / MTO is a cell the engine reads and the FG policy shows only behind it, the 13 Plant cells no run read are gone, the Customer card became one project line, P-P.4's buffer has no control (the row's S says how much); demand is authored on the Customer stage only (D286), and its parameters follow the row's distribution (D287) |
-| **15** | **15.0 – 15.7** | **the engine ledger: one build identity, an append-only build ledger, an archive installable by version, one change record with a CI gate, a release quality report, and an "Engine versions & changes" page on /docs** | — | **15.0 ✅** the plan (§25), §4 D291–D296 registered from a verified reading, blueprint gap G21, gate `engine-ledger` named in `CLAUDE.md`. Five owner decisions are open (§25.5). **15.4 ✅** the change record: `scsim/CHANGELOG.yaml` holds all 18 versions back to 0.1.0, with a gate in `scsim-tests.yml` (rules 1–4 as planned, plus 6 and 7, added because rules 1–4 could not catch the unbumped commit that motivated the phase) and two generated views. It found four unbumped engine changes, now amendments, and 44 engine commits no record describes, published as a count. **15.1 ✅** one engine identity: a build is named by a digest of its source (`scsim-0.6.1+<12 hex>`, over scsim and the worker's compute path), the same in the worker, the browser and the library. The plan's commit stamp was replaced because the browser wheels cannot name the commit that holds them. The package version is the engine version. The demo fixture, labelled 0.2.8 for eight versions, was re-recorded with identical numbers. **15.2 ✅** the build ledger (`20261004000001`): every build a boot report, a run (as anon) or history names, append-only, withdrawn and never deleted, with dispatch refusing a withdrawn current build. Four planned design points were not built because each would author a fact twice. **15.3 ✅** the archive: every build ever published is listed in `versions.json` and installable by version or exact build (API and `suresuite`), history is backfilled (46 builds under 17 versions), and every version is tagged from the change record. An archived build, installed from its wheels alone, reproduces its own frozen results byte for byte. |
+| **15** | **15.0 – 15.7** | **the engine ledger: one build identity, an append-only build ledger, an archive installable by version, one change record with a CI gate, a release quality report, and an "Engine versions & changes" page on /docs** | — | **15.0 ✅** the plan (§25), §4 D291–D296 registered from a verified reading, blueprint gap G21, gate `engine-ledger` named in `CLAUDE.md`. Five owner decisions are open (§25.5). **15.4 ✅** the change record: `scsim/CHANGELOG.yaml` holds all 18 versions back to 0.1.0, with a gate in `scsim-tests.yml` (rules 1–4 as planned, plus 6 and 7, added because rules 1–4 could not catch the unbumped commit that motivated the phase) and two generated views. It found four unbumped engine changes, now amendments, and 44 engine commits no record describes, published as a count. **15.1 ✅** one engine identity: a build is named by a digest of its source (`scsim-0.6.1+<12 hex>`, over scsim and the worker's compute path), the same in the worker, the browser and the library. The plan's commit stamp was replaced because the browser wheels cannot name the commit that holds them. The package version is the engine version. The demo fixture, labelled 0.2.8 for eight versions, was re-recorded with identical numbers. **15.2 ✅** the build ledger (`20261004000001`): every build a boot report, a run (as anon) or history names, append-only, withdrawn and never deleted, with dispatch refusing a withdrawn current build. Four planned design points were not built because each would author a fact twice. **15.3 ✅** the archive: every build ever published is listed in `versions.json` and installable by version or exact build (API and `suresuite`), history is backfilled (46 builds under 17 versions), and every version is tagged from the change record. An archived build, installed from its wheels alone, reproduces its own frozen results byte for byte. **15.5 ✅** the release report: this build against the previous version's archived build on the worker's three frozen reference runs, same seeds, a 95 % interval per KPI; byte-compared in CI, with a gate refusing a change record that understates it. 0.6.1 against 0.6.0 is identical on the reference set. |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -26265,21 +26298,34 @@ to the engine.
   - a schema change marked Tier 2;
   - `identical` claimed while a golden moved.
 
-### WP 15.5 — The release quality report *(T3, T4)*
+### WP 15.5 — The release quality report ✅ *(T3, T4 · gate `engine-ledger` rule 8 — done, no migration)*
 
-- For each new version, CI runs the **reference set** on the previous build and the new one,
-  CRN-paired (same seeds):
-  - the 12 golden scenarios;
-  - the two committed datasets (Example, TRON);
-  - the `page_equals_run` example project.
-- It writes `scsim/docs/releases/<version>.md`: per scenario, each KPI's difference with a 95 %
-  interval, and whether it is inside the declared tolerance. The report is regenerated and
-  byte-compared in CI, like `study_demand_driven_planning.py --check`.
-- **Quality gate.** An entry marked `comparable: identical` or `changed-for: [P-…]` fails when
-  the report shows a KPI moving outside tolerance on a scenario that uses none of the named
-  policies. In short: a change record can't understate its own effect.
-- **Exit.** The report exists for the version this package ships, and the gate is mutation-tested
-  with an understated entry.
+- `scsim/scripts/release_report.py` runs the **reference set** twice on the same seeds:
+  - on the previous version's archived build, its wheels read from git at the commit that set it
+    and installed into a cached clean virtualenv;
+  - on this build.
+- The reference set is the worker's three frozen reference runs (Example under an outage and
+  under backorder, Project TRON under a supplier outage), at 20 replications.
+- It writes `scsim/docs/releases/<version>.{md,json}`. Per case and KPI (ten fixed KPIs): both
+  means, the paired difference, its 95 % t-interval, and a verdict: *identical*, *moved* or
+  *within noise*.
+- CI (`scsim-tests.yml`, `sim-worker` job) regenerates the report and byte-compares it.
+- **Quality gate (rule 8).** An entry that says `identical` while any KPI changed fails. So does
+  a `changed-for` entry whose `kpis` omit a KPI that moved beyond noise.
+- *Deviations from this plan as first written:*
+  - **The reference set is the worker's frozen runs, not the 12 scsim golden scenarios.** Those
+    are hand-built `Scenario` objects, and an older engine's model cannot read a newer
+    scenario's fields. `run_from_snapshots` (frozen dataset + policy snapshot + scenario) is the
+    interface every build since WP 12.1 shares, so it compares builds rather than APIs.
+  - **The tolerance is the paired 95 % interval, not a declared number**, so "moved" means a
+    difference the replications can distinguish from noise.
+  - **The gate checks KPIs, not "a scenario that uses none of the named policies".** Which
+    policies a reference run exercises is not declared anywhere a gate could read; which KPIs
+    moved is measured.
+- **Exit (met).** `releases/0.6.1.{md,json}` exists and `--check` holds: 0.6.1 against its
+  archived 0.6.0 is *identical* on all ten KPIs of all three runs. That matches the record (0.6.1
+  acts only on typed levels, which no reference run sets). Rule 8 and the verdict logic are
+  mutation-tested.
 
 ### WP 15.6 — On the page *(D296 · T1, T2, T3)*
 

@@ -257,6 +257,35 @@ def check_entries(
     return errs
 
 
+# ── rule 8: the record does not understate its own measured effect ───────────
+
+RELEASES = SCSIM / "docs" / "releases"
+
+
+def check_release(entry: dict[str, Any], report: dict[str, Any] | None) -> list[str]:
+    """Rule 8 (WP 15.5). `report` is `docs/releases/<version>.json`
+    (`release_report.py`): this build against the previous version on the
+    reference set. An entry may not call itself `identical` while any KPI there
+    changed, and a `changed-for` entry names every KPI there that MOVED (its 95 %
+    interval excludes 0). `not-comparable` already says the most an entry can."""
+    if report is None:
+        return []
+    errs: list[str] = []
+    v = entry.get("version")
+    if report.get("version") != v:
+        return [f"docs/releases/{v}.json describes {report.get('version')}, not {v} (rule 8)"]
+    changed, moved = set(report.get("changed") or []), set(report.get("moved") or [])
+    if entry.get("comparable") == "identical" and changed:
+        errs.append(f"entry {v}: comparable is 'identical' but the release report shows "
+                    f"{', '.join(sorted(changed))} changed against {report.get('previous_version')} (rule 8)")
+    if entry.get("comparable") == "changed-for":
+        missing = moved - set(entry.get("kpis") or [])
+        if missing:
+            errs.append(f"entry {v}: the release report shows {', '.join(sorted(missing))} moving beyond noise "
+                        "and the entry's kpis do not name it — the record understates its effect (rule 8)")
+    return errs
+
+
 # ── the history rules: this tree against its base ────────────────────────────
 
 def moved_goldens(base: dict[str, Any], head: dict[str, Any], prefix: str) -> list[str]:
@@ -514,6 +543,11 @@ def cmd_check(base_spec: str | None) -> int:
     errs = check_entries(entries, version, policy_ids=known_policy_ids(), kpis=known_kpis(),
                          goldens=golden_names(), adr_numbers=_adr_numbers())
     print(f"  rules 1, 4 + schema · {len(entries)} entries · ENGINE_VERSION {version}")
+    rel = RELEASES / f"{version}.json"
+    cur = next((e for e in entries if isinstance(e, dict) and e.get("version") == version), None)
+    if cur is not None:
+        errs += check_release(cur, json.loads(rel.read_text()) if rel.exists() else None)
+        print(f"  rule 8 · release report {'docs/releases/' + version + '.json' if rel.exists() else 'absent'}")
     if base_spec:
         base = resolve_base(base_spec)
         if base is None:
