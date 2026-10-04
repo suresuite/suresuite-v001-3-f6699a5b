@@ -20,7 +20,7 @@
 export type Row = Record<string, unknown>;
 export type OverrideDomain =
   | "positive" | "nonnegative" | "fraction" | "percent" | "distribution" | "demand_mode" | "fg_policy"
-  | "fulfillment_mode";
+  | "fulfillment_mode" | "lead_time_distribution";
 /** `row` (PLAN.md §24 WP 14.2) is a customer × product row of
  *  `outbound_logistics`, keyed exactly as the Customer stage keys it,
  *  `<customer>::<product>`. `lane` is its inbound twin: one supplier × material
@@ -30,7 +30,7 @@ export type OverrideEntity = "material" | "supplier" | "product" | "row" | "lane
 
 /** The values an ENUM domain accepts — the mapper's `_ROW_KIND` targets and the
  *  row's two modes. */
-type EnumDomain = "distribution" | "demand_mode" | "fg_policy" | "fulfillment_mode";
+type EnumDomain = "distribution" | "demand_mode" | "fg_policy" | "fulfillment_mode" | "lead_time_distribution";
 export const ENUM_DOMAIN_VALUES: Record<EnumDomain, readonly string[]> = {
   distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
   demand_mode: ["forecast", "model"],
@@ -38,9 +38,12 @@ export const ENUM_DOMAIN_VALUES: Record<EnumDomain, readonly string[]> = {
   fg_policy: ["base_stock", "min_max", "days_of_cover"],
   // Whether the product holds FG stock — `project_map._MODE_OVERRIDE_TOKENS`.
   fulfillment_mode: ["mts", "mto"],
+  // PLAN.md §26 WP 16.2 — a lane's lead-time shape, `project_map._LANE_LT_DISTS`.
+  lead_time_distribution: ["deterministic", "normal", "lognormal", "gamma", "triangular", "uniform"],
 };
 export const isEnumDomain = (d: OverrideDomain): d is EnumDomain =>
-  d === "distribution" || d === "demand_mode" || d === "fg_policy" || d === "fulfillment_mode";
+  d === "distribution" || d === "demand_mode" || d === "fg_policy" || d === "fulfillment_mode" ||
+  d === "lead_time_distribution";
 
 export interface OverrideDecl {
   /** The bundle key — the grid column's `field`. */

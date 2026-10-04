@@ -25,6 +25,12 @@ _SPEC.loader.exec_module(ec)
 
 ENTRIES = ec.load_entries(ec.CHANGELOG.read_text())
 
+# The mutations below add an entry above the running version: the next patch, or
+# the next minor. Derived, so a version bump does not turn them into duplicates.
+_V = ec.parse_version(ENGINE_VERSION)
+PATCH = f"{_V[0]}.{_V[1]}.{_V[2] + 1}"
+MINOR = f"{_V[0]}.{_V[1] + 1}.0"
+
 
 def _static(entries, version=ENGINE_VERSION):
     return ec.check_entries(entries, version, policy_ids=ec.known_policy_ids(), kpis=ec.known_kpis(),
@@ -108,29 +114,29 @@ def test_rule_1_a_duplicate_version_fails():
 # ── the schema ───────────────────────────────────────────────────────────────
 
 def test_a_tier_3_entry_without_an_adr_fails():
-    bad = [_new_entry("0.7.0", tier=3, adr=None)] + copy.deepcopy(ENTRIES)
-    assert any("names its ADR" in e for e in _static(bad, "0.7.0"))
+    bad = [_new_entry(MINOR, tier=3, adr=None)] + copy.deepcopy(ENTRIES)
+    assert any("names its ADR" in e for e in _static(bad, MINOR))
 
 
 def test_a_tier_3_entry_as_a_patch_fails():
-    bad = [_new_entry("0.6.2", tier=3, adr="0002")] + copy.deepcopy(ENTRIES)
-    assert any("minor or major bump" in e for e in _static(bad, "0.6.2"))
+    bad = [_new_entry(PATCH, tier=3, adr="0002")] + copy.deepcopy(ENTRIES)
+    assert any("minor or major bump" in e for e in _static(bad, PATCH))
 
 
 def test_an_unknown_policy_or_kpi_fails():
-    bad = [_new_entry("0.6.2", policies=["P-P.99"], kpis=["happiness"])] + copy.deepcopy(ENTRIES)
-    errs = _static(bad, "0.6.2")
+    bad = [_new_entry(PATCH, policies=["P-P.99"], kpis=["happiness"])] + copy.deepcopy(ENTRIES)
+    errs = _static(bad, PATCH)
     assert any("P-P.99" in e for e in errs) and any("happiness" in e for e in errs)
 
 
 def test_a_new_entry_may_not_leave_goldens_moved_unknown():
-    bad = [_new_entry("0.6.2", goldens_moved=None)] + copy.deepcopy(ENTRIES)
-    assert any("backfilled" in e for e in _static(bad, "0.6.2"))
+    bad = [_new_entry(PATCH, goldens_moved=None)] + copy.deepcopy(ENTRIES)
+    assert any("backfilled" in e for e in _static(bad, PATCH))
 
 
 def test_a_new_entry_may_not_count_unrecorded_changes():
-    bad = [_new_entry("0.6.2", unrecorded_changes=3)] + copy.deepcopy(ENTRIES)
-    assert any("recorded, not counted" in e for e in _static(bad, "0.6.2"))
+    bad = [_new_entry(PATCH, unrecorded_changes=3)] + copy.deepcopy(ENTRIES)
+    assert any("recorded, not counted" in e for e in _static(bad, PATCH))
 
 
 def test_an_all_digit_commit_left_unquoted_fails():
@@ -148,9 +154,9 @@ def test_a_tier_3_amendment_fails():
 # ── rule 4: identical means nothing moved ────────────────────────────────────
 
 def test_rule_4_identical_while_a_golden_moved_fails():
-    bad = [_new_entry("0.6.2", goldens_moved=["engine:g1_steady"], comparable="identical")] \
+    bad = [_new_entry(PATCH, goldens_moved=["engine:g1_steady"], comparable="identical")] \
         + copy.deepcopy(ENTRIES)
-    assert any("rule 4" in e for e in _static(bad, "0.6.2"))
+    assert any("rule 4" in e for e in _static(bad, PATCH))
 
 
 # ── rule 2: moved means bumped, and listed exactly ───────────────────────────
@@ -162,14 +168,14 @@ def test_rule_2_a_moved_digest_with_no_bump_fails():
 
 def test_rule_2_an_incomplete_goldens_moved_fails():
     head_e, moved = _moved_engine()
-    head = [_new_entry("0.6.2", goldens_moved=[])] + copy.deepcopy(ENTRIES)
-    assert any("rule 2" in e for e in _history(head, head_version="0.6.2", head_e=head_e))
+    head = [_new_entry(PATCH, goldens_moved=[])] + copy.deepcopy(ENTRIES)
+    assert any("rule 2" in e for e in _history(head, head_version=PATCH, head_e=head_e))
 
 
 def test_rule_2_holds_when_the_entry_names_exactly_what_moved():
     head_e, moved = _moved_engine()
-    head = [_new_entry("0.6.2", goldens_moved=[moved])] + copy.deepcopy(ENTRIES)
-    assert _history(head, head_version="0.6.2", head_e=head_e) == []
+    head = [_new_entry(PATCH, goldens_moved=[moved])] + copy.deepcopy(ENTRIES)
+    assert _history(head, head_version=PATCH, head_e=head_e) == []
 
 
 def test_rule_2_a_reworded_worker_warning_is_not_a_moved_run():
@@ -195,8 +201,8 @@ def _changed_schema():
 
 
 def test_rule_3_a_schema_change_marked_tier_2_fails():
-    head = [_new_entry("0.7.0")] + copy.deepcopy(ENTRIES)
-    assert any("rule 3" in e for e in _history(head, head_version="0.7.0", head_schema=_changed_schema()))
+    head = [_new_entry(MINOR)] + copy.deepcopy(ENTRIES)
+    assert any("rule 3" in e for e in _history(head, head_version=MINOR, head_schema=_changed_schema()))
 
 
 def test_rule_3_a_schema_change_with_no_bump_fails():
@@ -207,8 +213,8 @@ def test_rule_3_a_schema_change_with_no_bump_fails():
 def test_rule_3_only_the_version_stamp_changing_is_not_a_contract_change():
     d = json.loads(SCHEMA)
     d["engine_version"] = "9.9.9"
-    head = [_new_entry("0.6.2")] + copy.deepcopy(ENTRIES)
-    assert _history(head, head_version="0.6.2", head_schema=json.dumps(d)) == []
+    head = [_new_entry(PATCH)] + copy.deepcopy(ENTRIES)
+    assert _history(head, head_version=PATCH, head_schema=json.dumps(d)) == []
 
 
 # ── rule 6: an unbumped engine change is recorded ────────────────────────────
@@ -228,7 +234,8 @@ def test_rule_6_holds_with_an_appended_amendment():
 
 def test_rule_7_rewriting_a_published_entry_fails():
     head = copy.deepcopy(ENTRIES)
-    head[3]["comparable"] = "identical"
+    i = next(i for i, e in enumerate(head) if i > 0 and e["comparable"] != "identical")
+    head[i]["comparable"] = "identical"
     assert any("rule 7" in e for e in _history(head, head_version=ENGINE_VERSION))
 
 
@@ -239,15 +246,15 @@ def test_rule_7_removing_a_published_entry_fails():
 
 def test_rule_7_editing_an_amendment_fails():
     head = copy.deepcopy(ENTRIES)
-    head[0]["amendments"][0]["summary"] = "something else"
+    next(e for e in head if e["amendments"])["amendments"][0]["summary"] = "something else"
     assert any("rule 7" in e for e in _history(head, head_version=ENGINE_VERSION))
 
 
 def test_rule_7_completing_a_null_commit_is_allowed():
-    base = [_new_entry("0.6.2")] + copy.deepcopy(ENTRIES)
+    base = [_new_entry(PATCH)] + copy.deepcopy(ENTRIES)
     head = copy.deepcopy(base)
     head[0]["commit"] = "abcdef12"
-    assert _history(head, head_version="0.6.2", base_version="0.6.2", base_entries=base) == []
+    assert _history(head, head_version=PATCH, base_version=PATCH, base_entries=base) == []
 
 
 # ── rule 8: the record does not understate its measured effect (WP 15.5) ─────
@@ -263,24 +270,24 @@ def _report(version, changed=(), moved=()):
 
 
 def test_rule_8_identical_while_the_report_shows_a_change_fails():
-    e = _new_entry("0.6.2", comparable="identical", policies=[], kpis=[])
-    assert any("rule 8" in x for x in ec.check_release(e, _report("0.6.2", changed=["fill_rate"])))
+    e = _new_entry(PATCH, comparable="identical", policies=[], kpis=[])
+    assert any("rule 8" in x for x in ec.check_release(e, _report(PATCH, changed=["fill_rate"])))
 
 
 def test_rule_8_a_moved_kpi_the_entry_does_not_name_fails():
-    e = _new_entry("0.6.2", kpis=["fill_rate"])
-    errs = ec.check_release(e, _report("0.6.2", changed=["fill_rate", "revenue"], moved=["fill_rate", "revenue"]))
+    e = _new_entry(PATCH, kpis=["fill_rate"])
+    errs = ec.check_release(e, _report(PATCH, changed=["fill_rate", "revenue"], moved=["fill_rate", "revenue"]))
     assert any("revenue" in x and "understates" in x for x in errs)
 
 
 def test_rule_8_holds_when_the_entry_names_what_moved_or_says_not_comparable():
-    rep = _report("0.6.2", changed=["revenue"], moved=["revenue"])
-    assert ec.check_release(_new_entry("0.6.2", kpis=["revenue"]), rep) == []
-    assert ec.check_release(_new_entry("0.6.2", comparable="not-comparable"), rep) == []
+    rep = _report(PATCH, changed=["revenue"], moved=["revenue"])
+    assert ec.check_release(_new_entry(PATCH, kpis=["revenue"]), rep) == []
+    assert ec.check_release(_new_entry(PATCH, comparable="not-comparable"), rep) == []
 
 
 def test_rule_8_a_report_for_another_version_fails():
-    assert any("rule 8" in x for x in ec.check_release(_new_entry("0.6.2"), _report("0.6.1")))
+    assert any("rule 8" in x for x in ec.check_release(_new_entry(PATCH), _report(ENGINE_VERSION)))
 
 
 def test_the_committed_report_and_record_agree():

@@ -25,9 +25,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { STAGE_TABLE_SPEC, type ColSpec } from "../columnSpecs";
-import { masterIdOf, resolveCell, type DerivedMaps, type MasterRowMaps } from "../resolveEffective";
+import { masterIdOf, resolveCell, rowGateCtx, type DerivedMaps, type MasterRowMaps } from "../resolveEffective";
 import { customerRowMasters, type ForecastBucket } from "../customerRows";
-import { supplierLaneMasters } from "../supplierLanes";
+import { laneSpreadFromMaterials, supplierLaneMasters } from "../supplierLanes";
 import {
   derivedMaterialCost,
   derivedMaterialCostDetails,
@@ -70,6 +70,8 @@ const derived: DerivedMaps = {
   sellPrice: demandWeightedSellPrice(T.outbound),
   demandMean: weeklyDemand(T.outbound),
   productionCapacity: derivedProductionCapacity(T.products, T.outbound, defaults as unknown as Row, overrides as unknown as Row[]),
+  // PLAN.md §26 WP 16.3 — the material's lead-time shape under a lane with none.
+  laneSpread: laneSpreadFromMaterials(T.inbound, T.materials),
 };
 
 /** The grid's rows, keyed exactly as the stages key their overrides. */
@@ -99,10 +101,17 @@ function cells() {
         // grain (WP 14.3: a row's priority sits over its customer's value).
         const id = stage === "customer" ? String(row.key) : masterIdOf(col, row);
         const engine = FX.engine[`${col.master!.table}.${col.master!.field}`]?.[id];
+        const families = familiesForStage(stage) as PolicyFamily[];
+        // The row's gate context, as the grid builds it — a bounded lane's
+        // Lead time depends on its shape and bounds (§26 WP 16.3).
+        const gate = rowGateCtx({
+          rowKey: String(row.key), row, projectFulfillmentMode: "mto", families,
+          masterColByField, masterRowById: masters, derived, defaults, overrides, scope: "node",
+        });
         const cell = resolveCell({
-          rowKey: String(row.key), row, col, families: familiesForStage(stage) as PolicyFamily[],
+          rowKey: String(row.key), row, col, families,
           masterColByField, masterRowById: masters, derived, defaults, overrides,
-          scope: "node", familyDefault: () => undefined,
+          scope: "node", familyDefault: () => undefined, gate,
         });
         out.push({ where: `${stage} ${row.key} ${col.field}`, engine, cell });
       }

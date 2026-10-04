@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 1012;
+export const REFERENCE_COLUMN_COUNT = 1024;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -2353,12 +2353,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:236"
+        "evidence": "src/hooks/useItemMasters.tsx:244"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:236"
+        "evidence": "src/hooks/useItemMasters.tsx:244"
       }
     ],
     "governance": {
@@ -7128,6 +7128,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "inbound_logistics_lead_time_unit_known",
         "definition": "CHECK (lead_time_unit IS NULL OR public.unit_days(lead_time_unit) IS NOT NULL)"
+      },
+      {
+        "name": "inbound_logistics_lead_time_spread_check",
+        "definition": "CHECK ( (lead_time_dist IS NULL OR lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (lead_time_cv IS NULL OR (lead_time_cv >= 0 AND lead_time_cv <= 1)) AND (lead_time_min IS NULL OR lead_time_min >= 0) AND (lead_time_mode IS NULL OR lead_time_mode >= 0) AND (lead_time_max IS NULL OR lead_time_max >= 0) AND (lead_time_min IS NULL OR lead_time_mode IS NULL OR lead_time_min <= lead_time_mode) AND (lead_time_mode IS NULL OR lead_time_max IS NULL OR lead_time_mode <= lead_time_max) AND (lead_time_min IS NULL OR lead_time_max IS NULL OR lead_time_min <= lead_time_max) )"
       }
     ],
     "ingestDataset": {
@@ -7147,12 +7151,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:236"
+        "evidence": "src/hooks/useItemMasters.tsx:244"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:236"
+        "evidence": "src/hooks/useItemMasters.tsx:244"
       }
     ],
     "governance": {
@@ -7564,6 +7568,148 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "lead_time_dist",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": "lead_time_dist",
+        "required": false,
+        "validate": "one of deterministic, normal, lognormal, gamma, triangular, uniform — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "The SHAPE of this lane's lead time — deterministic, normal, lognormal, gamma, triangular or uniform (PLAN.md §26 WP 16.2, blueprint P-S.6). For deterministic, normal, lognormal and gamma, `lead_time` is the mean; a triangular or uniform lane IS its bounds, and its planning lead time is their mean. Blank: the material's shape (`materials.lead_time_dist`), else deterministic — how every lane ran before Phase 16.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "blank",
+            "value": "materials.lead_time_dist + lead_time_cv of the lane's material, else deterministic",
+            "provenance": "derived",
+            "visibleAs": "the Supplier table's lead-time distribution cell on /policies"
+          },
+          {
+            "when": "a shape whose parameters are missing or unusable",
+            "value": "deterministic",
+            "provenance": "default",
+            "visibleAs": "MappingWarning on the run's mapping report"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_dist",
+        "engineMissingDefault": "the material's lead_time_dist, else deterministic",
+        "engineTransform": "lower-cased; an unknown value, or a shape missing a parameter it needs, is warned and the lane runs deterministic",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "lead_time_cv",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "coefficient of variation (dimensionless)",
+        "csvHeader": "lead_time_cv",
+        "required": false,
+        "validate": "numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "How much this lane's lead time varies, as a coefficient of variation — read by normal, lognormal and gamma only (PLAN.md §26 WP 16.2). Bounded 0–1, as the engine bounds it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_cv",
+        "engineMissingDefault": null,
+        "engineTransform": "float(); the row's CV on /policies wins",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "lead_time_min",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "weeks",
+        "csvHeader": "lead_time_min",
+        "required": false,
+        "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "A triangular or uniform lane's shortest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.2).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_min_weeks",
+        "engineMissingDefault": null,
+        "engineTransform": "_duration_to_weeks(lead_time_min, lead_time_unit); the row's bound on /policies wins",
+        "unitColumn": "lead_time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "duration",
+          "canonical": "week"
+        },
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "lead_time_mode",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "weeks",
+        "csvHeader": "lead_time_mode",
+        "required": false,
+        "validate": "numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "A triangular lane's most likely lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular only (PLAN.md §26 WP 16.2).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_mode_weeks",
+        "engineMissingDefault": null,
+        "engineTransform": "_duration_to_weeks(lead_time_mode, lead_time_unit); the row's bound on /policies wins",
+        "unitColumn": "lead_time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "duration",
+          "canonical": "week"
+        },
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "lead_time_max",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "weeks",
+        "csvHeader": "lead_time_max",
+        "required": false,
+        "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "A triangular or uniform lane's longest lead time — a duration in the lane's `lead_time_unit` (blank = weeks), the unit `lead_time` is quoted in; weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.2).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_lane_lead_time_spread -> SupplierLink.lead_time_max_weeks",
+        "engineMissingDefault": null,
+        "engineTransform": "_duration_to_weeks(lead_time_max, lead_time_unit); the row's bound on /policies wins",
+        "unitColumn": "lead_time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "duration",
+          "canonical": "week"
+        },
+        "quantityGrain": "level",
         "computedBy": null
       }
     ]
@@ -10338,7 +10484,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "blank": "null",
         "engineField": "project_map.py::_map_supply -> SupplierLink.lead_time_dist",
         "engineMissingDefault": "deterministic",
-        "engineTransform": "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC",
+        "engineTransform": "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC. A lane's own shape (inbound_logistics.lead_time_dist) or the Supplier row's wins over it (PLAN.md §26 WP 16.2)",
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
@@ -10351,7 +10497,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unit": "coefficient of variation (dimensionless)",
         "csvHeader": "lead_time_cv",
         "required": false,
-        "validate": "numeric >= 0",
+        "validate": "numeric 0–1 — the engine's bound (§4 D302: a CV above 1 used to fail the run)",
         "meaning": "How much the lead time varies, as a coefficient of variation. Read only when `lead_time_dist` is not deterministic: the engine skips sampling entirely when the distribution is deterministic or the CV is zero.",
         "primaryKey": false,
         "unique": false,
@@ -10362,6 +10508,12 @@ export const REFERENCE_TABLES: RefTable[] = [
             "value": "0.0",
             "provenance": "default",
             "visibleAs": null
+          },
+          {
+            "when": "above 1 (a value stored before the upload rule bounded it — §4 D302)",
+            "value": "1.0, the engine's bound",
+            "provenance": "default",
+            "visibleAs": "MappingWarning on the run's mapping report"
           }
         ],
         "engineChain": null,
@@ -10369,7 +10521,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "blank": "null",
         "engineField": "project_map.py::_map_supply -> SupplierLink.lead_time_cv",
         "engineMissingDefault": "0.0 — no variability, so no sampling",
-        "engineTransform": "float() when truthy, else 0.0",
+        "engineTransform": "float() when truthy, else 0.0; above 1 → 1, warned (§4 D302). A lane's own CV (inbound_logistics.lead_time_cv) or the Supplier row's wins over it (PLAN.md §26 WP 16.2)",
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",
@@ -15191,12 +15343,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:236"
+        "evidence": "src/hooks/useItemMasters.tsx:244"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:236"
+        "evidence": "src/hooks/useItemMasters.tsx:244"
       }
     ],
     "governance": {
@@ -17554,6 +17706,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "products_fg_levels_nonnegative",
         "definition": "CHECK (coalesce(fg_base_stock, 0) >= 0 AND coalesce(fg_reorder_point, 0) >= 0 AND coalesce(fg_cover_days, 0) >= 0 AND coalesce(fg_initial_on_hand, 0) >= 0)"
+      },
+      {
+        "name": "products_production_lead_time_check",
+        "definition": "CHECK ( (production_lead_time_unit IS NULL OR public.unit_days(production_lead_time_unit) IS NOT NULL) AND (production_lead_time_dist IS NULL OR production_lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (production_lead_time_cv IS NULL OR (production_lead_time_cv >= 0 AND production_lead_time_cv <= 1)) AND coalesce(production_lead_time, 0) >= 0 AND coalesce(production_lead_time_min, 0) >= 0 AND coalesce(production_lead_time_mode, 0) >= 0 AND coalesce(production_lead_time_max, 0) >= 0 AND (production_lead_time_min IS NULL OR production_lead_time_mode IS NULL OR production_lead_time_min <= production_lead_time_mode) AND (production_lead_time_mode IS NULL OR production_lead_time_max IS NULL OR production_lead_time_mode <= production_lead_time_max) AND (production_lead_time_min IS NULL OR production_lead_time_max IS NULL OR production_lead_time_min <= production_lead_time_max) )"
       }
     ],
     "ingestDataset": {
@@ -18230,6 +18386,213 @@ export const REFERENCE_TABLES: RefTable[] = [
         "engineTransform": "the Plant-stage override, else this",
         "unitColumn": null,
         "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "production_lead_time",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "weeks",
+        "csvHeader": "production_lead_time",
+        "required": false,
+        "validate": "numeric >= 0; blank lands nothing",
+        "meaning": "How long this product takes to make at the focal plant: output started in a week is finished stock L weeks later (P-P.13, PLAN.md §26 WP 16.5). A duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Empty is 0 — the product completes in the week it starts, which is how every product ran before Phase 16. For deterministic, normal, lognormal and gamma it is the mean; a triangular or uniform product plans on the mean of its bounds instead.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "NULL",
+            "value": "0 weeks",
+            "provenance": "default",
+            "visibleAs": "the Plant cell's empty default"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_product_lead_time -> Product.production_lead_time_weeks",
+        "engineMissingDefault": "0 weeks — completes in the week it starts",
+        "engineTransform": "the Plant-stage override, else _duration_to_weeks(this, production_lead_time_unit); rounded half to even, clamped 0–26",
+        "unitColumn": "production_lead_time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "duration",
+          "canonical": "week"
+        },
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "production_lead_time_unit",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": "production_lead_time_unit",
+        "required": false,
+        "validate": "one of the units public.unit_days() knows — enforced by the column's CHECK constraint",
+        "meaning": "The period `production_lead_time` and its bounds are quoted in — day, week, month, … (PLAN.md §26 WP 16.5). Blank means WEEKS, the convention `inbound_logistics.lead_time_unit` set. After promotion it reads `week`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "NULL or blank",
+            "value": "weeks",
+            "provenance": "contract",
+            "visibleAs": null
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_product_lead_time -> _duration_to_weeks(…, production_lead_time_unit)",
+        "engineMissingDefault": "weeks",
+        "engineTransform": "looked up in the one unit table; an unknown value falls to a 7-day basis",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "production_lead_time_dist",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": "production_lead_time_dist",
+        "required": false,
+        "validate": "one of deterministic, normal, lognormal, gamma, triangular, uniform — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "The SHAPE of this product's production lead time — deterministic, normal, lognormal, gamma, triangular or uniform, chosen like a lane's lead time (PLAN.md §26 WP 16.5). Blank is deterministic.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "blank",
+            "value": "deterministic",
+            "provenance": "default",
+            "visibleAs": "the Plant table's production lead-time distribution cell"
+          },
+          {
+            "when": "a shape whose parameters are missing or unusable",
+            "value": "deterministic",
+            "provenance": "default",
+            "visibleAs": "MappingWarning on the run's mapping report"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_product_lead_time -> Product.production_lead_time_dist",
+        "engineMissingDefault": "deterministic",
+        "engineTransform": "lower-cased; an unknown value, or a shape missing a parameter it needs, is warned and the product runs deterministic",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "production_lead_time_cv",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "coefficient of variation (dimensionless)",
+        "csvHeader": "production_lead_time_cv",
+        "required": false,
+        "validate": "numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "How much the production lead time varies — read by normal, lognormal and gamma only (PLAN.md §26 WP 16.5). Bounded 0–1, as the engine bounds it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_product_lead_time -> Product.production_lead_time_cv",
+        "engineMissingDefault": null,
+        "engineTransform": "float(); the Plant row's CV on /policies wins",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "production_lead_time_min",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "weeks",
+        "csvHeader": "production_lead_time_min",
+        "required": false,
+        "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "A triangular or uniform product's shortest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.5, P-P.13).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_product_lead_time -> Product.production_lead_time_min_weeks",
+        "engineMissingDefault": null,
+        "engineTransform": "_duration_to_weeks(production_lead_time_min, production_lead_time_unit); the Plant row's bound on /policies wins",
+        "unitColumn": "production_lead_time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "duration",
+          "canonical": "week"
+        },
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "production_lead_time_mode",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "weeks",
+        "csvHeader": "production_lead_time_mode",
+        "required": false,
+        "validate": "numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "A triangular product's most likely production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular only (PLAN.md §26 WP 16.5, P-P.13).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_product_lead_time -> Product.production_lead_time_mode_weeks",
+        "engineMissingDefault": null,
+        "engineTransform": "_duration_to_weeks(production_lead_time_mode, production_lead_time_unit); the Plant row's bound on /policies wins",
+        "unitColumn": "production_lead_time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "duration",
+          "canonical": "week"
+        },
+        "quantityGrain": "level",
+        "computedBy": null
+      },
+      {
+        "name": "production_lead_time_max",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "weeks",
+        "csvHeader": "production_lead_time_max",
+        "required": false,
+        "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing",
+        "meaning": "A triangular or uniform product's longest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.5, P-P.13).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_product_lead_time -> Product.production_lead_time_max_weeks",
+        "engineMissingDefault": null,
+        "engineTransform": "_duration_to_weeks(production_lead_time_max, production_lead_time_unit); the Plant row's bound on /policies wins",
+        "unitColumn": "production_lead_time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "duration",
+          "canonical": "week"
+        },
         "quantityGrain": "level",
         "computedBy": null
       }
@@ -26871,7 +27234,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc assign_material_supplier",
-        "evidence": "src/components/policies/StagePolicyTable.tsx:400"
+        "evidence": "src/components/policies/StagePolicyTable.tsx:406"
       },
       {
         "page": "SimulationLab.tsx",

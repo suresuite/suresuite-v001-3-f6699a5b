@@ -1232,3 +1232,151 @@ def test_mrp_reaches_the_engine_as_the_project_type_and_per_material():
     pol = from_project_data(d).scenario.policies["inventory_control"]
     assert pol["policy_type"] == "min_max"
     assert pol["material_overrides"]["m1"]["policy_type"] == "mrp"
+
+
+# ── A lane's lead-time SPREAD — PLAN.md §26 WP 16.2, §4 D299 / D302 ────────────
+#
+# Order, per part: the Supplier row → the lane's upload → (shape and CV only)
+# the material → deterministic. A bounded shape's planning lead time is its
+# bounds' mean (§26.2 rule 3).
+
+def _link(res, sup, mat="m1"):
+    return next(l for l in res.scenario.network.supplier_links
+                if l.supplier_id == sup and l.material_id == mat)
+
+
+def test_the_lane_upload_beats_the_material_and_only_for_that_lane():
+    d = _two_lanes()
+    d.materials[0].lead_time_dist, d.materials[0].lead_time_cv = "lognormal", 0.3
+    d.supply_arcs[1].lead_time_dist, d.supply_arcs[1].lead_time_cv = "normal", 0.2
+    res = from_project_data(d)
+    a, b = _link(res, "s1"), _link(res, "s2")
+    assert (a.lead_time_dist.value, a.lead_time_cv) == ("lognormal", 0.3)
+    assert (b.lead_time_dist.value, b.lead_time_cv) == ("normal", 0.2)
+    dist = res.resolved["inbound_logistics.lead_time_dist"]
+    assert dist["s1::m1"] == {"source": "derived", "value": "lognormal"}
+    assert dist["s2::m1"] == {"source": "master", "value": "normal"}
+
+
+def test_the_supplier_row_beats_the_lane_upload():
+    d = _two_lanes()
+    d.supply_arcs[1].lead_time_dist, d.supply_arcs[1].lead_time_cv = "normal", 0.2
+    d.policies = {"node:s2::m1": {"sourcing": {"lane_lead_time_dist": "gamma",
+                                               "lane_lead_time_cv": 0.4}}}
+    res = from_project_data(d)
+    b = _link(res, "s2")
+    assert (b.lead_time_dist.value, b.lead_time_cv) == ("gamma", 0.4)
+    assert res.resolved["inbound_logistics.lead_time_cv"]["s2::m1"] == {"source": "override", "value": 0.4}
+    assert _sources(res, "inbound_logistics.lead_time_dist")  # counted: a lane states one
+
+
+def test_a_triangular_lane_plans_on_its_bounds_mean_and_converts_days():
+    d = _two_lanes()
+    arc = d.supply_arcs[1]
+    arc.lead_time, arc.lead_time_unit = 28, "day"
+    arc.lead_time_dist, arc.lead_time_min, arc.lead_time_mode, arc.lead_time_max = "triangular", 14, 21, 49
+    res = from_project_data(d)
+    b = _link(res, "s2")
+    assert (b.lead_time_min_weeks, b.lead_time_mode_weeks, b.lead_time_max_weeks) == (2, 3, 7)
+    assert b.lead_time_weeks == 4                       # (2 + 3 + 7) / 3
+    assert res.resolved["inbound_logistics.lead_time"]["s2::m1"] == {"source": "derived", "value": 4}
+
+
+def test_a_row_lead_time_is_not_read_on_a_bounded_lane_and_says_so():
+    d = _two_lanes()
+    d.policies = {"node:s2::m1": {"sourcing": {"lead_time_weeks": 9,
+                                               "lane_lead_time_dist": "uniform",
+                                               "lane_lead_time_min_weeks": 2, "lane_lead_time_max_weeks": 6}}}
+    res = from_project_data(d)
+    assert _link(res, "s2").lead_time_weeks == 4
+    assert any(w.field == "lead_time_weeks" and "bounds' mean" in w.reason for w in res.warnings)
+
+
+@pytest.mark.parametrize("patch, why", [
+    ({"lane_lead_time_dist": "triangular", "lane_lead_time_min_weeks": 2, "lane_lead_time_max_weeks": 6},
+     "needs min, mode and max"),
+    ({"lane_lead_time_dist": "normal"}, "needs a CV"),
+    ({"lane_lead_time_dist": "uniform", "lane_lead_time_min_weeks": 7, "lane_lead_time_max_weeks": 6},
+     "needs min ≤ max"),
+])
+def test_a_shape_missing_a_parameter_runs_deterministic_with_a_warning(patch, why):
+    d = _two_lanes()
+    d.policies = {"node:s2::m1": {"sourcing": patch}}
+    res = from_project_data(d)
+    b = _link(res, "s2")
+    assert b.lead_time_dist.value == "deterministic" and b.lead_time_weeks == 4
+    assert any(w.field == "lead_time_dist" and why in w.reason for w in res.warnings)
+
+
+def test_an_unknown_shape_on_the_row_is_ignored_with_a_warning():
+    d = _two_lanes()
+    d.policies = {"node:s2::m1": {"sourcing": {"lane_lead_time_dist": "weibull"}}}
+    res = from_project_data(d)
+    assert _link(res, "s2").lead_time_dist.value == "deterministic"
+    assert any(w.field == "lane_lead_time_dist" and "weibull" in w.reason for w in res.warnings)
+
+
+def test_a_material_cv_above_one_is_clamped_not_a_failed_run():
+    # §4 D302: before Phase 16 this raised a ValidationError while the network was built.
+    d = _base()
+    d.materials[0].lead_time_dist, d.materials[0].lead_time_cv = "lognormal", 1.5
+    res = from_project_data(d)
+    assert _link(res, "s1").lead_time_cv == 1.0
+    assert any(w.field == "lead_time_cv" and "D302" in w.reason for w in res.warnings)
+
+
+def test_without_any_spread_the_run_log_is_unchanged():
+    res = from_project_data(_two_lanes())
+    assert not any(w.entity == "source" and w.field.startswith("inbound_logistics.lead_time_")
+                   for w in res.warnings)
+    assert all(l.lead_time_dist.value == "deterministic" for l in res.scenario.network.supplier_links)
+
+
+# ── A product's production lead time — PLAN.md §26 WP 16.5, §4 D300 ───────────
+
+def _prod(res):
+    return res.scenario.network.products[0]
+
+
+def test_a_product_that_states_no_production_lead_time_maps_as_before():
+    res = from_project_data(_base())
+    p = _prod(res)
+    assert (p.production_lead_time_weeks, p.production_lead_time_dist.value) == (0, "deterministic")
+    assert res.resolved["products.production_lead_time"]["p1"] == {"source": "default", "value": 0}
+    assert not any(w.entity == "source" and w.field.startswith("products.production_lead_time")
+                   for w in res.warnings)
+    # …and the Product carries no new key, so it serializes exactly as before.
+    assert "production_lead_time_weeks" not in _prod(res).model_dump(exclude_defaults=True)
+
+
+def test_the_master_in_days_is_converted_and_the_plant_row_beats_it():
+    d = _base()
+    d.products[0].production_lead_time, d.products[0].production_lead_time_unit = 14, "day"
+    res = from_project_data(d)
+    assert _prod(res).production_lead_time_weeks == 2
+    assert res.resolved["products.production_lead_time"]["p1"] == {"source": "master", "value": 2}
+    d.policies = {"node:plant::p1": {"production": {"prod_lead_time_weeks": 3}}}
+    res = from_project_data(d)
+    assert _prod(res).production_lead_time_weeks == 3
+    assert res.resolved["products.production_lead_time"]["p1"] == {"source": "override", "value": 3}
+
+
+def test_a_bounded_production_lead_time_plans_on_its_mean():
+    d = _base()
+    d.policies = {"node:plant::p1": {"production": {
+        "prod_lead_time_weeks": 9, "prod_lead_time_dist": "triangular",
+        "prod_lead_time_min_weeks": 1, "prod_lead_time_mode_weeks": 2, "prod_lead_time_max_weeks": 6}}}
+    res = from_project_data(d)
+    p = _prod(res)
+    assert p.production_lead_time_weeks == 3 and p.production_lead_time_dist.value == "triangular"
+    assert res.resolved["products.production_lead_time"]["p1"] == {"source": "derived", "value": 3}
+    assert any(w.field == "prod_lead_time_weeks" and "bounds' mean" in w.reason for w in res.warnings)
+
+
+def test_a_production_shape_missing_its_cv_runs_deterministic_with_a_warning():
+    d = _base()
+    d.products[0].production_lead_time, d.products[0].production_lead_time_dist = 2, "gamma"
+    res = from_project_data(d)
+    p = _prod(res)
+    assert p.production_lead_time_dist.value == "deterministic" and p.production_lead_time_weeks == 2
+    assert any(w.field == "production_lead_time_dist" and "needs a CV" in w.reason for w in res.warnings)

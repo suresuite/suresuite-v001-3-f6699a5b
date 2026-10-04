@@ -305,7 +305,7 @@ The SHAPE of this material's delivery lead time — deterministic, or a named di
 | Unit | dimensionless |
 | Added by | `20260614000001_item_master.sql` |
 | Read by the engine | `project_map.py::_map_supply -> SupplierLink.lead_time_dist` |
-| Transform | LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC |
+| Transform | LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC. A lane's own shape (inbound_logistics.lead_time_dist) or the Supplier row's wins over it (PLAN.md §26 WP 16.2) |
 | When NULL, the engine uses | deterministic |
 | Validated at ingest | one of the LeadTimeDist enum values; `empirical` is reserved for the data-import path (M7) and is not selectable yet |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -340,9 +340,9 @@ How much the lead time varies, as a coefficient of variation. Read only when `le
 | Unit | `coefficient of variation (dimensionless)` — fixed |
 | Added by | `20260614000001_item_master.sql` |
 | Read by the engine | `project_map.py::_map_supply -> SupplierLink.lead_time_cv` |
-| Transform | float() when truthy, else 0.0 |
+| Transform | float() when truthy, else 0.0; above 1 → 1, warned (§4 D302). A lane's own CV (inbound_logistics.lead_time_cv) or the Supplier row's wins over it (PLAN.md §26 WP 16.2) |
 | When NULL, the engine uses | 0.0 — no variability, so no sampling |
-| Validated at ingest | numeric >= 0 |
+| Validated at ingest | numeric 0–1 — the engine's bound (§4 D302: a CV above 1 used to fail the run) |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 **Substitutions** — every point where a value you did not supply can stand in
@@ -351,6 +351,7 @@ for one you did.
 | When | The value used | Shown as | Visible where |
 |---|---|---|---|
 | NULL or zero | 0.0 | `default` | — |
+| above 1 (a value stored before the upload rule bounded it — §4 D302) | 1.0, the engine's bound | `default` | MappingWarning on the run's mapping report |
 
 **Resolution** — how a value is decided when more than one source could supply one.
 
@@ -471,6 +472,6 @@ The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_numb
 
 ---
 
-*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
+*Generated from data contract `c7c7da69c86d`, engine `0.8.0`,
 sidecar `supabase/contract/materials.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

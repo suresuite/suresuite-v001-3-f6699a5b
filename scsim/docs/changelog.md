@@ -4,6 +4,36 @@
 
 Every engine version, what it changed, and whether results stay comparable across it. Authored once in `scsim/CHANGELOG.yaml` and gated in CI (PLAN.md §25, gate `engine-ledger`). *Comparable* answers the user's question; *Tier* is the engineering classification (Part IX §9.5) — a patch can still change results for some projects.
 
+## 0.8.0 · 2026-10-04 · Tier 3
+
+**Changed for some projects.** Results change only for projects whose products carry a production lead time (L > 0) or its shape; L = 0, the default, runs byte-identically (every frozen reference run kept its digest).
+
+A product can take time to make: a production lead time per product, fixed or drawn from a distribution like a supplier's, so what starts this week is finished stock some weeks later. Planned production is offset by the expected lead time and work in progress is traced. A product with no production lead time completes in the week it starts, as before.
+
+*Technical.* P-P.13 (new): a per-product production pipeline ring — `production_started` is what starts at t, `production_output` what completes (t − L); a new world spawn key draws each product's lead time (`seeds.product_prodtime_rng`), with the shapes of `core/leadtime.py`; the plan reads `production_lead_time_offset` (E[L]). Mapper keys `prod_lead_time_*`. Pipeline schema stamp only.
+
+- commit: not yet recorded
+- ADR 0003
+- policies P-P.13
+- KPIs `fill_rate`, `lost_sales_value`
+- frozen reference runs moved: none
+- refs D300, D301, WP 16.4, WP 16.5, ADR 0003
+
+## 0.7.0 · 2026-10-03 · Tier 3
+
+**Changed for some projects.** Results change only for projects whose lanes or materials select normal, triangular or uniform lead times; every frozen reference run kept its digest.
+
+A supplier lead time can follow a normal, triangular or uniform distribution, chosen per supplier × material row with only the parameters that shape needs, as demand is. A bounded shape plans on the mean of its bounds. Lognormal and gamma lead times and every project with no new shape are unchanged.
+
+*Technical.* P-S.6 widened: `LeadTimeDist` gains normal / triangular / uniform; their standard uniforms are drawn per (lane, week) from a new world spawn key (`seeds.lane_leadtime_rng`, one child stream per lane) before any policy acts, and turned into a lead time by the one inverse CDF in `core/leadtime.py`. A bounded link's planning lead time is its bounds' mean; P-P.3's King formula reads the shape's own σ/μ. Pipeline schema stamp only.
+
+- commit: not yet recorded
+- ADR 0003
+- policies P-S.6
+- KPIs `fill_rate`, `lost_inbound_units`, `cost_of_resilience`
+- frozen reference runs moved: none
+- refs D299, D302, WP 16.1, WP 16.2, WP 16.3, ADR 0003
+
 ## 0.6.1 · 2026-10-03 · Tier 2
 
 **Changed for some projects.** Results change only for projects whose Supplier rows carry a typed s or S, a periodic review period, or an (R,Q) lot; every frozen reference run kept its digest.

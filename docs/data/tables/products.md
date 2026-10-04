@@ -26,6 +26,7 @@ partially or get corrected — the write fails.
 |---|---|---|
 | `products_fg_policy_check` | `CHECK (fg_policy IS NULL OR fg_policy IN ('base_stock', 'min_max', 'days_of_cover'))` | `20261003000002_fg_policy_per_product.sql` |
 | `products_fg_levels_nonnegative` | `CHECK (coalesce(fg_base_stock, 0) >= 0 AND coalesce(fg_reorder_point, 0) >= 0 AND coalesce(fg_cover_days, 0) >= 0 AND coalesce(fg_initial_on_hand, 0) >= 0)` | `20261003000002_fg_policy_per_product.sql` |
+| `products_production_lead_time_check` | `CHECK ( (production_lead_time_unit IS NULL OR public.unit_days(production_lead_time_unit) IS NOT NULL) AND (production_lead_time_dist IS NULL OR production_lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (production_lead_time_cv IS NULL OR (production_lead_time_cv >= 0 AND production_lead_time_cv <= 1)) AND coalesce(production_lead_time, 0) >= 0 AND coalesce(production_lead_time_min, 0) >= 0 AND coalesce(production_lead_time_mode, 0) >= 0 AND coalesce(production_lead_time_max, 0) >= 0 AND (production_lead_time_min IS NULL OR production_lead_time_mode IS NULL OR production_lead_time_min <= production_lead_time_mode) AND (production_lead_time_mode IS NULL OR production_lead_time_max IS NULL OR production_lead_time_mode <= production_lead_time_max) AND (production_lead_time_min IS NULL OR production_lead_time_max IS NULL OR production_lead_time_min <= production_lead_time_max) )` | `20261004000004_production_lead_time.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -102,6 +103,13 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `fg_reorder_point` | `fg_reorder_point` | `numeric` | `units of product` | no | s — `min_max` only: the plant builds up to S when the stock left after the week's demand falls below s, and builds nothing otherwise (WP 14.4). Must be below S. |
 | `fg_cover_days` | `fg_cover_days` | `numeric` | `days` | no | D — `days_of_cover` only: how many days of FUTURE demand the stock should cover. The target is D/7 × the projected weekly demand, so it moves with the forecast (WP 14.4). Days, not converted: the engine divides by 7 itself. |
 | `fg_initial_on_hand` | `fg_initial_on_hand` | `numeric` | `units of product` | no | The finished-goods stock an MTS product starts the run with — engine RFC 4, closed by WP 14.4 (the capability first, then this column, in RFC 4's own order). Empty starts the run at the policy target, which is today's behaviour. |
+| `production_lead_time` | `production_lead_time` | `numeric` | `weeks` *(from `production_lead_time_unit`)* | no | How long this product takes to make at the focal plant: output started in a week is finished stock L weeks later (P-P.13, PLAN.md §26 WP 16.5). A duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Empty is 0 — the product completes in the week it starts, which is how every product ran before Phase 16. For deterministic, normal, lognormal and gamma it is the mean; a triangular or uniform product plans on the mean of its bounds instead. |
+| `production_lead_time_unit` | `production_lead_time_unit` | `text` | — | no | The period `production_lead_time` and its bounds are quoted in — day, week, month, … (PLAN.md §26 WP 16.5). Blank means WEEKS, the convention `inbound_logistics.lead_time_unit` set. After promotion it reads `week`. |
+| `production_lead_time_dist` | `production_lead_time_dist` | `text` | — | no | The SHAPE of this product's production lead time — deterministic, normal, lognormal, gamma, triangular or uniform, chosen like a lane's lead time (PLAN.md §26 WP 16.5). Blank is deterministic. |
+| `production_lead_time_cv` | `production_lead_time_cv` | `numeric` | `coefficient of variation (dimensionless)` | no | How much the production lead time varies — read by normal, lognormal and gamma only (PLAN.md §26 WP 16.5). Bounded 0–1, as the engine bounds it. |
+| `production_lead_time_min` | `production_lead_time_min` | `numeric` | `weeks` *(from `production_lead_time_unit`)* | no | A triangular or uniform product's shortest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.5, P-P.13). |
+| `production_lead_time_mode` | `production_lead_time_mode` | `numeric` | `weeks` *(from `production_lead_time_unit`)* | no | A triangular product's most likely production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular only (PLAN.md §26 WP 16.5, P-P.13). |
+| `production_lead_time_max` | `production_lead_time_max` | `numeric` | `weeks` *(from `production_lead_time_unit`)* | no | A triangular or uniform product's longest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.5, P-P.13). |
 
 ## Each column in full
 
@@ -668,8 +676,138 @@ for one you did.
 |---|---|---|---|
 | NULL | the FG target | `default` | the Plant cell's empty note |
 
+### `production_lead_time`
+
+How long this product takes to make at the focal plant: output started in a week is finished stock L weeks later (P-P.13, PLAN.md §26 WP 16.5). A duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Empty is 0 — the product completes in the week it starts, which is how every product ran before Phase 16. For deterministic, normal, lognormal and gamma it is the mean; a triangular or uniform product plans on the mean of its bounds instead.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `weeks` — column, named by `production_lead_time_unit` |
+| Added by | `20261004000004_production_lead_time.sql` |
+| Read by the engine | `project_map.py::_product_lead_time -> Product.production_lead_time_weeks` |
+| Transform | the Plant-stage override, else _duration_to_weeks(this, production_lead_time_unit); rounded half to even, clamped 0–26 |
+| When NULL, the engine uses | 0 weeks — completes in the week it starts |
+| Validated at ingest | numeric >= 0; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+**Substitutions** — every point where a value you did not supply can stand in
+for one you did.
+
+| When | The value used | Shown as | Visible where |
+|---|---|---|---|
+| NULL | 0 weeks | `default` | the Plant cell's empty default |
+
+### `production_lead_time_unit`
+
+The period `production_lead_time` and its bounds are quoted in — day, week, month, … (PLAN.md §26 WP 16.5). Blank means WEEKS, the convention `inbound_logistics.lead_time_unit` set. After promotion it reads `week`.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261004000004_production_lead_time.sql` |
+| Read by the engine | `project_map.py::_product_lead_time -> _duration_to_weeks(…, production_lead_time_unit)` |
+| Transform | looked up in the one unit table; an unknown value falls to a 7-day basis |
+| When NULL, the engine uses | weeks |
+| Validated at ingest | one of the units public.unit_days() knows — enforced by the column's CHECK constraint |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+**Substitutions** — every point where a value you did not supply can stand in
+for one you did.
+
+| When | The value used | Shown as | Visible where |
+|---|---|---|---|
+| NULL or blank | weeks | `contract` | — |
+
+### `production_lead_time_dist`
+
+The SHAPE of this product's production lead time — deterministic, normal, lognormal, gamma, triangular or uniform, chosen like a lane's lead time (PLAN.md §26 WP 16.5). Blank is deterministic.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261004000004_production_lead_time.sql` |
+| Read by the engine | `project_map.py::_product_lead_time -> Product.production_lead_time_dist` |
+| Transform | lower-cased; an unknown value, or a shape missing a parameter it needs, is warned and the product runs deterministic |
+| When NULL, the engine uses | deterministic |
+| Validated at ingest | one of deterministic, normal, lognormal, gamma, triangular, uniform — enforced by the column's CHECK constraint; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+**Substitutions** — every point where a value you did not supply can stand in
+for one you did.
+
+| When | The value used | Shown as | Visible where |
+|---|---|---|---|
+| blank | deterministic | `default` | the Plant table's production lead-time distribution cell |
+| a shape whose parameters are missing or unusable | deterministic | `default` | MappingWarning on the run's mapping report |
+
+### `production_lead_time_cv`
+
+How much the production lead time varies — read by normal, lognormal and gamma only (PLAN.md §26 WP 16.5). Bounded 0–1, as the engine bounds it.
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `coefficient of variation (dimensionless)` — fixed |
+| Added by | `20261004000004_production_lead_time.sql` |
+| Read by the engine | `project_map.py::_product_lead_time -> Product.production_lead_time_cv` |
+| Transform | float(); the Plant row's CV on /policies wins |
+| Validated at ingest | numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `production_lead_time_min`
+
+A triangular or uniform product's shortest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.5, P-P.13).
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `weeks` — column, named by `production_lead_time_unit` |
+| Added by | `20261004000004_production_lead_time.sql` |
+| Read by the engine | `project_map.py::_product_lead_time -> Product.production_lead_time_min_weeks` |
+| Transform | _duration_to_weeks(production_lead_time_min, production_lead_time_unit); the Plant row's bound on /policies wins |
+| Validated at ingest | numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `production_lead_time_mode`
+
+A triangular product's most likely production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular only (PLAN.md §26 WP 16.5, P-P.13).
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `weeks` — column, named by `production_lead_time_unit` |
+| Added by | `20261004000004_production_lead_time.sql` |
+| Read by the engine | `project_map.py::_product_lead_time -> Product.production_lead_time_mode_weeks` |
+| Transform | _duration_to_weeks(production_lead_time_mode, production_lead_time_unit); the Plant row's bound on /policies wins |
+| Validated at ingest | numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `production_lead_time_max`
+
+A triangular or uniform product's longest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks after promotion. Read by triangular and uniform only (PLAN.md §26 WP 16.5, P-P.13).
+
+| | |
+|---|---|
+| Type | `numeric` |
+| Grain | `level` |
+| Unit | `weeks` — column, named by `production_lead_time_unit` |
+| Added by | `20261004000004_production_lead_time.sql` |
+| Read by the engine | `project_map.py::_product_lead_time -> Product.production_lead_time_max_weeks` |
+| Transform | _duration_to_weeks(production_lead_time_max, production_lead_time_unit); the Plant row's bound on /policies wins |
+| Validated at ingest | numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ---
 
-*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
+*Generated from data contract `c7c7da69c86d`, engine `0.8.0`,
 sidecar `supabase/contract/products.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

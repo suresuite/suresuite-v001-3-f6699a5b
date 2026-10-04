@@ -132,6 +132,6 @@ The super admin who last changed it. NULL for the seeded rows and after that acc
 
 ---
 
-*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
+*Generated from data contract `c7c7da69c86d`, engine `0.8.0`,
 sidecar `supabase/contract/docs_section_releases.contract.yaml`, table created by `20261001000002_docs_release_and_questions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

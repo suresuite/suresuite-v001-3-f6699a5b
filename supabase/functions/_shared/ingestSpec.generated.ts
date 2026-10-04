@@ -420,11 +420,102 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
           "blank": "null"
         },
         "validate": "one of the units public.unit_days() knows — enforced by the column's CHECK constraint"
+      },
+      {
+        "column": "lead_time_dist",
+        "csvHeader": "lead_time_dist",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "enum",
+          "values": [
+            "deterministic",
+            "normal",
+            "lognormal",
+            "gamma",
+            "triangular",
+            "uniform"
+          ],
+          "blank": "null"
+        },
+        "validate": "one of deterministic, normal, lognormal, gamma, triangular, uniform — enforced by the column's CHECK constraint; blank lands nothing"
+      },
+      {
+        "column": "lead_time_cv",
+        "csvHeader": "lead_time_cv",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "max": 1,
+          "blank": "null"
+        },
+        "validate": "numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing"
+      },
+      {
+        "column": "lead_time_min",
+        "csvHeader": "lead_time_min",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing"
+      },
+      {
+        "column": "lead_time_mode",
+        "csvHeader": "lead_time_mode",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing"
+      },
+      {
+        "column": "lead_time_max",
+        "csvHeader": "lead_time_max",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing"
       }
     ],
     "normalize": [
       {
         "column": "lead_time",
+        "unitColumn": "lead_time_unit",
+        "conversion": "duration",
+        "canonical": "week"
+      },
+      {
+        "column": "lead_time_max",
+        "unitColumn": "lead_time_unit",
+        "conversion": "duration",
+        "canonical": "week"
+      },
+      {
+        "column": "lead_time_min",
+        "unitColumn": "lead_time_unit",
+        "conversion": "duration",
+        "canonical": "week"
+      },
+      {
+        "column": "lead_time_mode",
         "unitColumn": "lead_time_unit",
         "conversion": "duration",
         "canonical": "week"
@@ -549,9 +640,10 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
         "rule": {
           "kind": "numeric",
           "min": 0,
+          "max": 1,
           "blank": "null"
         },
-        "validate": "numeric >= 0"
+        "validate": "numeric 0–1 — the engine's bound (§4 D302: a CV above 1 used to fail the run)"
       }
     ],
     "normalize": []
@@ -953,9 +1045,132 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
           "blank": "null"
         },
         "validate": "numeric >= 0; blank lands nothing"
+      },
+      {
+        "column": "production_lead_time",
+        "csvHeader": "production_lead_time",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; blank lands nothing"
+      },
+      {
+        "column": "production_lead_time_unit",
+        "csvHeader": "production_lead_time_unit",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "unit",
+          "blank": "null"
+        },
+        "validate": "one of the units public.unit_days() knows — enforced by the column's CHECK constraint"
+      },
+      {
+        "column": "production_lead_time_dist",
+        "csvHeader": "production_lead_time_dist",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "enum",
+          "values": [
+            "deterministic",
+            "normal",
+            "lognormal",
+            "gamma",
+            "triangular",
+            "uniform"
+          ],
+          "blank": "null"
+        },
+        "validate": "one of deterministic, normal, lognormal, gamma, triangular, uniform — enforced by the column's CHECK constraint; blank lands nothing"
+      },
+      {
+        "column": "production_lead_time_cv",
+        "csvHeader": "production_lead_time_cv",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "max": 1,
+          "blank": "null"
+        },
+        "validate": "numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing"
+      },
+      {
+        "column": "production_lead_time_min",
+        "csvHeader": "production_lead_time_min",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing"
+      },
+      {
+        "column": "production_lead_time_mode",
+        "csvHeader": "production_lead_time_mode",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing"
+      },
+      {
+        "column": "production_lead_time_max",
+        "csvHeader": "production_lead_time_max",
+        "required": false,
+        "type": "numeric",
+        "nullable": true,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing"
       }
     ],
-    "normalize": []
+    "normalize": [
+      {
+        "column": "production_lead_time",
+        "unitColumn": "production_lead_time_unit",
+        "conversion": "duration",
+        "canonical": "week"
+      },
+      {
+        "column": "production_lead_time_max",
+        "unitColumn": "production_lead_time_unit",
+        "conversion": "duration",
+        "canonical": "week"
+      },
+      {
+        "column": "production_lead_time_min",
+        "unitColumn": "production_lead_time_unit",
+        "conversion": "duration",
+        "canonical": "week"
+      },
+      {
+        "column": "production_lead_time_mode",
+        "unitColumn": "production_lead_time_unit",
+        "conversion": "duration",
+        "canonical": "week"
+      }
+    ]
   },
   "item_master_suppliers": {
     "dataset": "item_master_suppliers",

@@ -18,6 +18,7 @@
 
 import { useMemo } from "react";
 import { derivedMaterialCostDetails, derivedProductionCapacity } from "@/lib/policies/effectiveEconomics";
+import { laneSpreadFromMaterials } from "@/lib/policies/supplierLanes";
 import type { DerivedEconomics, ProductRow } from "@/hooks/useItemMasters";
 import type { DerivedMaps } from "@/lib/policies/resolveEffective";
 import type { OverrideRow } from "@/lib/policies/resolve";
@@ -30,10 +31,17 @@ export function useDerivedMaps(args: {
   outbound: Record<string, unknown>[];
   /** RAW inbound lanes — which step of the cost chain answered (§23 WP 13.4). */
   inbound?: Record<string, unknown>[];
+  /** The materials master — the derived step under a lane's lead-time shape
+   *  (PLAN.md §26 WP 16.2). Optional: a caller without it shows no material shape. */
+  materials?: Record<string, unknown>[];
   defaults: PolicyBundle;
   overrides: OverrideRow[];
 }): DerivedMaps {
-  const { derived, products, outbound, inbound, defaults, overrides } = args;
+  const { derived, products, outbound, inbound, materials, defaults, overrides } = args;
+  const laneSpread = useMemo(
+    () => laneSpreadFromMaterials(inbound ?? [], materials ?? []),
+    [inbound, materials],
+  );
   const materialCostVia = useMemo(
     () => derivedMaterialCostDetails(inbound ?? []),
     [inbound],
@@ -49,7 +57,7 @@ export function useDerivedMaps(args: {
     [products, outbound, defaults, overrides],
   );
   return useMemo(
-    () => ({ ...derived, productionCapacity, materialCostVia }),
-    [derived, productionCapacity, materialCostVia],
+    () => ({ ...derived, productionCapacity, materialCostVia, laneSpread }),
+    [derived, productionCapacity, materialCostVia, laneSpread],
   );
 }

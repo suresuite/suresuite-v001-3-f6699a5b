@@ -306,7 +306,10 @@ const UploadWizard = ({
       // every CSV anyone has ever uploaded. Blank means weeks, which is what the
       // engine has always assumed (project_map.py::_duration_to_weeks); supplying
       // it is how a lead time quoted in days stops being read as weeks.
-      optionalHeaders: ['lead_time_unit'],
+      // PLAN.md §26 WP 16.2 — the lane's own lead-time shape: a distribution and
+      // only the parameters it reads, the bounds in `lead_time_unit` like the
+      // lead time. All optional; a lane with none follows its material's shape.
+      optionalHeaders: ['lead_time_unit', 'lead_time_dist', 'lead_time_cv', 'lead_time_min', 'lead_time_mode', 'lead_time_max'],
       category: 'inbound',
     },
     {
@@ -379,7 +382,13 @@ const UploadWizard = ({
       ],
       // PLAN.md §24 WP 14.4 — the FG policy and levels of an MTS product, and its
       // FG opening stock (engine RFC 4). Optional: an MTO product leaves them blank.
-      optionalHeaders: ['fg_policy', 'fg_base_stock', 'fg_reorder_point', 'fg_cover_days', 'fg_initial_on_hand'],
+      // PLAN.md §26 WP 16.5 — P-P.13 production lead time: a duration in
+      // `production_lead_time_unit` (blank = weeks), its shape and parameters.
+      optionalHeaders: [
+        'fg_policy', 'fg_base_stock', 'fg_reorder_point', 'fg_cover_days', 'fg_initial_on_hand',
+        'production_lead_time', 'production_lead_time_unit', 'production_lead_time_dist',
+        'production_lead_time_cv', 'production_lead_time_min', 'production_lead_time_mode', 'production_lead_time_max',
+      ],
       category: 'item-master',
     },
     {

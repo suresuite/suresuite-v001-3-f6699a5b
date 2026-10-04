@@ -57,7 +57,7 @@ Written by the `combine-project` edge function, never by a page. Invariant I2: p
 | `FirmLevelNetwork.tsx` | rpc get_prediction_stats | `src/components/MLPrediction.tsx:54` | yes |
 | `ProcessLevelNetwork.tsx` | rpc get_prediction_stats | `src/components/MLPrediction.tsx:54` | yes |
 | `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:28` | yes |
-| `ProjectPolicies.tsx` | rpc assign_material_supplier | `src/components/policies/StagePolicyTable.tsx:400` | yes |
+| `ProjectPolicies.tsx` | rpc assign_material_supplier | `src/components/policies/StagePolicyTable.tsx:406` | yes |
 | `SimulationLab.tsx` | rpc assign_material_supplier | `src/components/sim/PreRunValidationPanel.tsx:78` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -437,6 +437,6 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 
 ---
 
-*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
+*Generated from data contract `c7c7da69c86d`, engine `0.8.0`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

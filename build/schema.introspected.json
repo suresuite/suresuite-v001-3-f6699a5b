@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 402,
-  "migrations_applied": 394,
+  "migrations_found": 404,
+  "migrations_applied": 396,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261004000002_version_codes.sql",
+  "last_migration": "20261004000004_production_lead_time.sql",
   "counts": {
     "tables": 94,
     "views": 8,
@@ -8436,6 +8436,66 @@
           "unique": false,
           "references": null,
           "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "lead_time_dist",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
+        },
+        {
+          "name": "lead_time_cv",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
+        },
+        {
+          "name": "lead_time_min",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
+        },
+        {
+          "name": "lead_time_mode",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
+        },
+        {
+          "name": "lead_time_max",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
         }
       ],
       "constraints": [
@@ -8464,6 +8524,13 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "inbound_logistics_lead_time_spread_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ( (lead_time_dist IS NULL OR lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (lead_time_cv IS NULL OR (lead_time_cv >= 0 AND lead_time_cv <= 1)) AND (lead_time_min IS NULL OR lead_time_min >= 0) AND (lead_time_mode IS NULL OR lead_time_mode >= 0) AND (lead_time_max IS NULL OR lead_time_max >= 0) AND (lead_time_min IS NULL OR lead_time_mode IS NULL OR lead_time_min <= lead_time_mode) AND (lead_time_mode IS NULL OR lead_time_max IS NULL OR lead_time_mode <= lead_time_max) AND (lead_time_min IS NULL OR lead_time_max IS NULL OR lead_time_min <= lead_time_max) )",
+          "added_by": "20261004000003_lane_lead_time_spread.sql"
         }
       ],
       "indexes": [
@@ -15872,6 +15939,90 @@
           "unique": false,
           "references": null,
           "added_by": "20261003000002_fg_policy_per_product.sql"
+        },
+        {
+          "name": "production_lead_time",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000004_production_lead_time.sql"
+        },
+        {
+          "name": "production_lead_time_unit",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000004_production_lead_time.sql"
+        },
+        {
+          "name": "production_lead_time_dist",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000004_production_lead_time.sql"
+        },
+        {
+          "name": "production_lead_time_cv",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000004_production_lead_time.sql"
+        },
+        {
+          "name": "production_lead_time_min",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000004_production_lead_time.sql"
+        },
+        {
+          "name": "production_lead_time_mode",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000004_production_lead_time.sql"
+        },
+        {
+          "name": "production_lead_time_max",
+          "quoted": false,
+          "type": "numeric",
+          "type_raw": "numeric",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261004000004_production_lead_time.sql"
         }
       ],
       "constraints": [
@@ -15907,6 +16058,13 @@
           "columns": [],
           "definition": "CHECK (coalesce(fg_base_stock, 0) >= 0 AND coalesce(fg_reorder_point, 0) >= 0 AND coalesce(fg_cover_days, 0) >= 0 AND coalesce(fg_initial_on_hand, 0) >= 0)",
           "added_by": "20261003000002_fg_policy_per_product.sql"
+        },
+        {
+          "name": "products_production_lead_time_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ( (production_lead_time_unit IS NULL OR public.unit_days(production_lead_time_unit) IS NOT NULL) AND (production_lead_time_dist IS NULL OR production_lead_time_dist IN ('deterministic', 'normal', 'lognormal', 'gamma', 'triangular', 'uniform')) AND (production_lead_time_cv IS NULL OR (production_lead_time_cv >= 0 AND production_lead_time_cv <= 1)) AND coalesce(production_lead_time, 0) >= 0 AND coalesce(production_lead_time_min, 0) >= 0 AND coalesce(production_lead_time_mode, 0) >= 0 AND coalesce(production_lead_time_max, 0) >= 0 AND (production_lead_time_min IS NULL OR production_lead_time_mode IS NULL OR production_lead_time_min <= production_lead_time_mode) AND (production_lead_time_mode IS NULL OR production_lead_time_max IS NULL OR production_lead_time_mode <= production_lead_time_max) AND (production_lead_time_min IS NULL OR production_lead_time_max IS NULL OR production_lead_time_min <= production_lead_time_max) )",
+          "added_by": "20261004000004_production_lead_time.sql"
         }
       ],
       "indexes": [],
@@ -24756,7 +24914,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261003000002_fg_policy_per_product.sql"
+      "defined_by": "20261004000004_production_lead_time.sql"
     },
     {
       "name": "_build_dataset_snapshot",
@@ -28606,7 +28764,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": "Phase 3 / WP 3.3 — the unit conversions ingest_apply_run applies as it ",
-      "defined_by": "20261003000001_demand_per_row.sql"
+      "defined_by": "20261004000004_production_lead_time.sql"
     },
     {
       "name": "ingest_promotion_plan",

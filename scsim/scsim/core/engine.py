@@ -62,12 +62,14 @@ from scsim.core.phases import (
     PhaseId,
     validate_hooks,
 )
-from scsim.core.planning import fg_gap, fg_target_for, plan_ahead
+from scsim.core.leadtime import from_variate as lt_from_variate
+from scsim.core.planning import fg_gap, fg_target_for, plan_ahead, production_lead_time_offset
 from scsim.disruption.injector import any_stochastic, resolve_events, validate_events
 from scsim.entities.config import StatisticsReport, WarmupReport
 from scsim.entities.enums import (
     EffectType,
     FulfillmentMode,
+    SHAPED_LEAD_TIME_DISTS,
     LeadTimeDist,
     OverflowRule,
     RunMode,
@@ -104,6 +106,7 @@ def _mech_week_start(model: CompiledModel, ctx: SimContext) -> None:
     ctx.production_plan[:] = 0.0
     ctx.overtime_extra[:] = 0.0
     ctx.production_output[:] = 0.0
+    ctx.production_started[:] = 0.0
     ctx.fulfillment[:] = 0.0
     ctx.lost_units_week[:] = 0.0
     ctx.material_demand[:] = 0.0
@@ -213,12 +216,20 @@ def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
     # MTO: produce to order (D + backlog). MTS step ②: replenish toward last
     # week's S^FG plus any backlog PH-30 could not serve from stock.
     want_mto = ctx.demand + ctx.backlog
+    # P-P.13 (PLAN.md §26 WP 16.4): a start this week completes at t + L, so it is
+    # planned against the requirement THEN, net of the work in progress that
+    # completes before it — offset by the EXPECTED (planning) L only, never by a
+    # drawn one (gate `plan-from-demand`). Every product with L = 0 keeps the
+    # arithmetic below exactly.
+    stock_now = ctx.fg_on_hand
+    if model.has_prod_lt:
+        want_mto, stock_now = production_lead_time_offset(model, ctx, want_mto)
     if model.mts_mask.any():
         backlog_unserved = ctx.backlog - ctx.fg_served_backlog
         # The FG policy's ask (WP 14.4): base-stock and days of cover fill to the
         # target, min-max only below s — `max(target − stock, 0)` for the first two,
         # exactly as before.
-        gap = fg_gap(model, ctx.fg_target, ctx.fg_on_hand) + backlog_unserved
+        gap = fg_gap(model, ctx.fg_target, stock_now) + backlog_unserved
         want = np.where(model.mts_mask, gap, want_mto)
     else:
         want = want_mto
@@ -243,7 +254,9 @@ def _mech_production_execute(model: CompiledModel, ctx: SimContext) -> None:
     cap = _effective_prod_capacity(model, ctx)
     plan = np.minimum(ctx.production_plan, cap)
     Q, remaining = greedy_feasible(model, plan, ctx.on_hand)
-    ctx.production_output = Q
+    # Materials are consumed at the START (P-P.13): `remaining` is the stock after
+    # this week's starts, whatever their lead time.
+    ctx.production_started = Q.copy()
     ctx.on_hand = remaining
     # The capacity the week offered, and the output that used it. Recorded from
     # the SAME `cap` the clip above used, so the two can never describe
@@ -252,9 +265,50 @@ def _mech_production_execute(model: CompiledModel, ctx: SimContext) -> None:
     # a collapse in demand rather than a loss of capacity.
     ctx.trace.plant_capacity_units[ctx.week] = float(cap.sum())
     ctx.trace.plant_capacity_used_units[ctx.week] = float(Q.sum())
+    if model.has_prod_lt:
+        ctx.production_output = _production_completions(model, ctx, Q)
+    else:
+        ctx.production_output = Q
     if model.mts_mask.any():
-        # Eq. 9: MTS output replenishes FG (same-week completion, W^FG = 0 in v1).
-        ctx.fg_on_hand = ctx.fg_on_hand + np.where(model.mts_mask, Q, 0.0)
+        # Eq. 9: MTS completions replenish FG — this week's starts when the
+        # product has no production lead time (W^FG = 0, the default), else what
+        # started L weeks ago (P-P.13).
+        ctx.fg_on_hand = ctx.fg_on_hand + np.where(model.mts_mask, ctx.production_output, 0.0)
+
+
+def _production_completions(model: CompiledModel, ctx: SimContext, Q: np.ndarray) -> np.ndarray:
+    """P-P.13 (PLAN.md §26 WP 16.4): put this week's starts in the production
+    pipeline at t + L and take out what completes this week.
+
+    L is the product's planning lead time, or — for a product with a shape — a
+    draw from the variate pre-drawn for this (product, week) from the world
+    production-time stream (the one inverse CDF, ``core/leadtime``). A draw below
+    0 or beyond the ring is bounded and counted. A product with L = 0 completes
+    in the week it starts, exactly as an engine without this feature."""
+    t, W = ctx.week, model.prod_ring_width
+    lt = model.prod_lt.astype(np.int64).copy()
+    for j in np.flatnonzero(model.prod_lt_stochastic):
+        lo, mo, hi = model.prod_lt_min[j], model.prod_lt_mode[j], model.prod_lt_max[j]
+        x = lt_from_variate(model.prod_lt_dist[j], int(model.prod_lt[j]), float(model.prod_lt_cv[j]),
+                            float(ctx.prod_lt_variates[j, t]),
+                            lo=None if np.isnan(lo) else lo, mode=None if np.isnan(mo) else mo,
+                            hi=None if np.isnan(hi) else hi, nominal=float(model.prod_lt[j]))
+        if x < 0 or x > W - 2:
+            ctx.prod_lt_clipped[j] += 1
+            x = min(max(x, 0), W - 2)
+        lt[j] = x
+    np.add.at(ctx.prod_pipeline, (np.arange(model.n_prods), (t + lt) % W), Q)
+    done = ctx.prod_pipeline[:, t % W].copy()
+    ctx.prod_pipeline[:, t % W] = 0.0
+    # Work in progress after this week's completions: traced in units and at
+    # material value (COGS) — and charged NO holding cost (§26.2 rule 8: the page
+    # shows no WIP rate, so the engine charges none).
+    wip = ctx.prod_pipeline.sum(axis=1)
+    ctx.trace.wip_units[t] = float(wip.sum())
+    ctx.trace.wip_value[t] = float((wip * model.fg_unit_cogs).sum())
+    if ctx.trace.WIP is not None:
+        ctx.trace.WIP[:, t] = wip
+    return done
 
 
 def _mech_material_demand(model: CompiledModel, ctx: SimContext) -> None:
@@ -382,16 +436,25 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
     L, Q = L[keep], Q[keep]
     ovr = ctx.po_lt_override[L]
     lt = np.where(ovr > 0, ovr, model.link_lt[L]).astype(np.int64)
-    stoch_links = getattr(model, "_link_stochastic", None)
-    if stoch_links is None:
-        stoch_links = model._link_stochastic = np.array(
-            [model.link_lt_dist[l] != LeadTimeDist.DETERMINISTIC and model.link_lt_cv[l] > 0
-             for l in range(model.n_links)], dtype=bool)
-    stoch = np.flatnonzero(stoch_links[L])
+    stoch = np.flatnonzero(model.link_lt_stochastic[L])
     for i in stoch:
         link = int(L[i])
-        lt[i] = _lt_from_variate(model.link_lt_dist[link], int(lt[i]),
-                                 float(model.link_lt_cv[link]), float(ctx.lt_variates[link, t]))
+        dist = model.link_lt_dist[link]
+        if dist in SHAPED_LEAD_TIME_DISTS:
+            lo, mo, hi = (model.link_lt_min[link], model.link_lt_mode[link],
+                          model.link_lt_max[link])
+            raw = lt_from_variate(
+                dist, int(lt[i]), float(model.link_lt_cv[link]), float(ctx.lt_variates[link, t]),
+                lo=None if np.isnan(lo) else lo, mode=None if np.isnan(mo) else mo,
+                hi=None if np.isnan(hi) else hi, nominal=float(model.link_lt[link]))
+            # A normal draw below one week is raised to one (the arrival floor
+            # below) — counted so the shift is stated (PLAN.md §26 WP 16.1).
+            if raw < 1:
+                ctx.lt_floor_raised[link] += 1
+            lt[i] = raw
+        else:
+            lt[i] = _lt_from_variate(dist, int(lt[i]), float(model.link_lt_cv[link]),
+                                     float(ctx.lt_variates[link, t]))
     arrival = t + np.maximum(1, lt)
     block = ctx.lt_block_end[model.link_sup[L]]
     arrival = np.where(block > 0, np.maximum(arrival, block), arrival)
@@ -409,22 +472,10 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
 def _lt_from_variate(dist: LeadTimeDist, mean: float, cv: float, v: float,
                      rounded: bool = True) -> float:
     """A lead time with the link's distribution and the shipment's mean, from a
-    variate pre-drawn for this (link, week) (audit F-24).
-
-    Lognormal: ``exp(μ + σ·z)`` with ``σ² = ln(1+cv²)`` and ``μ = ln(mean) − σ²/2``,
-    so ``E = mean``. Gamma: ``(mean/shape)·g`` with ``g ~ Γ(shape, 1)`` and
-    ``shape = 1/cv²``, the same scale family ``rng.gamma(shape, mean/shape)`` drew
-    from. The distribution is unchanged; only WHEN the stream is consumed moved.
-    """
-    if dist == LeadTimeDist.LOGNORMAL:
-        sigma2 = np.log1p(cv * cv)
-        mu = np.log(max(mean, 1e-9)) - sigma2 / 2.0
-        x = float(np.exp(mu + np.sqrt(sigma2) * v))
-    elif dist == LeadTimeDist.GAMMA:
-        x = float(v * mean * cv * cv)  # (mean / shape) · g, shape = 1/cv²
-    else:
-        x = float(mean)
-    return int(round(x)) if rounded else x
+    variate pre-drawn for this (link, week) (audit F-24). The one implementation
+    is ``core/leadtime.from_variate`` (PLAN.md §26 WP 16.1); this is its CV-shape
+    entry, kept for the callers that have always used it."""
+    return lt_from_variate(dist, mean, cv, v, rounded=rounded)
 
 
 def _mech_land_arrivals(model: CompiledModel, ctx: SimContext) -> None:
@@ -473,7 +524,9 @@ def _mech_accounting(model: CompiledModel, ctx: SimContext, policies: list[Polic
         tr.PD[:, t] = ctx.plan_projected_demand[:, 0]
         tr.REQ[:, t] = ctx.plan_requirement[:, 0]
         tr.PLAN[:, t] = ctx.planned_production[:, 0]
-        tr.Q[:, t] = ctx.production_output
+        # Built = STARTED (what the plan asked the line for). Identical to the
+        # completions whenever no product has a production lead time (P-P.13).
+        tr.Q[:, t] = ctx.production_started
         tr.F[:, t] = F
         tr.B[:, t] = ctx.backlog
         tr.L[:, t] = L
@@ -809,6 +862,19 @@ class ScenarioResult:
     # [{"supplier_id", "material_id", "draws", "replications", "bounded_to_weeks"}].
     # Empty when no draw was bounded — the common case.
     lead_time_truncations: list = field(default_factory=list)
+    # Normal (or zero-floored bounded) lead-time draws below one week, raised to
+    # one (PLAN.md §26 WP 16.1): [{"supplier_id", "material_id", "draws",
+    # "replications"}]. Empty when nothing was raised — always, for a project
+    # with no shaped lead time.
+    lead_time_floor_raises: list = field(default_factory=list)
+    # P-P.13 production lead time (PLAN.md §26 WP 16.4). `work_in_progress`:
+    # None when no product has one; else {"mean_units", "mean_value",
+    # "by_product": [{"product_id", "mean_units"}], "replications"} over the
+    # analysis window — units started and not yet completed, at material value,
+    # carrying NO holding cost. `production_lead_time_clips`: drawn production
+    # lead times bounded to [0, ring] — [{"product_id", "draws", "replications"}].
+    work_in_progress: Optional[dict] = None
+    production_lead_time_clips: list = field(default_factory=list)
     # Fixed-start events moved from inside warm-up to t_w (audit F-03):
     # [{"event_index", "target_id", "authored_week", "used_week", "replications"}].
     event_shifts: list = field(default_factory=list)
@@ -889,6 +955,14 @@ class _CapacityBindingAccumulator:
         # count summed over replications — so it rides the same observer rather
         # than a second parameter through `_extend_until_ci` (audit F-36).
         self.lt_truncated = np.zeros(model.n_links, dtype=int)
+        self.lt_floor_raised = np.zeros(model.n_links, dtype=int)
+        self.has_prod_lt = bool(getattr(model, "has_prod_lt", False))
+        self.prod_ids = list(model.prod_ids)
+        self.wip_units_sum = 0.0
+        self.wip_value_sum = 0.0
+        self.wip_by_prod = np.zeros(model.n_prods)
+        self.wip_weeks = 0
+        self.prod_lt_clipped = np.zeros(model.n_prods, dtype=int)
         self.ring_width = int(model.ring_width)
         self.link_ids = [(model.sup_ids[model.link_sup[k]], model.mat_ids[model.link_mat[k]])
                          for k in range(model.n_links)]
@@ -924,9 +998,42 @@ class _CapacityBindingAccumulator:
             for k, (sid, mid) in enumerate(self.link_ids) if self.lt_truncated[k] > 0
         ]
 
+    def lead_time_floor_raises(self) -> list[dict]:
+        return [
+            {"supplier_id": sid, "material_id": mid, "draws": int(self.lt_floor_raised[k]),
+             "replications": self.reps}
+            for k, (sid, mid) in enumerate(self.link_ids) if self.lt_floor_raised[k] > 0
+        ]
+
+    def work_in_progress(self) -> Optional[dict]:
+        if not self.has_prod_lt or self.wip_weeks == 0:
+            return None
+        n = float(self.wip_weeks)
+        return {
+            "mean_units": round(self.wip_units_sum / n, 6),
+            "mean_value": round(self.wip_value_sum / n, 6),
+            "by_product": [{"product_id": pid, "mean_units": round(float(self.wip_by_prod[j]) / n, 6)}
+                           for j, pid in enumerate(self.prod_ids) if self.wip_by_prod[j] > 0],
+            "replications": self.reps,
+        }
+
+    def production_lead_time_clips(self) -> list[dict]:
+        return [
+            {"product_id": pid, "draws": int(self.prod_lt_clipped[j]), "replications": self.reps}
+            for j, pid in enumerate(self.prod_ids) if self.prod_lt_clipped[j] > 0
+        ]
+
     def observe(self, ctx: SimContext, t_w: int, window_end: int) -> None:
         w = slice(t_w, window_end)
         self.lt_truncated += ctx.lt_truncated
+        self.lt_floor_raised += ctx.lt_floor_raised
+        if self.has_prod_lt:
+            self.prod_lt_clipped += ctx.prod_lt_clipped
+            self.wip_units_sum += float(ctx.trace.wip_units[w].sum())
+            self.wip_value_sum += float(ctx.trace.wip_value[w].sum())
+            if ctx.trace.WIP is not None:
+                self.wip_by_prod += ctx.trace.WIP[:, w].sum(axis=1)
+            self.wip_weeks += max(window_end - t_w, 0)
         self.demand_clips += ctx.demand_clips
         self.demand_clip_add += ctx.demand_clip_add
         self.prod_bound += ctx.trace.prod_cap_bound[:, w].sum(axis=1)
@@ -1059,6 +1166,9 @@ def run_scenario(
             "product.backlog": tr.B,
             "product.lost_units": tr.L,
         }
+        if tr.WIP is not None:
+            # P-P.13 — units started and not yet completed, per product.
+            item_series["product.wip"] = tr.WIP
         if tr.MRP_NEED is not None:
             # WP 14.5 — the MRP record, week by week, for a run that has MRP
             # materials (orders placed are `material.orders`).
@@ -1108,6 +1218,9 @@ def run_scenario(
         item_ids=item_ids,
         capacity_binding=cap_acc.summary(compiled.model, t_w, window_end) or None,
         lead_time_truncations=cap_acc.lead_time_truncations(),
+        lead_time_floor_raises=cap_acc.lead_time_floor_raises(),
+        work_in_progress=cap_acc.work_in_progress(),
+        production_lead_time_clips=cap_acc.production_lead_time_clips(),
         event_shifts=[
             {"event_index": i, "target_id": scenario.events[i].target_id,
              "authored_week": a, "used_week": u, "replications": len(grid)}

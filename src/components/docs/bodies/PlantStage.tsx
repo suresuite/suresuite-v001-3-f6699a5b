@@ -19,10 +19,13 @@ export default function PlantStage() {
           <DocLink to="outbound-logistics">outbound lanes</DocLink> that name a product.
         </P>
         <P>
-          Each row's <Term>FG stock</Term> switch — the product's <Term>fulfillment_mode</Term> —
+          Each row's <Term>FG inventory</Term> switch — the product's <Term>fulfillment_mode</Term> —
           decides how much of this stage applies to it. A make-to-order product holds no finished
-          goods, so its row shows no FG policy at all. For a make-to-stock product the FG policy
-          and only the levels it reads appear, and they decide how much to build: planned
+          goods, so its row shows no FG policy at all. For a make-to-stock product the FG inventory
+          band reads like the Supplier stage's inventory band: the FG policy is the policy type, and
+          one <Term>Replenishment parameters</Term> cell holds only the levels that policy reads —
+          S for base-stock, s and S for min-max, D for days of cover — then the opening stock. They
+          decide how much to build: planned
           production is the policy's requirement plus any backlog, capped at capacity. How much
           finished stock to keep is said once, on the row: an empty S is one week of the projected
           demand, and a typed S is used as typed. Demand is not set here: it is set per row on the{" "}
@@ -36,9 +39,20 @@ export default function PlantStage() {
         <StageColumns
           stage="plant"
           notes={{
+            prod_lead_time_weeks: (
+              <>
+                How many weeks a product takes to make: what the plant starts in a week is finished
+                that many weeks later. Materials are used when production starts, the plan starts
+                each batch that many weeks ahead of the demand it serves, and the units in between
+                are work in progress (shown in inspection runs, charged no holding cost). Empty is 0
+                — finished in the week it starts. Choose a shape beside it to make it vary, exactly
+                as on the Supplier stage; a triangular or uniform product plans on the mean of its
+                bounds.
+              </>
+            ),
             fulfillment_mode: (
               <>
-                MTS holds finished-goods stock and shows the FG columns; MTO builds to order and
+                MTS holds finished-goods inventory and shows the FG columns; MTO builds to order and
                 shows none. Empty follows the product's own value, then the project's model, then
                 MTO — the order the run reads them in.
               </>

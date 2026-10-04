@@ -26,6 +26,7 @@ import {
   ProvenanceDot,
   ProvenanceLegend,
   ReplenishmentCell,
+  PROVENANCE,
   ColResizeHandle,
   RowFlag,
   SortHeader,
@@ -38,6 +39,8 @@ import {
   familiesForStage,
   fitColsForStage,
   vectorParamCols,
+  fgVectorParamCols,
+  FG_POLICY_PARAMS,
   flattenBundle,
   fgBufferAppliesToRow,
   isFgDependentCol,
@@ -343,6 +346,7 @@ export function StagePolicyTable({
     products,
     outbound: lanes.outbound,
     inbound: lanes.inbound,
+    materials: materials as unknown as Record<string, unknown>[],
     defaults,
     overrides,
   });
@@ -838,6 +842,12 @@ export function StagePolicyTable({
     for (const c of vectorParamCols(stageKey)) m.set(c.field, c);
     return m;
   }, [stageKey]);
+  // The FG levels grouped into the Plant row's vector cell (WP 16.6).
+  const fgParamColByField = useMemo(() => {
+    const m = new Map<string, ColSpec>();
+    for (const c of fgVectorParamCols(stageKey)) m.set(c.field, c);
+    return m;
+  }, [stageKey]);
 
   /** Enum choices for a column, with the registry's own labels for Policy Type. */
   const enumOptionsFor = (
@@ -867,7 +877,7 @@ export function StagePolicyTable({
       return opts.map((o) => ({
         value: o,
         label: o.toUpperCase(),
-        title: o === "mts" ? "Make to stock — holds FG stock; the FG policy applies" : "Make to order — no FG stock",
+        title: o === "mts" ? "Make to stock — holds FG inventory; the FG policy applies" : "Make to order — no FG inventory",
       }));
     }
     return opts.map((o) => ({ value: o, label: o }));
@@ -982,6 +992,53 @@ export function StagePolicyTable({
         basis={basis as "days_of_supply" | "forward_visible"}
         onBasisChange={(b) => onCellChange(rowKey, "basis", b)}
         basisNotSimulated={notSimulatedNote("basis")}
+      />
+    );
+  };
+
+  /**
+   * The Plant row's FG "Replenishment parameters" cell (PLAN.md §26 WP 16.6,
+   * §4 D301) — the Supplier stage's layout for the FG policy: only the levels
+   * the row's FG policy reads (`FG_POLICY_PARAMS`, gated like `fgPolicyIn`).
+   * Each level is still the master-backed cell it was: its value and source
+   * come from the one resolver, a typed value saves as this row's override, and
+   * clearing it resets to the item master (`null`, §23 WP 13.1).
+   */
+  const renderFgInvParamsCell = (
+    rowKey: string,
+    r: Record<string, unknown>,
+    rowCtx: ColSpecCtx,
+    paramW?: number,
+  ) => {
+    const policy = String(rowCtx.resolved?.fg_policy || "base_stock");
+    const paramSpec = FG_POLICY_PARAMS[policy] ?? FG_POLICY_PARAMS.base_stock;
+    return (
+      <ReplenishmentCell
+        policyType={policy}
+        paramSpec={paramSpec}
+        paramW={paramW}
+        emptyNote={{ label: "—", title: "This FG policy reads no level" }}
+        params={paramSpec.map(({ field }) => {
+          const col = fgParamColByField.get(field)!;
+          const cell = resolveCell({
+            rowKey, row: r, col, draft: drafts[rowKey]?.[field], families, masterColByField,
+            masterRowById, derived, defaults, overrides, scope: spec.scope, familyDefault: getDefault,
+            gate: rowCtx,
+          });
+          const v = typeof cell.value === "number" ? cell.value : undefined;
+          return {
+            field,
+            value: cell.provenance === "contract" ? undefined : v,
+            onCommit: (n: number | undefined) => onCellChange(rowKey, field, n === undefined ? null : n),
+            placeholder: cell.placeholder,
+            placeholderNote: cell.placeholderTitle,
+            source: cell.provenance,
+            sourceTitle: substitutionNote(cell) ?? PROVENANCE[cell.provenance]?.title,
+          };
+        })}
+        labelFor={(f) => fgParamColByField.get(f)?.label ?? f}
+        basis="days_of_supply"
+        onBasisChange={() => undefined}
       />
     );
   };
@@ -1886,9 +1943,9 @@ export function StagePolicyTable({
                 colSpan={span}
                 className="border-b px-2 font-mono text-[10px] text-[#b4b4b4]"
                 style={{ width: spanWidth, minWidth: spanWidth, ...cellDivider(spanLast) }}
-                title="Made to order — this product holds no finished-goods stock, so no FG policy is read. Switch FG stock to MTS to set one."
+                title="Made to order — this product holds no finished-goods inventory, so no FG policy is read. Switch FG inventory to MTS to set one."
               >
-                made to order · no FG stock
+                made to order · no FG inventory
               </td>
             );
           }
@@ -1903,6 +1960,18 @@ export function StagePolicyTable({
                 title="Not applicable for the current policy choice"
               >
                 —
+              </td>
+            );
+          }
+          // The Plant row's FG "Replenishment parameters" cell (WP 16.6).
+          if (col.synthetic && col.field === "__fg_inv_params") {
+            return (
+              <td
+                key={col.field}
+                className="border-b p-0 align-middle group-hover:bg-[#fafafa]"
+                style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
+              >
+                {renderFgInvParamsCell(rowKey, r, rowCtx, fc.paramW)}
               </td>
             );
           }
@@ -1969,6 +2038,8 @@ export function StagePolicyTable({
             overrides,
             scope: spec.scope,
             familyDefault: getDefault,
+            // A bounded lane's Lead time is its bounds' mean (PLAN.md §26 WP 16.3).
+            gate: rowCtxByKey.get(rowKey),
           });
           const {
             cellValue, liveDefault, provenance: prov, edited,
@@ -1989,7 +2060,12 @@ export function StagePolicyTable({
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);
-          const kind = kindOf(col, opts, firms, cellValue, liveDefault);
+          // A bounded lane's Lead time is its bounds' mean (§26.2 rule 3): the
+          // engine reads no typed value there, so the cell is not an input.
+          const kind =
+            resolved.derivedVia?.via === "lead_time_bounds_mean"
+              ? "readonly"
+              : kindOf(col, opts, firms, cellValue, liveDefault);
           // A cleared master-backed cell is *reset to master* (§23 WP 13.1):
           // `null` removes the override on save, `undefined` would be no edit.
           // A column the engine rounds (`ColSpec.round`, the lane lead time) is
@@ -2072,7 +2148,7 @@ export function StagePolicyTable({
                 <Select value={String(cellValue ?? liveDefault ?? "")} onValueChange={commit}>
                   <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
                     {/* An empty distribution runs the PRODUCT's, × the row's share. */}
-                    <SelectValue placeholder={col.field === "row_demand_distribution" ? "product's" : "—"} />
+                    <SelectValue placeholder={col.field === "row_demand_distribution" ? "product's" : col.field === "lane_lead_time_dist" || col.field === "prod_lead_time_dist" ? "deterministic" : "—"} />
                   </SelectTrigger>
                   <SelectContent>
                     {(col.field === "sourcing_firm" && firms

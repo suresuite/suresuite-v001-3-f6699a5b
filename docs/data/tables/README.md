@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 77 of 94 tables are covered,
-1012 columns in all. A table that is not here is listed
+1024 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -34,7 +34,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`experiments`](experiments.md) | 5 | `engine` | 10 | One designed experiment over a project: a name, a design (full factorial or Latin hypercube), the factors and levels it varies, and the `scenarios` it cloned — one per design row — to run. A design a person authors, grouping runs that were MADE to be compared. UNREACHABLE TODAY: the only screen that writes or reads it, `ExperimentDesigner.tsx`, is mounted by no route (§4 D115), so although `useExperiments` reads and writes the table, no page a user can open reaches that code. |
 | [`external_evidence`](external_evidence.md) | 4 | `platform` | 9 | One retrieved external claim about a supply chain, as a subject–predicate–object triple with the source it came from, the confidence attached to it and the hash of the content it was read from. The network cartographer's evidence store: what an agent FOUND, kept apart from what a person entered. |
 | [`graph_level_versions`](graph_level_versions.md) | 3 | `platform` | 10 | One row per (project, level, content): the FIRST time a project's product, process, firm or simulation level had that hash. Numbered per project PER LEVEL, so "Product graph v3" and "Firm graph v5" are both sentences the system can say, and a change to one level moves that level's number and no other. A snapshot (`dataset_versions`) names its level versions — its tuple. |
-| [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 14 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed). |
+| [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 19 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed). |
 | [`ingest_files`](ingest_files.md) | 0 | `data-ingestion` | 11 | One file as received, in one run: the manifest for bytes held in storage — where they are, how many there were, and the SHA-256 of exactly the sequence received. Write-once: the row records an event that has already happened and cannot be edited into a different one. |
 | [`ingest_runs`](ingest_runs.md) | 1 | `data-ingestion` | 23 | One ingestion attempt, from any source — a connector sync, a CSV upload or an API push — with the counts and the mapping report it produced. The unit a person reviews and approves: staged rows belong to a run, and promotion is a decision about a run rather than about a row. |
 | [`ingest_staged_bom_lines`](ingest_staged_bom_lines.md) | 1 | `data-ingestion` | 13 | One component line of one staged BOM version, as the source sent it: this much of that component goes into one unit of the parent. |
@@ -59,7 +59,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`policy_overrides`](policy_overrides.md) | 4 | `policy-ui` | 10 | One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family. |
 | [`policy_presets`](policy_presets.md) | 4 | `policy-ui` | 9 | One named policy bundle a user can apply to a project — the DECISION plane's catalog of starting points. A system preset (`is_system`) ships with the product; a user preset belongs to its `owner_id`. |
 | [`policy_versions`](policy_versions.md) | 4 | `policy-ui` | 15 | One saved snapshot of a project's whole policy bundle, with the bundle it replaced and the hash of both. The audit trail of the /policies grid: what the policies WERE at a moment somebody chose to record, which is what makes a simulation result reproducible from the policy side. |
-| [`products`](products.md) | 2 | `data-ingestion` | 23 | One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs. |
+| [`products`](products.md) | 2 | `data-ingestion` | 30 | One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs. |
 | [`project_erp_links`](project_erp_links.md) | G | `data-ingestion` | 15 | One authorized link between one project and one company in one external system: project ownership proved on this side, company membership proved on that side by the linking user's own OAuth consent. One link is one credential and one project — never shared, so revoking one project's link cannot be bypassed by a sibling. |
 | [`project_graph_state`](project_graph_state.md) | 3 | `analysis` | 13 | One row per project: every hash of the project's LIVE data — the composite `graph_hash`, its two domains and the three levels — stored, so a page that asks "has this project's graph changed?" reads a row instead of rebuilding a snapshot of thirteen tables. A CACHE of a pure function of tier 2, safe to drop: the next read rebuilds it. |
 | [`project_members`](project_members.md) | G | `platform` | 8 | One person's standing on one project. This is the level of access the platform did not have until WP 2.2 — between "in the organization" (sees every project) and "not in it" (sees none). |
@@ -92,4 +92,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`.*
+*Generated from data contract `c7c7da69c86d`, engine `0.8.0`.*

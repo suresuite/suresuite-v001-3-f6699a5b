@@ -190,7 +190,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.6.1",
+  "engine_version": "0.8.0",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -619,6 +619,19 @@
           ],
           "title": "FulfillmentMode",
           "type": "string"
+        },
+        "LeadTimeDist": {
+          "enum": [
+            "deterministic",
+            "lognormal",
+            "gamma",
+            "empirical",
+            "normal",
+            "triangular",
+            "uniform"
+          ],
+          "title": "LeadTimeDist",
+          "type": "string"
         }
       },
       "description": "Product + demand model + fulfillment mode (CODP) \u2014 \u00a73.1\u20133.3.",
@@ -850,6 +863,84 @@
           "title": "Production Capacity",
           "type": "number",
           "unit": "units/wk"
+        },
+        "production_lead_time_cv": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "notes": "CV for normal/lognormal/gamma production lead times.",
+          "scope": "P",
+          "title": "Production Lead Time Cv",
+          "type": "number",
+          "unit": "-"
+        },
+        "production_lead_time_dist": {
+          "$ref": "#/$defs/LeadTimeDist",
+          "default": "deterministic",
+          "notes": "Shape of the production lead time; drawn per (product, week) from the world production-time stream (CRN).",
+          "scope": "P",
+          "unit": "enum"
+        },
+        "production_lead_time_max_weeks": {
+          "anyOf": [
+            {
+              "maximum": 26,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Upper bound (triangular, uniform).",
+          "scope": "P",
+          "title": "Production Lead Time Max Weeks",
+          "unit": "weeks"
+        },
+        "production_lead_time_min_weeks": {
+          "anyOf": [
+            {
+              "maximum": 26,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Lower bound (triangular, uniform).",
+          "scope": "P",
+          "title": "Production Lead Time Min Weeks",
+          "unit": "weeks"
+        },
+        "production_lead_time_mode_weeks": {
+          "anyOf": [
+            {
+              "maximum": 26,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Most likely value (triangular).",
+          "scope": "P",
+          "title": "Production Lead Time Mode Weeks",
+          "unit": "weeks"
+        },
+        "production_lead_time_weeks": {
+          "default": 0,
+          "maximum": 26,
+          "minimum": 0,
+          "notes": "L_p: the planning production lead time. 0 = completes in the week it starts (byte-identical to an engine without it).",
+          "scope": "P",
+          "title": "Production Lead Time Weeks",
+          "type": "integer",
+          "unit": "weeks"
         },
         "unit_price": {
           "exclusiveMinimum": 0,
@@ -1152,7 +1243,10 @@
             "deterministic",
             "lognormal",
             "gamma",
-            "empirical"
+            "empirical",
+            "normal",
+            "triangular",
+            "uniform"
           ],
           "title": "LeadTimeDist",
           "type": "string"
@@ -1172,7 +1266,7 @@
           "default": 0.0,
           "maximum": 1.0,
           "minimum": 0.0,
-          "notes": "CV for lognormal/gamma lead-time dists.",
+          "notes": "CV for normal/lognormal/gamma lead-time dists.",
           "scope": "SM",
           "title": "Lead Time Cv",
           "type": "number",
@@ -1184,6 +1278,57 @@
           "notes": "Stochastic lead times are pre-drawn per (link, week) from the world leadtime stream, so CRN pairing holds across policies (docs/statistics.md).",
           "scope": "SM",
           "unit": "enum"
+        },
+        "lead_time_max_weeks": {
+          "anyOf": [
+            {
+              "maximum": 51,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Upper bound (triangular, uniform).",
+          "scope": "SM",
+          "title": "Lead Time Max Weeks",
+          "unit": "weeks"
+        },
+        "lead_time_min_weeks": {
+          "anyOf": [
+            {
+              "maximum": 51,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Lower bound (triangular, uniform).",
+          "scope": "SM",
+          "title": "Lead Time Min Weeks",
+          "unit": "weeks"
+        },
+        "lead_time_mode_weeks": {
+          "anyOf": [
+            {
+              "maximum": 51,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Most likely value (triangular).",
+          "scope": "SM",
+          "title": "Lead Time Mode Weeks",
+          "unit": "weeks"
         },
         "lead_time_weeks": {
           "maximum": 51,
@@ -3687,6 +3832,81 @@
     },
     {
       "catalog_ref": null,
+      "domain": "lead_time_distribution",
+      "empty_default": null,
+      "empty_note": "the material's lead-time shape, else deterministic",
+      "family": "sourcing",
+      "key": "lane_lead_time_dist",
+      "master": "inbound_logistics.lead_time_dist",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_dist",
+      "transform": "enum deterministic | normal | lognormal | gamma | triangular | uniform. Order: the Supplier-stage row -> inbound_logistics.lead_time_dist -> materials.lead_time_dist -> deterministic. A shape missing a parameter it reads runs deterministic, warned"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "fraction",
+      "empty_default": null,
+      "empty_note": "the material's CV, else none \u2014 normal, lognormal and gamma need one",
+      "family": "sourcing",
+      "key": "lane_lead_time_cv",
+      "master": "inbound_logistics.lead_time_cv",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_cv",
+      "transform": "fraction 0-1, read by normal, lognormal and gamma. Order: the Supplier-stage row -> inbound_logistics.lead_time_cv -> materials.lead_time_cv"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular and uniform need it",
+      "family": "sourcing",
+      "key": "lane_lead_time_min_weeks",
+      "master": "inbound_logistics.lead_time_min",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_min_weeks",
+      "transform": "weeks, >= 0; triangular and uniform. Order: the Supplier-stage row -> inbound_logistics.lead_time_min x lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular needs it",
+      "family": "sourcing",
+      "key": "lane_lead_time_mode_weeks",
+      "master": "inbound_logistics.lead_time_mode",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_mode_weeks",
+      "transform": "weeks, >= 0; triangular. Order: the Supplier-stage row -> inbound_logistics.lead_time_mode x lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular and uniform need it",
+      "family": "sourcing",
+      "key": "lane_lead_time_max_weeks",
+      "master": "inbound_logistics.lead_time_max",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.lead_time_max_weeks",
+      "transform": "weeks, >= 0, at most 51; triangular and uniform. Order: the Supplier-stage row -> inbound_logistics.lead_time_max x lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
       "domain": "nonnegative",
       "empty_default": null,
       "empty_note": "the engine's own opening stock (its starting cover)",
@@ -4040,6 +4260,95 @@
       ],
       "target": "Product.fulfillment_mode",
       "transform": "enum \u2014 mts (holds FG stock, the FG policy applies) \u00b7 mto (built to order, no FG stock). Order: the Plant-stage row -> products.fulfillment_mode -> projects.supply_chain_model -> mto"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": 0.0,
+      "family": "production",
+      "key": "prod_lead_time_weeks",
+      "master": "products.production_lead_time",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_weeks",
+      "transform": "weeks, >= 0: output started in a week completes this many weeks later; rounded half to even, clamped 0-26. Order: the Plant-stage row -> products.production_lead_time x production_lead_time_unit -> 0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "lead_time_distribution",
+      "empty_default": null,
+      "empty_note": "deterministic",
+      "family": "production",
+      "key": "prod_lead_time_dist",
+      "master": "products.production_lead_time_dist",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_dist",
+      "transform": "enum deterministic | normal | lognormal | gamma | triangular | uniform. Order: the Plant-stage row -> products.production_lead_time_dist -> deterministic. A shape missing a parameter runs deterministic, warned"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "fraction",
+      "empty_default": null,
+      "empty_note": "none \u2014 normal, lognormal and gamma need one",
+      "family": "production",
+      "key": "prod_lead_time_cv",
+      "master": "products.production_lead_time_cv",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_cv",
+      "transform": "fraction 0-1, read by normal, lognormal and gamma. Order: the Plant-stage row -> products.production_lead_time_cv"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular and uniform need it",
+      "family": "production",
+      "key": "prod_lead_time_min_weeks",
+      "master": "products.production_lead_time_min",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_min_weeks",
+      "transform": "weeks, >= 0; triangular and uniform. Order: the Plant-stage row -> products.production_lead_time_min x production_lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular needs it",
+      "family": "production",
+      "key": "prod_lead_time_mode_weeks",
+      "master": "products.production_lead_time_mode",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_mode_weeks",
+      "transform": "weeks, >= 0; triangular. Order: the Plant-stage row -> products.production_lead_time_mode x production_lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular and uniform need it",
+      "family": "production",
+      "key": "prod_lead_time_max_weeks",
+      "master": "products.production_lead_time_max",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_max_weeks",
+      "transform": "weeks, >= 0, at most 26; triangular and uniform. Order: the Plant-stage row -> products.production_lead_time_max x production_lead_time_unit"
     },
     {
       "catalog_ref": "P-C.1",

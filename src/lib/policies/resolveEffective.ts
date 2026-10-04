@@ -5,6 +5,7 @@ import { reducerLabel, type DerivedValue } from "./effectiveEconomics";
 import { shadowedBy } from "./registryAccess";
 import { entityOverride, masterOverrideRule, type ResolvedOverride } from "./masterOverrides";
 import { isEnumDomain } from "../../../supabase/functions/_shared/entityOverrides.ts";
+import { boundedLeadTimeMean, engineWholeWeeks, pyRound } from "../../../supabase/functions/_shared/grading.ts";
 import type { Provenance } from "@/components/policies/policyGridUi";
 
 /**
@@ -97,6 +98,9 @@ export interface DerivedMaps {
   /** `materials.cost`'s derived value WITH the step that answered (§23 WP 13.4),
    *  so a lane-derived cost is shown with its source. Optional, like the above. */
   materialCostVia?: Map<string, DerivedValue>;
+  /** PLAN.md §26 WP 16.2 — the material's lead-time shape under a lane that
+   *  states none (`laneSpreadFromMaterials`), keyed `<supplier>::<material>`. */
+  laneSpread?: Map<string, { lead_time_dist?: string; lead_time_cv?: number }>;
 }
 
 export function masterValueFor(
@@ -171,6 +175,10 @@ export function derivedValueFor(
   // Nor does a lane's lead time: an empty one runs at the engine's declared 2
   // weeks, which the cell shows as that default — never an average of other
   // lanes (§4 D189 (a)).
+  // A lane's lead-time CV falls back to its MATERIAL's (§26 WP 16.2).
+  if (col.master.table === "inbound_logistics" && col.master.field === "lead_time_cv") {
+    return derived.laneSpread?.get(masterIdOf(col, row))?.lead_time_cv;
+  }
   if (col.master.table === "outbound_logistics" || col.master.table === "customers" || col.master.table === "inbound_logistics") return undefined;
   const id = masterIdOf(col, row);
   if (col.master.table === "materials" && col.master.field === "cost") return derived.materialCost.get(id);
@@ -196,6 +204,41 @@ export function derivedValueFor(
   return undefined;
 }
 
+/** `derivedValueFor` for any master — an enum token where the derived step is a
+ *  shape (a lane's lead-time shape from its material, §26 WP 16.2). */
+export function derivedRawFor(
+  col: ColSpec,
+  row: Record<string, unknown>,
+  derived: DerivedMaps,
+): number | string | undefined {
+  if (col.master?.table === "inbound_logistics" && col.master.field === "lead_time_dist") {
+    return derived.laneSpread?.get(masterIdOf(col, row))?.lead_time_dist;
+  }
+  return derivedValueFor(col, row, derived);
+}
+
+/**
+ * The planning lead time of a row whose lead-time shape is BOUNDED (triangular,
+ * uniform) — the bounds' mean in the engine's whole weeks, or undefined. On such
+ * a row the engine does not read the Lead time cell (§26.2 rule 3), so the cell
+ * shows this, derived and read-only. `resolved` is the row's gate context (the
+ * shape and bounds as the cells show them, drafts included).
+ */
+export function rowBoundedLeadTime(
+  ctx: ColSpecCtx | undefined,
+  /** `lane` — a Supplier row's lead time (1–51 weeks); `prod` — a Plant row's
+   *  production lead time (0–26 weeks, PLAN.md §26 WP 16.5). */
+  which: "lane" | "prod" = "lane",
+): number | undefined {
+  const r = ctx?.resolved;
+  if (!r) return undefined;
+  const k = `${which}_lead_time`;
+  const m = boundedLeadTimeMean(r[`${k}_dist`], r[`${k}_min_weeks`], r[`${k}_mode_weeks`], r[`${k}_max_weeks`]);
+  if (m === undefined) return undefined;
+  if (which === "prod") return m > 26 ? undefined : Math.min(26, Math.max(0, pyRound(m)));
+  return engineWholeWeeks(m);
+}
+
 /** The registry step behind a derived master value, when there is one and the
  *  caller supplied the map that carries it. Only `production_capacity` has a
  *  chain whose steps disagree about what the number MEANS; the rest resolve to
@@ -205,6 +248,10 @@ function derivedStepFor(
   row: Record<string, unknown>,
   derived: DerivedMaps,
 ): DerivedValue | undefined {
+  if (col.master?.table === "inbound_logistics" && col.master.field === "lead_time_cv") {
+    const value = derivedValueFor(col, row, derived);
+    return value === undefined ? undefined : { value, via: "material_lead_time_spread", grade: "info" };
+  }
   if (!col.master || col.master.table === "outbound_logistics" || col.master.table === "customers" || col.master.table === "inbound_logistics") return undefined;
   const id = masterIdOf(col, row);
   if (col.master.field === "production_capacity") return derived.productionCapacity?.get(id);
@@ -250,7 +297,7 @@ export function getEffectiveValue(args: {
       const ov = masterOverrideFor(mcol, dataRow, overrides, masterRowById);
       if (ov?.usable) return enumCell ? normalizeEnumToken(ov.value) : Number(ov.value);
     }
-    if (enumCell) return masterRawFor(mcol, dataRow, masterRowById);
+    if (enumCell) return masterRawFor(mcol, dataRow, masterRowById) ?? derivedRawFor(mcol, dataRow, derived);
     return masterBaseFor(mcol, dataRow, masterRowById, derived);
   }
   if (draft !== undefined) return draft;
@@ -510,6 +557,9 @@ export function resolveCell(args: {
   scope: "node" | "edge";
   /** family raw default fallback, mirroring StagePolicyTable's `getDefault`. */
   familyDefault: (field: string, family: PolicyFamily) => unknown;
+  /** The row's gate context (`rowGateCtx`) — needed by a cell whose value
+   *  depends on another cell of the row (a bounded lane's lead time). */
+  gate?: ColSpecCtx;
 }): ResolvedCell {
   const {
     rowKey, row, col, draft, families,
@@ -521,9 +571,21 @@ export function resolveCell(args: {
     masterColByField, masterRowById, derived, defaults, overrides, scope,
   });
 
+  // A BOUNDED lane's lead time is its bounds' mean and the engine reads no
+  // override or upload for it (§26.2 rule 3): the cell shows that, derived.
+  if ((col.field === "lead_time_weeks" || col.field === "prod_lead_time_weeks") && col.master) {
+    const bounded = rowBoundedLeadTime(args.gate, col.field === "prod_lead_time_weeks" ? "prod" : "lane");
+    if (bounded !== undefined) {
+      return {
+        value: bounded, provenance: "derived", cellValue: bounded, liveDefault: bounded,
+        edited: false, derivedVia: { value: bounded, via: "lead_time_bounds_mean", grade: "info" },
+      };
+    }
+  }
+
   const masterSet = col.master ? masterRawFor(col, row, masterRowById) !== undefined : false;
-  const derivedVal = col.master && !masterSet ? derivedValueFor(col, row, derived) : undefined;
-  const derivedVia = derivedVal !== undefined ? derivedStepFor(col, row, derived) : undefined;
+  const derivedVal = col.master && !masterSet ? derivedRawFor(col, row, derived) : undefined;
+  const derivedVia = typeof derivedVal === "number" ? derivedStepFor(col, row, derived) : undefined;
   // §23 WP 13.1 — the override the engine reads ahead of the master.
   const savedOverride = col.master ? masterOverrideFor(col, row, overrides, masterRowById) : undefined;
   const overridden = draft === undefined && !!savedOverride?.usable;

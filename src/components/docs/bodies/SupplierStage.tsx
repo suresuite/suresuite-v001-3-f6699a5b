@@ -41,6 +41,16 @@ export default function SupplierStage() {
                 that is the one this column suggests.
               </>
             ),
+            lane_lead_time_dist: (
+              <>
+                How much this lane&apos;s lead time varies, chosen like a customer row&apos;s demand: a
+                shape, then only the numbers that shape needs — a CV for normal, lognormal and
+                gamma; min and max for uniform; min, mode and max for triangular. For a triangular
+                or uniform row the Lead time cell shows the mean of the bounds, because that is
+                what the run plans on. Empty follows the lane&apos;s upload, then the
+                material&apos;s shape, then a fixed lead time.
+              </>
+            ),
             material_price: (
               <>
                 The price shown on this row. Editing it is the clearest example of the problem this

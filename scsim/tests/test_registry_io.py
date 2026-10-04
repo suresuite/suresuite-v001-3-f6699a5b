@@ -476,6 +476,12 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         # The first override of a LANE column: one supplier × material link's
         # lead time over the uploaded `inbound_logistics.lead_time`.
         "lead_time_weeks": ("inbound_logistics.lead_time", "supplier"),
+        # PLAN.md §26 WP 16.2 — the lane's lead-time SPREAD, chosen like demand.
+        "lane_lead_time_dist": ("inbound_logistics.lead_time_dist", "supplier"),
+        "lane_lead_time_cv": ("inbound_logistics.lead_time_cv", "supplier"),
+        "lane_lead_time_min_weeks": ("inbound_logistics.lead_time_min", "supplier"),
+        "lane_lead_time_mode_weeks": ("inbound_logistics.lead_time_mode", "supplier"),
+        "lane_lead_time_max_weeks": ("inbound_logistics.lead_time_max", "supplier"),
         "sell_price": ("products.sell_price", "plant"),
         "production_capacity": ("products.production_capacity", "plant"),
         # PLAN.md §24 WP 14.2 — the Customer row's demand spec over
@@ -497,13 +503,21 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         "fg_initial_on_hand": ("products.fg_initial_on_hand", "plant"),
         # Whether the product holds FG stock at all — the Plant row's MTS / MTO.
         "fulfillment_mode": ("products.fulfillment_mode", "plant"),
+        # PLAN.md §26 WP 16.5 — the product's production lead time (P-P.13).
+        "prod_lead_time_weeks": ("products.production_lead_time", "plant"),
+        "prod_lead_time_dist": ("products.production_lead_time_dist", "plant"),
+        "prod_lead_time_cv": ("products.production_lead_time_cv", "plant"),
+        "prod_lead_time_min_weeks": ("products.production_lead_time_min", "plant"),
+        "prod_lead_time_mode_weeks": ("products.production_lead_time_mode", "plant"),
+        "prod_lead_time_max_weeks": ("products.production_lead_time_max", "plant"),
     }
     for k in POLICY_BUNDLE_KEYS:
         assert bool(k.get("master")) == bool(k.get("rows")) == bool(k.get("domain")), k
         # One ENUM domain joined in WP 14.2 for the Customer row's
         # distribution; the numeric three are the mapper's `_override_num`.
         assert k.get("domain") in (None, "positive", "nonnegative", "fraction", "percent",
-                                   "distribution", "fg_policy", "fulfillment_mode"), k
+                                   "distribution", "fg_policy", "fulfillment_mode",
+                                   "lead_time_distribution"), k
         assert k["catalog_ref"] is None or not k.get("master"), k
 
 
@@ -524,17 +538,43 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         ScenarioSettings, SupplierRow, SupplyArc, from_project_data,
     )
 
-    def project():
+    # WP 16.2 — a lane-spread key is read only where the shape reads it, so its
+    # probe lane (S3) uploads the shape that key can perturb.
+    lane_spread = {
+        "lane_lead_time_dist": dict(lead_time_cv=0.2, lead_time_min=1, lead_time_mode=2,
+                                       lead_time_max=4),
+        "lane_lead_time_cv": dict(lead_time_dist="normal", lead_time_cv=0.1),
+        "lane_lead_time_min_weeks": dict(lead_time_dist="triangular", lead_time_min=1,
+                                    lead_time_mode=2, lead_time_max=4),
+        "lane_lead_time_mode_weeks": dict(lead_time_dist="triangular", lead_time_min=1,
+                                     lead_time_mode=2, lead_time_max=4),
+        "lane_lead_time_max_weeks": dict(lead_time_dist="triangular", lead_time_min=1,
+                                    lead_time_mode=2, lead_time_max=4),
+    }
+
+    # WP 16.5 — likewise for a product's production lead-time keys (P1's master).
+    product_lt = {
+        "prod_lead_time_dist": dict(production_lead_time_min=1, production_lead_time_max=5),
+        "prod_lead_time_cv": dict(production_lead_time_dist="normal", production_lead_time_cv=0.1,
+                                  production_lead_time=2),
+        **{k: dict(production_lead_time_dist="triangular", production_lead_time_min=0.5,
+                   production_lead_time_mode=2, production_lead_time_max=4)
+           for k in ("prod_lead_time_min_weeks", "prod_lead_time_mode_weeks", "prod_lead_time_max_weeks")},
+    }
+
+    def project(key=None):
         return ProjectData(
             suppliers=[SupplierRow("S1"), SupplierRow("S3")],
             materials=[MaterialRow("M1", cost=10.0)],
             # WP 14.4 — the master states s, S and D so every FG override has a
             # complete policy to land in.
             products=[ProductRow("P1", sell_price=100.0, demand_mean=50.0, fulfillment_mode="mts",
-                                 fg_base_stock=400.0, fg_reorder_point=100.0, fg_cover_days=10.0)],
+                                 fg_base_stock=400.0, fg_reorder_point=100.0, fg_cover_days=10.0,
+                                 **product_lt.get(key, {}))],
             supply_arcs=[
                 SupplyArc("S1", "M1", unit_price=10, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
-                SupplyArc("S3", "M1", unit_price=11, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
+                SupplyArc("S3", "M1", unit_price=11, lead_time=2, lead_time_unit="week", volume=60, time_unit="week",
+                          **lane_spread.get(key, {})),
             ],
             bom=[BomArc("P1", "M1", 1.0)],
             # C1 states its own demand (WP 14.2), so every Customer-row key has
@@ -573,6 +613,8 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "material_cost": 3.3,
         "material_moq": 9, "capacity_per_week": 77, "reliability_score": 0.5, "initial_on_hand": 5,
         "lead_time_weeks": 5,
+        "lane_lead_time_dist": "triangular", "lane_lead_time_cv": 0.35, "lane_lead_time_min_weeks": 2,
+        "lane_lead_time_mode_weeks": 3, "lane_lead_time_max_weeks": 6,
         "sell_price": 7, "production_capacity": 66,
         "row_demand_mode": "model", "row_demand_distribution": "poisson", "row_demand_mean": 25,
         "row_demand_schedule": [30, 0, 45],
@@ -581,12 +623,14 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "row_priority": 4, "price": 55, "sla_fill_floor_pct": 70,
         "fg_policy": "min_max", "fg_base_stock": 500, "fg_reorder_point": 50, "fg_cover_days": 21,
         "fg_initial_on_hand": 250, "fulfillment_mode": "mto",
+        "prod_lead_time_weeks": 3, "prod_lead_time_dist": "uniform", "prod_lead_time_cv": 0.3,
+        "prod_lead_time_min_weeks": 1, "prod_lead_time_mode_weeks": 3, "prod_lead_time_max_weeks": 6,
     }
     keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1",
             "customer": "node:C1::P1"}
 
-    def mapped(policies):
-        d = project()
+    def mapped(policies, key=None):
+        d = project(key)
         d.policies = policies
         sc = from_project_data(d).scenario
         return json.dumps({"net": sc.network.model_dump(mode="json"), "pol": sc.policies},
@@ -597,11 +641,11 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         assert set(k["scopes"]) <= set(keys) and k["scopes"], k
         assert k["key"] in value, f"no probe value for {k['key']} — add one"
         base = {"default": copy.deepcopy(context.get(k["key"], {}))}
-        before = mapped(base)
+        before = mapped(base, k["key"])
         for scope, target in keys.items():
             pol = copy.deepcopy(base)
             pol.setdefault(target, {}).setdefault(k["family"], {})[k["key"]] = value[k["key"]]
-            read = mapped(pol) != before
+            read = mapped(pol, k["key"]) != before
             if read != (scope in k["scopes"]):
                 wrong.append(f"{k['family']}.{k['key']} @ {scope}: declared "
                              f"{'read' if scope in k['scopes'] else 'not read'}, mapper "

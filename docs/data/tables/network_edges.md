@@ -327,6 +327,6 @@ Upstream or downstream relative to the seed, as uploaded.
 
 ---
 
-*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
+*Generated from data contract `c7c7da69c86d`, engine `0.8.0`,
 sidecar `supabase/contract/network_edges.contract.yaml`, table created by `20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

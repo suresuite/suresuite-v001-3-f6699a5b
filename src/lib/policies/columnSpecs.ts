@@ -3,7 +3,11 @@ import { fieldEngineStatus } from "./fieldStatus";
 import type { StageKey } from "./stages";
 import type { FitCol } from "./columnFit";
 import { emptyMeansFor } from "./registryAccess";
-import { engineWholeWeeks } from "../../../supabase/functions/_shared/grading";
+import { engineWholeWeeks, pyRound } from "../../../supabase/functions/_shared/grading";
+
+/** A production lead time as the engine carries it: whole weeks, half to even,
+ *  0–26 (`project_map._product_lead_time`). */
+export const prodWholeWeeks = (weeks: number): number => Math.min(26, Math.max(0, pyRound(weeks)));
 
 export interface ColSpecCtx {
   fulfillmentStrategy?: string;
@@ -25,7 +29,14 @@ export interface ColSpecCtx {
 }
 
 /** The master-backed fields a `visibleWhen` gate reads (via `ctx.resolved`). */
-export const GATE_FIELDS = ["fulfillment_mode", "fg_policy", "fg_base_stock", "row_demand_distribution"] as const;
+export const GATE_FIELDS = [
+  "fulfillment_mode", "fg_policy", "fg_base_stock", "row_demand_distribution",
+  // PLAN.md §26 WP 16.3 — a Supplier row's lead-time shape and bounds: which
+  // parameter cells show, and whether the Lead time cell is the bounds' mean.
+  "lane_lead_time_dist", "lane_lead_time_min_weeks", "lane_lead_time_mode_weeks", "lane_lead_time_max_weeks",
+  // WP 16.5 — the Plant row's production lead time, the same rule.
+  "prod_lead_time_dist", "prod_lead_time_min_weeks", "prod_lead_time_mode_weeks", "prod_lead_time_max_weeks",
+] as const;
 
 /** `projects.supply_chain_model` as the mapper reads it (`_fulfillment_mode`):
  *  Make-To-Stock / mts → mts, anything else → mto. */
@@ -114,7 +125,7 @@ export interface ColSpec {
    * `inventoryParamsForType` (registryPolicyTypes), which mirrors these `visibleWhen`
    * gates — kept here so prefill only persists type-relevant params.
    */
-  vectorGroup?: "invParams";
+  vectorGroup?: "invParams" | "fgInvParams";
   /** A render-only anchor column with no stored field (holds the vector cell). */
   synthetic?: boolean;
   /**
@@ -238,6 +249,25 @@ const demandParamFor =
     return d === "triangular" || rowDemandMode(ctx) === "model";
   };
 
+/**
+ * A lead-time PARAMETER is shown only for the shapes that read it — ONE helper
+ * for every lead time a grid row carries (the Supplier row's lane, and the
+ * Plant row's production lead time, PLAN.md §26 WP 16.5), as `demandParamFor`
+ * is for demand (`single-source`):
+ *   normal, lognormal, gamma → CV · triangular → min, mode, max · uniform → min, max
+ *   deterministic → none.
+ * The shape is the row's RESOLVED one — its own, else the lane's upload, else
+ * the material's (a derived fallback), as the engine resolves it.
+ */
+export const leadTimeParamFor =
+  (param: "cv" | "min" | "mode" | "max", distField = "lane_lead_time_dist"): ColSpec["visibleWhen"] =>
+  (ctx) => {
+    const d = String(ctx.resolved?.[distField] ?? "").trim().toLowerCase();
+    if (param === "cv") return d === "normal" || d === "lognormal" || d === "gamma";
+    if (param === "mode") return d === "triangular";
+    return d === "triangular" || d === "uniform";
+  };
+
 /** An FG level is shown only for the FG policies that use it: base-stock S,
  *  min-max s and S, days of cover D. Empty policy = base-stock (the engine's). */
 const fgPolicyIn =
@@ -260,7 +290,7 @@ const invTypeIn = (...types: string[]): ColSpec["visibleWhen"] =>
   ({ effective }) => types.includes(String(effective?.type ?? "min_max"));
 
 /** The Plant grid's FG columns read as one band (their saves stay `production`). */
-const FG_BAND: ColSpec["band"] = { family: "inventory", label: "FG stock" };
+const FG_BAND: ColSpec["band"] = { family: "inventory", label: "FG inventory" };
 
 /** A column that exists only for a product that holds FG stock — every FG
  *  column but the switch itself. An MTO row renders them as one sentence. */
@@ -369,6 +399,33 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
         master: { table: "inbound_logistics", field: "lead_time", idFrom: "supplier_id::material_id" },
         round: engineWholeWeeks,
       }),
+      // THE LEAD TIME'S SHAPE, CHOSEN LIKE DEMAND (PLAN.md §26 WP 16.3, blueprint
+      // P-S.6). A shape per row and only the parameters it reads
+      // (`leadTimeParamFor`), each an OVERRIDE of the lane's own upload
+      // (`inbound_logistics.lead_time_dist` …), the material's shape beneath it
+      // as a derived fallback, deterministic at the bottom — the engine's order.
+      // For normal / lognormal / gamma the Lead time cell above is the MEAN; a
+      // triangular or uniform row IS its bounds, and the Lead time cell then
+      // shows the bounds' mean, derived (§26.2 rule 3). In weeks, like the lead time.
+      col("lane_lead_time_dist", "sourcing", {
+        master: { table: "inbound_logistics", field: "lead_time_dist", idFrom: "supplier_id::material_id" },
+      }),
+      col("lane_lead_time_cv", "sourcing", {
+        visibleWhen: leadTimeParamFor("cv"),
+        master: { table: "inbound_logistics", field: "lead_time_cv", idFrom: "supplier_id::material_id" },
+      }),
+      col("lane_lead_time_min_weeks", "sourcing", {
+        visibleWhen: leadTimeParamFor("min"),
+        master: { table: "inbound_logistics", field: "lead_time_min", idFrom: "supplier_id::material_id" },
+      }),
+      col("lane_lead_time_mode_weeks", "sourcing", {
+        visibleWhen: leadTimeParamFor("mode"),
+        master: { table: "inbound_logistics", field: "lead_time_mode", idFrom: "supplier_id::material_id" },
+      }),
+      col("lane_lead_time_max_weeks", "sourcing", {
+        visibleWhen: leadTimeParamFor("max"),
+        master: { table: "inbound_logistics", field: "lead_time_max", idFrom: "supplier_id::material_id" },
+      }),
       col("type", "inventory"),
       // Type-specific level/lot params render inside this one dynamic vector cell
       // (§II.3) — only the params the chosen type needs; the discrete gated
@@ -441,6 +498,35 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // number here could only ever speak by disagreeing (the WP 0.1 gap
       // check's second divergence).
       col("utilization_cap_pct", "production", { readOnly: true }),
+      // P-P.13 PRODUCTION LEAD TIME (PLAN.md §26 WP 16.5): weeks from the start
+      // of production to the finished good, chosen like a lane's lead time —
+      // a mean, a shape, and only the parameters the shape reads, through the
+      // SAME helper (`leadTimeParamFor`, `single-source`). Overrides of the
+      // `products` master; empty = 0 weeks (completes in the week it starts). On
+      // a triangular or uniform row the lead time is the bounds' mean, derived.
+      col("prod_lead_time_weeks", "production", {
+        master: { table: "products", field: "production_lead_time", idFrom: "product_id" },
+        round: prodWholeWeeks,
+      }),
+      col("prod_lead_time_dist", "production", {
+        master: { table: "products", field: "production_lead_time_dist", idFrom: "product_id" },
+      }),
+      col("prod_lead_time_cv", "production", {
+        visibleWhen: leadTimeParamFor("cv", "prod_lead_time_dist"),
+        master: { table: "products", field: "production_lead_time_cv", idFrom: "product_id" },
+      }),
+      col("prod_lead_time_min_weeks", "production", {
+        visibleWhen: leadTimeParamFor("min", "prod_lead_time_dist"),
+        master: { table: "products", field: "production_lead_time_min", idFrom: "product_id" },
+      }),
+      col("prod_lead_time_mode_weeks", "production", {
+        visibleWhen: leadTimeParamFor("mode", "prod_lead_time_dist"),
+        master: { table: "products", field: "production_lead_time_mode", idFrom: "product_id" },
+      }),
+      col("prod_lead_time_max_weeks", "production", {
+        visibleWhen: leadTimeParamFor("max", "prod_lead_time_dist"),
+        master: { table: "products", field: "production_lead_time_max", idFrom: "product_id" },
+      }),
       // P-P.9 per-product allocation priority (recovery response opt-in).
       col("allocation_priority_weight", "production", { visibleWhen: wantsMaterialAllocation, defaultWhenMissing: 1 }),
       // Fulfillment (backorder, allocation, service level) is a customer-stage
@@ -462,7 +548,7 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // the one project control above the grid (`FgBufferBar`), shown only when
       // some product holds stock.
       col("fulfillment_mode", "production", {
-        label: "FG stock",
+        label: "FG inventory",
         master: { table: "products", field: "fulfillment_mode", idFrom: "product_id" },
         band: FG_BAND,
       }),
@@ -477,10 +563,26 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
         master: { table: "products", field: "fg_policy", idFrom: "product_id" },
         band: FG_BAND,
       }),
+      // LAID OUT LIKE THE SUPPLIER STAGE'S INVENTORY BAND (PLAN.md §26 WP 16.6,
+      // §4 D301): the switch, the FG policy as the policy TYPE, then ONE
+      // "Replenishment parameters" cell holding only the levels the chosen
+      // policy reads (s, S, D — `fgPolicyIn`), then opening stock. The three
+      // level columns below feed that cell (`vectorGroup: "fgInvParams"`) and are
+      // not header columns of their own; their value, source and save wiring is
+      // the master-backed resolver's, unchanged. No safety-stock or holding-cost
+      // cell: the engine reads neither per product (a cell no run reads is a
+      // page-equals-run breach, §4 D204).
+      col("__fg_inv_params", "production", {
+        synthetic: true,
+        label: "Replenishment parameters",
+        visibleWhen: holdsFgStock,
+        band: FG_BAND,
+      }),
       col("fg_reorder_point", "production", {
         visibleWhen: fgPolicyIn("min_max"),
         master: { table: "products", field: "fg_reorder_point", idFrom: "product_id" },
         band: FG_BAND,
+        vectorGroup: "fgInvParams",
       }),
       col("fg_base_stock", "production", {
         visibleWhen: fgPolicyIn("base_stock", "min_max"),
@@ -494,11 +596,13 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
           },
         },
         band: FG_BAND,
+        vectorGroup: "fgInvParams",
       }),
       col("fg_cover_days", "production", {
         visibleWhen: fgPolicyIn("days_of_cover"),
         master: { table: "products", field: "fg_cover_days", idFrom: "product_id" },
         band: FG_BAND,
+        vectorGroup: "fgInvParams",
       }),
       // FG OPENING STOCK IS A REAL CELL SINCE PLAN.md §24 WP 14.4 (§4 D89's
       // remainder, engine RFC 4). Engine 0.5.0 starts an MTS product at
@@ -650,6 +754,24 @@ export function vectorParamCols(stage: StageKey): ColSpec[] {
   return STAGE_TABLE_SPEC[stage].cols.filter((c) => c.vectorGroup === "invParams");
 }
 
+/** The FG levels grouped into the Plant row's "Replenishment parameters" cell
+ *  (PLAN.md §26 WP 16.6), in declared order — s, S, D. */
+export function fgVectorParamCols(stage: StageKey): ColSpec[] {
+  return STAGE_TABLE_SPEC[stage].cols.filter((c) => c.vectorGroup === "fgInvParams");
+}
+
+/** FG policy → the levels it reads, with their symbols, in display order —
+ *  the FG twin of the Supplier stage's `POLICY_PARAMS` (base-stock S · min-max
+ *  s, S · days of cover D). Empty policy = base-stock, as the engine runs it. */
+export const FG_POLICY_PARAMS: Record<string, Array<{ field: string; symbol: string }>> = {
+  base_stock: [{ field: "fg_base_stock", symbol: "S" }],
+  min_max: [
+    { field: "fg_reorder_point", symbol: "s" },
+    { field: "fg_base_stock", symbol: "S" },
+  ],
+  days_of_cover: [{ field: "fg_cover_days", symbol: "D" }],
+};
+
 /** Flatten a PolicyBundle into a single { field: value } map across families. */
 export function flattenBundle(bundle: PolicyBundle): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -700,6 +822,19 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   capacity_per_week: { sub: "units / wk · master", w: 96, kind: "int", prio: 4 },
   reliability_score: { sub: "0–1 · master", w: 84, kind: "num", dec: 2, prio: 3 },
   lead_time_weeks: { sub: "weeks · lane · 1–51", w: 84, kind: "int", keep: true },
+  // ---- supplier · lead-time shape per lane (WP 16.3)
+  lane_lead_time_dist: { sub: "shape · per lane", w: 112, kind: "text", keep: true, align: "left" },
+  lane_lead_time_cv: { sub: "CV · normal, lognormal, gamma", w: 92, kind: "num", dec: 2, prio: 5 },
+  lane_lead_time_min_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
+  lane_lead_time_mode_weeks: { sub: "weeks · triangular", w: 84, kind: "num", dec: 1, prio: 5 },
+  lane_lead_time_max_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
+  // ---- plant · production lead time (WP 16.5)
+  prod_lead_time_weeks: { sub: "weeks · start → finished · 0–26", w: 96, kind: "int", keep: true },
+  prod_lead_time_dist: { sub: "shape · per product", w: 112, kind: "text", keep: true, align: "left" },
+  prod_lead_time_cv: { sub: "CV · normal, lognormal, gamma", w: 92, kind: "num", dec: 2, prio: 5 },
+  prod_lead_time_min_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
+  prod_lead_time_mode_weeks: { sub: "weeks · triangular", w: 84, kind: "num", dec: 1, prio: 5 },
+  prod_lead_time_max_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
   // ---- inventory (shared by supplier + plant)
   type: { sub: "s,S · S · R,Q · T,S", w: 152, kind: "type", keep: true, filterable: false, align: "left" },
   __inv_params: { sub: "levels & lot sizes", w: 184, kind: "vector", keep: true, filterable: false, align: "left" },
@@ -727,10 +862,11 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   row_demand_variation: { sub: "CV (normal) · ± (triangularAV)", w: 96, kind: "num", dec: 2, prio: 5 },
   row_demand_min: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
   row_demand_max: { sub: "units / wk · triangular", w: 84, kind: "num", dec: 1, prio: 4 },
-  // ---- plant · FG stock (WP 14.4) — the switch, then only the levels the
+  // ---- plant · FG inventory (WP 14.4, 15.6) — the switch, then only the levels the
   // row's FG policy reads, so each one that shows is one the run uses.
   fulfillment_mode: { sub: "mts holds stock · mto", w: 104, kind: "text", keep: true, filterable: false, align: "left" },
   fg_policy: { sub: "base · min-max · cover", w: 120, kind: "text", keep: true, align: "left" },
+  __fg_inv_params: { sub: "levels · s, S, D", w: 150, kind: "vector", keep: true, filterable: false, align: "left" },
   fg_reorder_point: { sub: "s · units · reorder", w: 84, kind: "int", keep: true },
   fg_base_stock: { sub: "S · units · target", w: 84, kind: "int", keep: true },
   fg_cover_days: { sub: "D · days of demand", w: 84, kind: "num", dec: 1, keep: true },
@@ -762,6 +898,17 @@ export const SHORT_LABEL: Record<string, string> = {
   capacity_per_week: "Capacity",
   reliability_score: "Reliability",
   lead_time_weeks: "Lead time",
+  lane_lead_time_dist: "LT shape",
+  lane_lead_time_cv: "LT CV",
+  lane_lead_time_min_weeks: "LT min",
+  lane_lead_time_mode_weeks: "LT mode",
+  lane_lead_time_max_weeks: "LT max",
+  prod_lead_time_weeks: "Prod. lead time",
+  prod_lead_time_dist: "Prod. LT shape",
+  prod_lead_time_cv: "Prod. LT CV",
+  prod_lead_time_min_weeks: "Prod. LT min",
+  prod_lead_time_mode_weeks: "Prod. LT mode",
+  prod_lead_time_max_weeks: "Prod. LT max",
   type: "Policy type",
   __inv_params: "Replenishment",
   initial_on_hand: "Initial stock",
@@ -783,7 +930,8 @@ export const SHORT_LABEL: Record<string, string> = {
   row_demand_variation: "Variation",
   row_demand_min: "Min",
   row_demand_max: "Max",
-  fulfillment_mode: "FG stock",
+  fulfillment_mode: "FG inventory",
+  __fg_inv_params: "Replenishment",
   fg_policy: "FG policy",
   fg_base_stock: "FG S",
   fg_reorder_point: "FG s",

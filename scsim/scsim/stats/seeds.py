@@ -36,6 +36,16 @@ _REALM_POLICY = 2
 
 _WORLD_DEMAND = 0
 _WORLD_LEADTIME = 1
+# PLAN.md §26 WP 16.1 — the demand-style lead-time shapes (normal, triangular,
+# uniform). One child stream PER LANE, keyed by a digest of `supplier::material`
+# rather than by the lane's position: the link order follows the chosen primary
+# (a policy), and a positional stream would hand a lane another lane's draws
+# under a different primary. A new key, so `_WORLD_LEADTIME` — and every
+# lognormal/gamma draw — is untouched.
+_WORLD_LEADTIME_LANE = 2
+# PLAN.md §26 WP 16.4 — a product's production lead time (P-P.13): one child
+# stream per PRODUCT, keyed by a digest of its id, for the same reason.
+_WORLD_PRODTIME = 3
 
 HAZARD_START = 0
 HAZARD_DURATION = 1
@@ -86,6 +96,31 @@ def world_streams(project_seed: int, model_rep: int, event_rep: int) -> Replicat
         demand=demand,
         leadtime=leadtime,
     )
+
+
+def lane_leadtime_rng(project_seed: int, model_rep: int, supplier_id: str,
+                      material_id: str) -> np.random.Generator:
+    """The WORLD stream of one supplier × material lane's shaped lead time.
+
+    World realm, so it is scenario- and portfolio-independent (CRN), and keyed by
+    the lane's ids, so it is independent of which other lanes exist, of their
+    order, and of which supplier a policy made primary.
+    """
+    lane = policy_key(f"{supplier_id}::{material_id}")
+    seq = np.random.SeedSequence(
+        entropy=project_seed, spawn_key=(_REALM_WORLD, model_rep, _WORLD_LEADTIME_LANE, lane)
+    )
+    return np.random.default_rng(seq)
+
+
+def product_prodtime_rng(project_seed: int, model_rep: int, product_id: str) -> np.random.Generator:
+    """The WORLD stream of one product's production lead time (P-P.13) — keyed
+    by the product's id, independent of the product order and of every policy."""
+    seq = np.random.SeedSequence(
+        entropy=project_seed,
+        spawn_key=(_REALM_WORLD, model_rep, _WORLD_PRODTIME, policy_key(f"product::{product_id}")),
+    )
+    return np.random.default_rng(seq)
 
 
 def hazard_rng(project_seed: int, event_rep: int, event_index: int, draw_id: int) -> np.random.Generator:

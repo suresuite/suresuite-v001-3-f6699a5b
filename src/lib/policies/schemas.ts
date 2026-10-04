@@ -411,6 +411,10 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
   // customer · demand per row (WP 14.2) — the engine's own enum domains
   row_demand_mode: ["forecast", "model", "schedule"],
   row_demand_distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
+  // PLAN.md §26 WP 16.3 — a Supplier row's lead-time shape (`project_map._LANE_LT_DISTS`).
+  lane_lead_time_dist: ["deterministic", "normal", "lognormal", "gamma", "triangular", "uniform"],
+  // WP 16.5 — a Plant row's production lead-time shape, the same six.
+  prod_lead_time_dist: ["deterministic", "normal", "lognormal", "gamma", "triangular", "uniform"],
   // PLAN.md §24 WP 14.4 — the Plant row's FG policy (MTS).
   fg_policy: ["base_stock", "min_max", "days_of_cover"],
   // Whether the product holds FG stock — the Plant row's switch over
@@ -634,6 +638,17 @@ export const FIELD_LABELS: Record<string, string> = {
   reliability_score: "Reliability (0–1)",
   material_moq: "MOQ (master)",
   lead_time_weeks: "Lead time (weeks)",
+  lane_lead_time_dist: "Lead-time distribution",
+  lane_lead_time_cv: "Lead-time CV (normal, lognormal, gamma)",
+  lane_lead_time_min_weeks: "Lead time min (weeks)",
+  lane_lead_time_mode_weeks: "Lead time mode (weeks)",
+  lane_lead_time_max_weeks: "Lead time max (weeks)",
+  prod_lead_time_weeks: "Production lead time (weeks)",
+  prod_lead_time_dist: "Production lead-time distribution",
+  prod_lead_time_cv: "Production lead-time CV (normal, lognormal, gamma)",
+  prod_lead_time_min_weeks: "Production lead time min (weeks)",
+  prod_lead_time_mode_weeks: "Production lead time mode (weeks)",
+  prod_lead_time_max_weeks: "Production lead time max (weeks)",
   // inventory extensions
   moq: "MOQ",
   // production extensions
@@ -653,7 +668,7 @@ export const FIELD_LABELS: Record<string, string> = {
   row_demand_min: "Demand min (units/wk, triangular)",
   row_demand_max: "Demand max (units/wk, triangular)",
   // plant · FG policy per product (PLAN.md §24 WP 14.4) — MTS only.
-  fulfillment_mode: "Holds FG stock (mts) or builds to order (mto)",
+  fulfillment_mode: "Holds FG inventory (mts) or builds to order (mto)",
   fg_policy: "FG policy (base-stock / min-max / days of cover)",
   fg_base_stock: "FG target S (units)",
   fg_reorder_point: "FG reorder point s (units, min-max)",

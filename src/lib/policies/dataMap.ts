@@ -42,6 +42,7 @@ export type StatusKey =
   | "inbound_unit_price"
   | "inbound_lead_time"
   | "inbound_lead_time_unit"
+  | "inbound_lead_time_spread" // WP 16.2 — the lane's own lead-time shape and parameters
   | "inbound_volume"
   | "outbound_unit_price"
   | "outbound_volume"
@@ -58,6 +59,7 @@ export type StatusKey =
   | "product_demand_mean"
   | "product_capacity"
   | "product_fulfillment_mode"
+  | "product_production_lead_time" // WP 16.5 — P-P.13 production lead time and its shape
   | "product_demand_distribution"
   | "product_demand_cv"
   | "product_demand_min"
@@ -129,6 +131,11 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "inbound_logistics", field: "unit_price", engineField: "SupplierLink.cost (c_{m,s})", chain: "per link; blank or ≤ 0 → 1.0 (warn). The cheapest link is the material's PRIMARY source. Also the fallback for materials.cost", statusKey: "inbound_unit_price" },
   { dataset: "inbound_logistics", field: "lead_time", engineField: "SupplierLink.lead_time_weeks", chain: "converted to weeks by lead_time_unit, rounded, clamped [1, 51]; blank or 0 → 2 weeks (warn)", statusKey: "inbound_lead_time" },
   { dataset: "inbound_logistics", field: "lead_time_unit", engineField: "lead-time unit", chain: "the unit of lead_time (day / week / month …); blank → weeks. Uploads promoted since WP 3.3 are already in weeks", statusKey: "inbound_lead_time_unit" },
+  { dataset: "inbound_logistics", field: "lead_time_dist", engineField: "SupplierLink.lead_time_dist", chain: "the lane's own lead-time shape (deterministic, normal, lognormal, gamma, triangular, uniform); a /policies Supplier-row choice wins; blank → the material's shape, else deterministic. A shape missing a parameter runs deterministic (warn) (PLAN.md §26 WP 16.2)", statusKey: "inbound_lead_time_spread" },
+  { dataset: "inbound_logistics", field: "lead_time_cv", engineField: "SupplierLink.lead_time_cv", chain: "CV 0–1 for normal, lognormal, gamma; a /policies Supplier-row value wins; blank → the material's CV", statusKey: "inbound_lead_time_spread" },
+  { dataset: "inbound_logistics", field: "lead_time_min", engineField: "SupplierLink.lead_time_min_weeks", chain: "triangular and uniform: the shortest lead time, in lead_time_unit, weeks after promotion; a /policies Supplier-row value wins", statusKey: "inbound_lead_time_spread" },
+  { dataset: "inbound_logistics", field: "lead_time_mode", engineField: "SupplierLink.lead_time_mode_weeks", chain: "triangular: the most likely lead time, in lead_time_unit, weeks after promotion; a /policies Supplier-row value wins", statusKey: "inbound_lead_time_spread" },
+  { dataset: "inbound_logistics", field: "lead_time_max", engineField: "SupplierLink.lead_time_max_weeks", chain: "triangular and uniform: the longest lead time, in lead_time_unit, weeks after promotion; a /policies Supplier-row value wins. A bounded lane's planning lead time is the bounds' mean", statusKey: "inbound_lead_time_spread" },
   { dataset: "inbound_logistics", field: "time_unit", engineField: "volume unit", chain: "the period of volume only (day / week / month / year …); unknown → week", statusKey: "identity" },
   { dataset: "inbound_logistics", field: "plant_name", engineField: null, chain: "not read — the engine merges every plant name into one plant. The network pages and the Supplier tree do NOT — they join on plant, so a row on a different plant name is a separate island there (§4 D202)", statusKey: "plant_ignored" },
   { dataset: "inbound_logistics", field: "volume", engineField: "weight of the materials.cost fallback", chain: "only weights the volume-weighted price when materials.cost is blank. It does NOT pick the primary (the Supplier stage's saved primary does, else the cheapest link) and does NOT split orders (P-S.2 without shares splits equally)", statusKey: "inbound_volume" },
@@ -163,13 +170,20 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "materials", field: "holding_cost_pct", engineField: "Material.holding_cost_rate", chain: "the Supplier stage's per-row Holding (/policies) → master → the PROJECT-DEFAULT policy inventory.holding_cost_pct → 20 %/yr · fraction ×100, clamp [5, 50]. A value set on /policies beats the master (§4 D204)", statusKey: "material_holding" },
   { dataset: "materials", field: "moq", engineField: "SupplierLink.moq", chain: "master → 0", statusKey: "material_moq" },
   { dataset: "materials", field: "initial_on_hand", engineField: "Material.initial_on_hand", chain: "master → the engine starts at its own base stock: coverage weeks (κ) × expected demand, plus safety stock, on hand; the lead-time demand starts in transit", statusKey: "material_initial_on_hand" },
-  { dataset: "materials", field: "lead_time_dist / lead_time_cv", engineField: "SupplierLink.lead_time_dist/cv", chain: "master → deterministic, cv 0", statusKey: "material_lead_time_dist" },
+  { dataset: "materials", field: "lead_time_dist / lead_time_cv", engineField: "SupplierLink.lead_time_dist/cv", chain: "the lane's own shape (inbound_logistics.lead_time_dist) or the Supplier row's wins → master → deterministic, cv 0. A CV above 1 is used as 1 (warn, §4 D302)", statusKey: "material_lead_time_dist" },
   // ── products master ────────────────────────────────────────────────────
   { dataset: "products", field: "product_id", engineField: "Product.id", chain: "identity. A product that another product's BOM consumes is a SUB-ASSEMBLY: the engine models it through its components and excludes it from the product list — its sell price, demand and capacity are not used (warned; §4 D174)", statusKey: "product_identity" },
   { dataset: "products", field: "name", engineField: "Product.name", chain: "display only → id", statusKey: "name" },
   { dataset: "products", field: "sell_price", engineField: "Product.unit_price (u_p)", chain: "master (when > 0; a 0 counts as blank) → demand-weighted outbound unit_price (info) → 1.0 (warn)", statusKey: "product_sell_price" },
   { dataset: "products", field: "demand_mean", engineField: "Product.demand_mode (b_p)", chain: "master (when > 0; a 0 counts as blank) → Σ weekly outbound volume → 0 (warn: never ordered)", statusKey: "product_demand_mean" },
   { dataset: "products", field: "production_capacity", engineField: "Product.production_capacity (O_p)", chain: "master (units/week, when > 0) → Plant grid line capacity/day × 7 × utilization → max(2·demand, 1000) (warn: never binds)", statusKey: "product_capacity" },
+  { dataset: "products", field: "production_lead_time", engineField: "Product.production_lead_time_weeks", chain: "P-P.13: the Plant row's override → this × production_lead_time_unit (weeks after promotion), rounded, clamped 0–26 → 0 (completes in the week it starts). A triangular or uniform product plans on the mean of its bounds (PLAN.md §26 WP 16.5)", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_unit", engineField: "production lead-time unit", chain: "the unit of production_lead_time and its bounds (day / week …); blank → weeks", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_dist", engineField: "Product.production_lead_time_dist", chain: "the Plant row's override → this → deterministic; a shape missing a parameter runs deterministic (warn)", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_cv", engineField: "Product.production_lead_time_cv", chain: "CV 0–1 for normal, lognormal, gamma; the Plant row's value wins", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_min", engineField: "Product.production_lead_time_min_weeks", chain: "triangular and uniform: the lower bound, weeks after promotion", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_mode", engineField: "Product.production_lead_time_mode_weeks", chain: "triangular: the most likely value, weeks after promotion", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_max", engineField: "Product.production_lead_time_max_weeks", chain: "triangular and uniform: the upper bound, weeks after promotion, at most 26", statusKey: "product_production_lead_time" },
   { dataset: "products", field: "fulfillment_mode", engineField: "Product.fulfillment_mode", chain: "master → projects.supply_chain_model → MTO. The Policies page's fulfillment strategy is NOT read by the server engine (§4 D197)", statusKey: "product_fulfillment_mode" },
   { dataset: "products", field: "demand_distribution", engineField: "Product demand model", chain: "master → the SCENARIO's demand_model.kind (scenarios created in the app are Poisson) → triangular. The engine models triangular, poisson, negbin and deterministic; any other value runs as triangular (warned)", statusKey: "product_demand_distribution" },
   { dataset: "products", field: "demand_cv", engineField: "demand variability", chain: "master → scenario demand_model.cv → 0.30. Sets the spread under triangular and the dispersion under negbin; no effect under poisson (variance = mean) or deterministic", statusKey: "product_demand_cv" },

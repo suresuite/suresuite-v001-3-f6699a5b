@@ -47,9 +47,11 @@ from scsim.entities.enums import (
     RampProfile,
     TransportMode,
 )
-from scsim.entities.network import primary_rank
+from scsim.core.leadtime import draws_uniforms, is_stochastic as is_lt_stochastic
+from scsim.entities.enums import BOUNDED_LEAD_TIME_DISTS
+from scsim.entities.network import lead_time_bounds_cv, primary_rank
 from scsim.entities.scenario import Scenario
-from scsim.stats.seeds import ReplicationStreams
+from scsim.stats.seeds import ReplicationStreams, lane_leadtime_rng, product_prodtime_rng
 
 # C^res components — Part V cost_of_resilience.
 COST_COMPONENTS: tuple[str, ...] = (
@@ -127,6 +129,35 @@ class CompiledModel:
         # Products.
         self.unit_price = np.array([p.unit_price for p in net.products])
         self.capacity = np.array([p.production_capacity for p in net.products])
+        # P-P.13 production lead time (PLAN.md §26 WP 16.4). `prod_lt` is the
+        # PLANNING lead time per product (whole weeks, 0 = same-week completion);
+        # the shape and bounds feed the per-(product, week) draw. `has_prod_lt`
+        # False — every product 0 and deterministic — keeps the engine on its
+        # pre-Phase-15 path, byte for byte.
+        self.prod_lt = np.array([p.production_lead_time_weeks for p in net.products], dtype=int)
+        self.prod_lt_dist = [p.production_lead_time_dist for p in net.products]
+        self.prod_lt_min = np.array([np.nan if p.production_lead_time_min_weeks is None
+                                     else float(p.production_lead_time_min_weeks) for p in net.products])
+        self.prod_lt_mode = np.array([np.nan if p.production_lead_time_mode_weeks is None
+                                      else float(p.production_lead_time_mode_weeks) for p in net.products])
+        self.prod_lt_max = np.array([np.nan if p.production_lead_time_max_weeks is None
+                                     else float(p.production_lead_time_max_weeks) for p in net.products])
+        self.prod_lt_cv = np.array([
+            lead_time_bounds_cv(p.production_lead_time_dist, float(p.production_lead_time_min_weeks),
+                                p.production_lead_time_mode_weeks, float(p.production_lead_time_max_weeks))
+            if p.production_lead_time_dist in BOUNDED_LEAD_TIME_DISTS else p.production_lead_time_cv
+            for p in net.products])
+        self.prod_lt_stochastic = np.array([
+            is_lt_stochastic(self.prod_lt_dist[j], float(self.prod_lt_cv[j]),
+                             None if np.isnan(self.prod_lt_min[j]) else self.prod_lt_min[j],
+                             None if np.isnan(self.prod_lt_max[j]) else self.prod_lt_max[j])
+            for j in range(len(net.products))], dtype=bool)
+        self.has_prod_lt = bool((self.prod_lt > 0).any() or self.prod_lt_stochastic.any())
+        # The production pipeline ring: completion slots ahead of the start week,
+        # wide enough for the longest planning L and any bound, plus slack for a
+        # CV draw's tail; a draw beyond it is bounded and counted (F-36's rule).
+        bound_max = np.nanmax(self.prod_lt_max) if np.isfinite(self.prod_lt_max).any() else 0.0
+        self.prod_ring_width = int(max(int(self.prod_lt.max(initial=0)), int(np.ceil(bound_max)))) + 30
         nu = self.settings.demand_floor_factor
         tri = np.array([p.triangular_params(nu) for p in net.products])
         self.demand_a, self.demand_b, self.demand_c = tri[:, 0], tri[:, 1], tri[:, 2]
@@ -190,7 +221,27 @@ class CompiledModel:
         self.link_cost = np.array([l.cost for l in links])
         self.link_moq = np.array([l.moq for l in links])
         self.link_lt_dist = [l.lead_time_dist for l in links]
-        self.link_lt_cv = np.array([l.lead_time_cv for l in links])
+        # The bounded shapes (triangular, uniform; PLAN.md §26 WP 16.1) carry
+        # their bounds, shifted by the lane's transit leg exactly as the planning
+        # lead time is; NaN where a link has none. Their CV is the shape's own
+        # σ/μ, which is what P-P.3's King formula reads for a lognormal or gamma
+        # link — one σ_LT whatever the shape. Every other link keeps its input CV,
+        # so a project with no bounded shape compiles byte-identically.
+        def _bound(l, v):
+            return np.nan if v is None else float(v) + lane_extra.get(l.supplier_id, 0)
+        self.link_lt_min = np.array([_bound(l, l.lead_time_min_weeks) for l in links])
+        self.link_lt_mode = np.array([_bound(l, l.lead_time_mode_weeks) for l in links])
+        self.link_lt_max = np.array([_bound(l, l.lead_time_max_weeks) for l in links])
+        self.link_lt_cv = np.array([
+            lead_time_bounds_cv(l.lead_time_dist, float(l.lead_time_min_weeks),
+                                l.lead_time_mode_weeks, float(l.lead_time_max_weeks))
+            if l.lead_time_dist in BOUNDED_LEAD_TIME_DISTS else l.lead_time_cv
+            for l in links])
+        self.link_lt_stochastic = np.array([
+            is_lt_stochastic(self.link_lt_dist[k], float(self.link_lt_cv[k]),
+                             None if np.isnan(self.link_lt_min[k]) else self.link_lt_min[k],
+                             None if np.isnan(self.link_lt_max[k]) else self.link_lt_max[k])
+            for k in range(len(links))], dtype=bool)
         self.links_of_mat: list[np.ndarray] = [
             np.flatnonzero(self.link_mat == m) for m in range(self.n_mats)
         ]
@@ -721,6 +772,16 @@ class WeeklyTrace:
     # rule ("level"/"flow"/"ratio") a lie about half its rows.
     prod_cap_bound: np.ndarray = field(init=False)
     sup_cap_bound: np.ndarray = field(init=False)
+    # Work in progress (P-P.13, PLAN.md §26 WP 16.4): units started and not yet
+    # completed, and their material value, after each week's completions. All
+    # zero for a run with no production lead time. Deliberately NOT weekly
+    # series: publishing one would move every golden digest for a quantity that
+    # is zero on every existing project; the run carries a summary instead
+    # (`ScenarioResult.work_in_progress`) and inspection runs the per-product
+    # matrix `WIP`.
+    wip_units: np.ndarray = field(init=False)
+    wip_value: np.ndarray = field(init=False)
+    WIP: Optional[np.ndarray] = None
     D: Optional[np.ndarray] = None
     PD: Optional[np.ndarray] = None
     # WP 14.5 — the MRP record per material (need over the lead time, on hand
@@ -752,6 +813,8 @@ class WeeklyTrace:
             setattr(self, name, np.zeros(T))
         self.prod_cap_bound = np.zeros((self.n_prods, T))
         self.sup_cap_bound = np.zeros((self.n_sups, T))
+        self.wip_units = np.zeros(T)
+        self.wip_value = np.zeros(T)
         if self.keep_matrices:
             self.D = np.zeros((self.n_prods, T))
             # WP 14.4 — the plan's own record per product: projected demand,
@@ -806,6 +869,17 @@ class SimContext:
                 self.lt_variates[k] = streams.leadtime.standard_normal(T)
             elif dist == LeadTimeDist.GAMMA:
                 self.lt_variates[k] = streams.leadtime.gamma(1.0 / (cv * cv), 1.0, T)
+        # The demand-style shapes (normal, triangular, uniform — PLAN.md §26 WP
+        # 15.1): standard uniforms from each lane's OWN world stream, so neither
+        # the loop above nor the other lanes nor the chosen primary moves them.
+        # Drawn after the loop above and from different streams, so a project
+        # with none of these shapes consumes exactly what it did before.
+        for k in range(model.n_links):
+            if model.link_lt_stochastic[k] and draws_uniforms(model.link_lt_dist[k]):
+                rng = lane_leadtime_rng(streams.project_seed, streams.model_rep,
+                                        model.sup_ids[model.link_sup[k]],
+                                        model.mat_ids[model.link_mat[k]])
+                self.lt_variates[k] = rng.random(T)
 
         # Persistent state.
         self.on_hand = np.zeros(model.n_mats)
@@ -891,6 +965,28 @@ class SimContext:
         self.gross_requirements = np.zeros((model.n_mats, H))
         self.overtime_extra = np.zeros(model.n_prods)
         self.production_output = np.zeros(model.n_prods)
+        # P-P.13 (PLAN.md §26 WP 16.4): what the line STARTED this week (it is
+        # what consumed materials and capacity). `production_output` is what
+        # COMPLETED — the supply fulfillment ships and FG stock receives. The two
+        # are one array's value whenever no product has a production lead time.
+        self.production_started = np.zeros(model.n_prods)
+        self.prod_pipeline = (np.zeros((model.n_prods, model.prod_ring_width))
+                              if model.has_prod_lt else None)
+        self.prod_lt_clipped = np.zeros(model.n_prods, dtype=int)
+        self.prod_lt_variates = np.zeros((model.n_prods, T)) if model.has_prod_lt else None
+        if model.has_prod_lt:
+            for j in range(model.n_prods):
+                if not model.prod_lt_stochastic[j]:
+                    continue
+                rng = product_prodtime_rng(streams.project_seed, streams.model_rep,
+                                           model.prod_ids[j])
+                dist, cv = model.prod_lt_dist[j], float(model.prod_lt_cv[j])
+                if dist == LeadTimeDist.LOGNORMAL:
+                    self.prod_lt_variates[j] = rng.standard_normal(T)
+                elif dist == LeadTimeDist.GAMMA:
+                    self.prod_lt_variates[j] = rng.gamma(1.0 / (cv * cv), 1.0, T)
+                else:
+                    self.prod_lt_variates[j] = rng.random(T)
         self.fulfillment = np.zeros(model.n_prods)
         self.material_demand = np.zeros(model.n_mats)
         self.level_s = np.zeros(model.n_mats)
@@ -910,6 +1006,9 @@ class SimContext:
         # Draws bounded to the in-transit ring, per link (audit F-36). A draw
         # longer than the ring used to wrap and land EARLY with no symptom.
         self.lt_truncated = np.zeros(model.n_links, dtype=int)
+        # Normal lead-time draws below one week, raised to one (PLAN.md §26 WP
+        # 15.1) — counted like the ring bound, so the shift is stated.
+        self.lt_floor_raised = np.zeros(model.n_links, dtype=int)
         # P-S.4 early_warning_failover: monitored detection lag. None → the
         # scenario's settings.detection_lag_weeks applies unchanged.
         self.detection_lag_override: Optional[int] = None
@@ -920,6 +1019,11 @@ class SimContext:
 
         self.trace = WeeklyTrace(T, model.n_prods, model.n_mats, keep_matrices,
                                  n_sups=model.n_sups)
+        if model.has_prod_lt:
+            # Per product on EVERY replication of a run that has a production lead
+            # time (it is what `work_in_progress.by_product` averages); absent,
+            # and free, on every run that has none.
+            self.trace.WIP = np.zeros((model.n_prods, T))
         self._active_hook: Optional[BoundHook] = None
         self._params: dict[str, object] = {}
 

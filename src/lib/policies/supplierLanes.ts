@@ -25,8 +25,43 @@ export function supplierLaneMasters(inbound: readonly Row[]): Map<string, Row> {
     out.set(key, {
       supplier_id: link.supplier,
       material_id: link.material,
+      // A bounded lane's planning lead time is DERIVED from its bounds, not the
+      // uploaded number (§26.2 rule 3) — the cell shows it as derived
+      // (`rowBoundedLeadTime`), so the master slot is empty here.
       lead_time: link.leadSource === "master" ? link.leadWeeks : null,
+      // PLAN.md §26 WP 16.2 — the lane's own spread, in weeks.
+      lead_time_dist: link.spread.dist,
+      lead_time_cv: link.spread.cv,
+      lead_time_min: link.spread.min,
+      lead_time_mode: link.spread.mode,
+      lead_time_max: link.spread.max,
     });
+  }
+  return out;
+}
+
+/**
+ * The MATERIAL's lead-time shape under each lane that states none of its own —
+ * the derived step of the lane spread chain (row → lane → material →
+ * deterministic, `project_map._lane_lead_time_spread`). Keyed like the lanes.
+ * A material CV above the engine's bound is shown as the 1 the run uses (§4 D302).
+ */
+export function laneSpreadFromMaterials(
+  inbound: readonly Row[],
+  materials: readonly Row[],
+): Map<string, { lead_time_dist?: string; lead_time_cv?: number }> {
+  const byId = new Map(materials.map((m) => [String(m.material_id ?? m.id ?? ""), m]));
+  const out = new Map<string, { lead_time_dist?: string; lead_time_cv?: number }>();
+  for (const [key, link] of engineSupplierLinks(inbound as Row[])) {
+    const m = byId.get(link.material);
+    if (!m) continue;
+    const entry: { lead_time_dist?: string; lead_time_cv?: number } = {};
+    if (link.spread.dist === null && m.lead_time_dist) entry.lead_time_dist = String(m.lead_time_dist);
+    const cv = Number(m.lead_time_cv);
+    if (link.spread.cv === null && m.lead_time_cv != null && Number.isFinite(cv) && cv > 0) {
+      entry.lead_time_cv = Math.min(cv, 1);
+    }
+    if (entry.lead_time_dist !== undefined || entry.lead_time_cv !== undefined) out.set(key, entry);
   }
   return out;
 }

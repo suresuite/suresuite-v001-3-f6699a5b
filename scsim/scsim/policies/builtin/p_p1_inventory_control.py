@@ -369,7 +369,8 @@ class InventoryControl(PolicyPlugin):
         st["late"][:, t] = mask & (st["due_cum"] - st["recv_cum"] > 1e-6)
         due[np.arange(m.n_mats), t + np.maximum(lt, 1)] += order
         # Material shortage: the plant built less than it planned this week.
-        st["shortage"][t] = bool((ctx.planned_production[:, 0] - ctx.production_output > 1e-9).any())
+        # The plan is of STARTS (P-P.13), so the shortfall compares starts.
+        st["shortage"][t] = bool((ctx.planned_production[:, 0] - ctx.production_started > 1e-9).any())
         return order
 
     def _override_arrays(

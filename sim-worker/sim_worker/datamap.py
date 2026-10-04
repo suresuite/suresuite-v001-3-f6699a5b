@@ -189,6 +189,14 @@ def build_project_data(
                 fg_reorder_point=_num(r.get("fg_reorder_point")),
                 fg_cover_days=_num(r.get("fg_cover_days")),
                 fg_initial_on_hand=_num(r.get("fg_initial_on_hand")),
+                # WP 16.5 (§26, D300) — P-P.13 production lead time and its shape.
+                production_lead_time=_num(r.get("production_lead_time")),
+                production_lead_time_unit=r.get("production_lead_time_unit"),
+                production_lead_time_dist=r.get("production_lead_time_dist"),
+                production_lead_time_cv=_num(r.get("production_lead_time_cv")),
+                production_lead_time_min=_num(r.get("production_lead_time_min")),
+                production_lead_time_mode=_num(r.get("production_lead_time_mode")),
+                production_lead_time_max=_num(r.get("production_lead_time_max")),
             )
             for r in products if r.get("product_id")
         ],
@@ -198,6 +206,12 @@ def build_project_data(
                 unit_price=_num(r.get("unit_price")), lead_time=_num(r.get("lead_time")),
                 lead_time_unit=r.get("lead_time_unit"), time_unit=r.get("time_unit"),
                 volume=_num(r.get("volume")),
+                # WP 16.2 (§26, D299): the lane's own lead-time spread.
+                lead_time_dist=r.get("lead_time_dist"),
+                lead_time_cv=_num(r.get("lead_time_cv")),
+                lead_time_min=_num(r.get("lead_time_min")),
+                lead_time_mode=_num(r.get("lead_time_mode")),
+                lead_time_max=_num(r.get("lead_time_max")),
             )
             for r in inbound if r.get("supplier_id") and r.get("material_id")
         ],
@@ -373,7 +387,7 @@ async def load_project_data(
         # adding the column to the table is not enough on its own.
         inbound=await rows(
             "inbound_logistics",
-            "supplier_id,material_id,unit_price,lead_time,lead_time_unit,time_unit,volume",
+            "supplier_id,material_id,unit_price,lead_time,lead_time_unit,time_unit,volume,lead_time_dist,lead_time_cv,lead_time_min,lead_time_mode,lead_time_max",
         ),
         bom=bom,
         # One string literal, not two concatenated: `dataMapContract.test.ts` and

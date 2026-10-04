@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "fc91bab0c1e3";
-export const ENGINE_VERSION = "0.6.1";
-export const LAST_MIGRATION = "20261004000002_version_codes.sql";
+export const CONTRACT_VERSION = "c7c7da69c86d";
+export const ENGINE_VERSION = "0.8.0";
+export const LAST_MIGRATION = "20261004000004_production_lead_time.sql";
 
 export const COUNTS = {
   "tablesInSchema": 94,
   "tablesDescribed": 77,
-  "columnsDescribed": 1012,
+  "columnsDescribed": 1024,
   "tablesUndescribed": 17
 } as const;
 
@@ -117,7 +117,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "inbound_logistics",
         "grain": "One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed).",
-        "columns": 14,
+        "columns": 19,
         "owner": "data-ingestion"
       },
       {
@@ -141,7 +141,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "products",
         "grain": "One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs.",
-        "columns": 23,
+        "columns": 30,
         "owner": "data-ingestion"
       },
       {
