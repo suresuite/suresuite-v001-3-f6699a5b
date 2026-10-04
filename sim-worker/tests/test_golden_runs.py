@@ -104,5 +104,5 @@ def test_golden_run_unchanged(case):
     assert got["mapping_warnings"] == frozen["mapping_warnings"]
     assert got["sha256"] == frozen["sha256"], (
         f"{case}: a committed dataset's run moved. If deliberate, bump ENGINE_VERSION, "
-        f"record it in ADR 0002 and PLAN.md §16, and regenerate with SIMWORKER_WRITE_GOLDEN=1."
+        f"add its entry to scsim/CHANGELOG.yaml (goldens_moved names this run), and regenerate with SIMWORKER_WRITE_GOLDEN=1."
     )

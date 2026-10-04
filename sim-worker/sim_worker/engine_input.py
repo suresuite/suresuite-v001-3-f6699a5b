@@ -215,8 +215,11 @@ def describe(mapping: Any) -> dict[str, Any]:
 
     scenario = mapping.scenario.model_dump(mode="json")
     row_sources, flat = _sources(mapping, scenario.get("network") or {})
+    from sim_worker.build import code_version
+
     return {
         "engine_version": ENGINE_VERSION,
+        "engine_build": code_version(),
         "scenario": scenario,
         "fields": field_guide(),
         "row_sources": row_sources,

@@ -59,6 +59,25 @@ if [[ "$MODE" == "--check" ]]; then
   fi
   diff_wheel_source "$committed_scsim" "$fresh_scsim" "scsim" || rc=1
   diff_wheel_source "$committed_worker" "$fresh_worker" "sim_worker" || rc=1
+  # WP 15.1 · §4 D293 — the manifest names the BUILD the committed wheels are, and
+  # it is the build this source names: the browser and the worker run the same
+  # code exactly when these agree (gate `engine-ledger` rule 5).
+  want_build="$(python scripts/engine_build_id.py --source)"
+  wheel_build="$(python scripts/engine_build_id.py "$committed_scsim" "$committed_worker")"
+  manifest_build="$(python -c 'import json,sys; print(json.load(open(sys.argv[1])).get("engine_build",""))' "$OUT/manifest.json")"
+  if [[ "$wheel_build" != "$want_build" || "$manifest_build" != "$want_build" ]]; then
+    echo "❌ engine build mismatch — source $want_build · committed wheels $wheel_build · manifest ${manifest_build:-<none>}"
+    rc=1
+  fi
+  for whl in "$committed_scsim" "$committed_worker"; do
+    f="$(basename "$whl")"
+    have="$(python -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$whl")"
+    said="$(python -c 'import json,sys; print(json.load(open(sys.argv[1])).get("wheel_sha256",{}).get(sys.argv[2],""))' "$OUT/manifest.json" "$f")"
+    if [[ "$have" != "$said" ]]; then
+      echo "❌ manifest.json's wheel_sha256 for $f is ${said:-<none>}, the committed file is $have"
+      rc=1
+    fi
+  done
   rm -rf "$TMP"
   if [[ $rc -ne 0 ]]; then
     echo "→ Regenerate with: scripts/build_engine_wheels.sh && commit public/engine/"
@@ -100,15 +119,22 @@ if [[ -z "$SCSIM_VER" || "$SCSIM_VER" == "unknown" ]]; then
   echo "❌ scsim.ENGINE_VERSION resolved to \"$SCSIM_VER\" — refusing to write the manifest." >&2
   exit 1
 fi
+# WP 15.1 · §4 D293 — the build these wheels ARE (by content), and each file's sha256,
+# so a result computed in the browser names the same build the worker would.
+ENGINE_BUILD="$(python scripts/engine_build_id.py "$OUT/$SCSIM_WHL" "$OUT/$WORKER_WHL")"
+SHA_SCSIM="$(python -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$OUT/$SCSIM_WHL")"
+SHA_WORKER="$(python -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$OUT/$WORKER_WHL")"
 cat > "$OUT/manifest.json" <<JSON
 {
   "engine_version": "${SCSIM_VER}",
+  "engine_build": "${ENGINE_BUILD}",
   "pyodide_version": "0.26.4",
   "wheels": ["${SCSIM_WHL}", "${WORKER_WHL}"],
+  "wheel_sha256": {"${SCSIM_WHL}": "${SHA_SCSIM}", "${WORKER_WHL}": "${SHA_WORKER}"},
   "pyodide_packages": ["numpy", "scipy", "pydantic", "micropip"],
   "micropip_packages": []
 }
 JSON
 
 rm -rf "$TMP"
-echo "Wrote $OUT: $SCSIM_WHL, $WORKER_WHL (engine ${SCSIM_VER})"
+echo "Wrote $OUT: $SCSIM_WHL, $WORKER_WHL (engine ${SCSIM_VER}, build ${ENGINE_BUILD})"

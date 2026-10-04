@@ -323,10 +323,12 @@ export function useVerifiableExports(
         try {
           const res = await fetch("/engine/manifest.json");
           if (res.ok) {
-            const manifest = (await res.json()) as { engine_version?: string };
+            const manifest = (await res.json()) as { engine_version?: string; engine_build?: string };
             // "unknown" is what the build script used to write when its version
             // lookup failed. It is not a version and must not be bound as one.
-            const v = manifest.engine_version;
+            // WP 15.1 · §4 D293 — the BUILD (`scsim-0.6.1+<digest>`) when the
+            // manifest names one, so it compares with a run's `code_version`.
+            const v = manifest.engine_build || manifest.engine_version;
             browserEngineVersion = v && v !== "unknown" ? v : null;
           }
         } catch {

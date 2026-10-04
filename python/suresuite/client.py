@@ -190,9 +190,13 @@ class SuReSuite:
         """One frozen policy version with its `snapshot` and `policy_hash`."""
         return self.get(f"/projects/{project_id}/policy-versions/{version}")
 
-    def engine(self):
-        """The engine's wheels: sha256, size and a short-lived signed URL each."""
-        return self.get("/engine")
+    def engine(self, version=None):
+        """The engine's wheels: sha256, size and a short-lived signed URL each.
+
+        ``version`` — ``"0.4.0"`` (the newest build of that version) or an exact
+        build ``"scsim-0.4.0+<digest>"`` — fetches an EARLIER engine, so a stored
+        result can be re-run on the engine that produced it (PLAN.md §25 WP 15.3)."""
+        return self.get("/engine", version=version)
 
     def policy_versions(self, project_id):
         return self.get(f"/projects/{project_id}/policy-versions")["data"]

@@ -223,6 +223,6 @@ When the experiment was last changed — re-stamped by `experiments_updated_at`.
 
 ---
 
-*Generated from data contract `4c80c3d64438`, engine `0.6.1`,
+*Generated from data contract `9980b7ae3762`, engine `0.6.1`,
 sidecar `supabase/contract/experiments.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

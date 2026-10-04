@@ -73,8 +73,8 @@ Tier 4 — a DECISION. Readable by every API role (`model_validations_read_all`,
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `SimulationLab.tsx` | table read | `src/hooks/useModelValidation.tsx:333` | yes |
-| `ProjectPolicies.tsx` | table read | `src/hooks/useModelValidation.tsx:333` | yes |
+| `SimulationLab.tsx` | table read | `src/hooks/useModelValidation.tsx:355` | yes |
+| `ProjectPolicies.tsx` | table read | `src/hooks/useModelValidation.tsx:355` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -647,6 +647,6 @@ The simulation scope's level version ("simulation inputs v4") — `graph_level_v
 
 ---
 
-*Generated from data contract `4c80c3d64438`, engine `0.6.1`,
+*Generated from data contract `9980b7ae3762`, engine `0.6.1`,
 sidecar `supabase/contract/model_validations.contract.yaml`, table created by `20260710000001_model_validations.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

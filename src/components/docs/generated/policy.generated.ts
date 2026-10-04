@@ -2326,6 +2326,12 @@ export const API_ERRORS: ApiErrorCode[] = [
     "sites": 1
   },
   {
+    "code": "engine_version_not_published",
+    "status": 404,
+    "message": "engine ${wanted} was never published; published versions: ${publishedVersions(versions).join(\", \")}",
+    "sites": 1
+  },
+  {
     "code": "key_not_found",
     "status": 404,
     "message": "key not found",
@@ -3994,7 +4000,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 76,
+  "described": 77,
   "open": [
     {
       "table": "analysis_kinds",
@@ -4179,6 +4185,13 @@ export const READ_EXPOSURE: ReadExposure = {
       ]
     },
     {
+      "table": "sim_engine_builds",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
       "table": "sim_engines",
       "roles": [
         "anon",
@@ -4226,6 +4239,7 @@ export const READ_EXPOSURE: ReadExposure = {
     "run_item_series",
     "run_replications",
     "scenarios",
+    "sim_engine_builds",
     "sim_engines",
     "simulation_runs",
     "suppliers"

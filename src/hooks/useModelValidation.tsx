@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { ValidatedModelProtocol } from "@/lib/sim/validatedModel";
+import { engineDifference } from "@/lib/sim/engineBuild";
+import { engineChangeSummary } from "@/lib/sim/engineChanges";
 
 // Model-validation cards — Phase B0 / G13 / §9.5.
 // Loads the project's model_validations rows (the persisted V&V credibility
@@ -82,12 +84,29 @@ export type DriftComponent = "policy" | "data" | "scenario" | "engine";
 /** WP 11.2 — shown beside a badge, never a reason it is stale: `network` means the
  *  composite moved and the simulation's inputs did not — the deep tier, tier 2/3 or
  *  the multi-tier chain changed, none of which the engine reads. */
+/** WP 15.6 — the model's engine against the run's, in words: how they differ
+ *  (version / build / unknowable) and what the change record says lies between. */
+function describeEngineChange(from: string | null, to: string | null): string | null {
+  const how = engineDifference(from, to);
+  if (!how) return null;
+  const between = engineChangeSummary(from, to);
+  return between ? `${how}: ${between}` : how;
+}
+
 export type CredibilityNote = "network";
 
 export type Credibility =
   | { state: "unvalidated" }
   | { state: "validated"; card: ModelValidationCard; notes?: CredibilityNote[] }
-  | { state: "stale"; card: ModelValidationCard; drift: DriftComponent[]; notes?: CredibilityNote[] };
+  | {
+      state: "stale";
+      card: ModelValidationCard;
+      drift: DriftComponent[];
+      notes?: CredibilityNote[];
+      /** WP 15.6 · §4 D297 — what lies between the model's engine and the run's, in words
+       *  (from the change record). Present only with `engine` drift. It never clears it. */
+      engineChange?: string;
+    };
 
 /** The current context a card is compared against (all hashes read live).
  *
@@ -251,9 +270,12 @@ export function deriveCredibility(
     drift.push("engine");
   }
   const withNotes = notes.length > 0 ? { notes } : {};
+  const engineChange = drift.includes("engine")
+    ? describeEngineChange(card.engine_fingerprint, ctx.runCodeVersion ?? null)
+    : null;
   return drift.length === 0
     ? { state: "validated", card, ...withNotes }
-    : { state: "stale", card, drift, ...withNotes };
+    : { state: "stale", card, drift, ...withNotes, ...(engineChange ? { engineChange } : {}) };
 }
 
 export interface UseModelValidationResult {
@@ -463,7 +485,8 @@ export function useModelValidation(
       // completion; a mismatch with the card's evidence engine renders stale.
       const cv = run?.code_version ?? null;
       if (cv && card.engine_fingerprint && cv !== card.engine_fingerprint) {
-        return { state: "stale", card, drift: ["engine"] };
+        const engineChange = describeEngineChange(card.engine_fingerprint, cv);
+        return { state: "stale", card, drift: ["engine"], ...(engineChange ? { engineChange } : {}) };
       }
       return { state: "validated", card };
     },
