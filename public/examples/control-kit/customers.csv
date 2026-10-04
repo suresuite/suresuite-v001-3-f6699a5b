@@ -1,0 +1,2 @@
+customer_id,name,segment,priority_weight,sla_fill_floor_pct
+C-SHOP,Example retailer,default,1,95

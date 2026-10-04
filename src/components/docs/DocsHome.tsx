@@ -36,22 +36,22 @@ const START_HERE = [
   {
     slug: "what-suresuite-is",
     icon: Compass,
-    question: "What is this?",
+    question: "Manager or researcher: understand the model",
   },
   {
     slug: "how-suresuite-is-designed",
     icon: BookText,
-    question: "How is it put together?",
+    question: "New engineer: explore the architecture",
   },
   {
     slug: "your-first-project",
     icon: Rocket,
-    question: "How do I start?",
+    question: "Analyst: build your first comparison",
   },
   {
-    slug: "known-limits",
+    slug: "getting-an-api-key",
     icon: ShieldCheck,
-    question: "What does it not do?",
+    question: "API developer: authenticate and make a request",
   },
 ] as const;
 

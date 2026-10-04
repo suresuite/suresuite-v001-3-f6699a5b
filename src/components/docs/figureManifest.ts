@@ -71,22 +71,10 @@ export const FIGURE_SLOTS: FigureSlot[] = [
     id: "flow",
     page: "how-your-data-flows",
     file: "flow.svg",
-    title: "One row's journey",
-    alt:
-      "A single spreadsheet row followed down the page: uploaded, parsed and checked, diffed " +
-      "against your existing data, approved by a person, promoted, computed from, governed by " +
-      "policies and finally used by a stamped run. The approval step is filled solid, and two " +
-      "arrows come in from the right marking the only two places a number you did not supply " +
-      "can enter.",
-    caption:
-      "Every uploaded value takes this path, and the approval step is a person every time. The " +
-      "two inbound arrows are the only places a number you did not type can join it.",
-    shows:
-      "ONE row, not the whole system, with the tier each step lands in beside it. The approval " +
-      "gate marked as HUMAN and visually unlike every other step. And the brief's third ask, " +
-      "which the fallback never carried: where a substitution can enter — a derived fallback " +
-      "and a policy default, both ABOVE your data and neither able to reach down into it. " +
-      "Supersedes the `DataFlow` schematic, which stays as the fallback.",
+    title: "From supplied file to recorded result",
+    alt: "Five stages separate original and staged data, promotion, derived views, saved versions, and run execution. Each stage names the evidence to check.",
+    caption: "Illustration of the described CSV path. Review, promotion and execution are separate decisions; bulk network uploads follow a different path.",
+    shows: "Follow the described CSV ingestion lifecycle, preserving the distinction between staged rows, accepted data, derived views and version-bound runs.",
   },
   {
     id: "boundary",
@@ -594,6 +582,33 @@ export const FIGURE_SLOTS: FigureSlot[] = [
       "could walk into — because the point is that nobody decides it. Rejected stays on the " +
       "diagram, faded, for the same reason it stays in the thread.",
   },
+  {
+    "id": "first-project-checkpoints",
+    "page": "your-first-project",
+    "file": "first-project-checkpoints.svg",
+    "title": "Checkpoints for your first comparison",
+    "alt": "Five checkpoints move from a new project through row and network checks to baseline, outage and buffer runs and an evidence comparison.",
+    "caption": "Illustration: compare baseline A with outage B, then compare B with buffer C. Only the intended experimental factor should change.",
+    "shows": "Five checkpoints move from a new project through row and network checks to baseline, outage and buffer runs and an evidence comparison."
+},
+  {
+    "id": "control-kit-chain",
+    "page": "your-first-project",
+    "file": "control-kit-chain.svg",
+    "title": "A control kit needs both materials",
+    "alt": "Two suppliers feed a board and housing halves. One board and two halves feed a kit at KIT-PLANT, which supplies customer C-SHOP. Capacities and weekly demand are labelled.",
+    "caption": "Synthetic illustration, not an application screenshot. The BOM explains why losing board supply can constrain kits even when housing supply continues.",
+    "shows": "Two suppliers feed a board and housing halves. One board and two halves feed a kit at KIT-PLANT, which supplies customer C-SHOP. Capacities and weekly demand are labelled."
+},
+  {
+    "id": "upload-review-promote",
+    "page": "uploading-data",
+    "file": "upload-review-promote.svg",
+    "title": "Uploading is not promoting",
+    "alt": "Preview checks a file; Upload retains it and stages rows; a review precedes promotion into accepted inputs; the final step checks rebuilding and row counts.",
+    "caption": "Illustration of the described CSV route. A staged upload can be reviewed without treating its rows as accepted project inputs.",
+    "shows": "Preview checks a file; Upload retains it and stages rows; a review precedes promotion into accepted inputs; the final step checks rebuilding and row counts."
+},
 ];
 
 /** Slots for one page, in manifest order. */

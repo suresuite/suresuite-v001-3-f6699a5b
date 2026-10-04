@@ -1,165 +1,53 @@
-import { PageTitle, Section, P, Key, Callout, DocLink, Term } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Callout, DocLink, Term, Defs } from "@/components/docs/prose";
 import { DocFigure } from "@/components/docs/DocFigure";
-import { DataFlow } from "@/components/docs/figures";
 
 export default function HowYourDataFlows() {
-  return (
-    <>
-      <PageTitle lead="One file, followed from your desktop to a stamped result.">
-        How your data flows
-      </PageTitle>
-
-      <Section id="the-shape" title="The shape of it">
-        <P>
-          Seven hops. Each one either checks something, adds something, or records something — and
-          each lands in one of the six tiers described on{" "}
-          <DocLink to="how-suresuite-is-designed">How SuReSuite is designed</DocLink>. Nothing skips
-          a hop, and nothing moves backwards.
-        </P>
-        <DocFigure id="flow" fallback={<DataFlow />} />
-      </Section>
-
-      <Section id="upload" title="1. You upload a file">
-        <P>
-          You pick a dataset — inbound lanes, products, the bill of materials — and give it a CSV.
-          The file is kept exactly as you sent it, byte for byte, before anything reads it.
-        </P>
-        <P>
-          That matters more than it sounds. If a later step misreads a column, the question is
-          always “what did the file actually say?”, and the only answer that settles it is the file.
-          Keeping the original is what makes every later step reviewable rather than a matter of
-          trust.
-        </P>
-      </Section>
-
-      <Section id="check" title="2. We parse and check it">
-        <P>
-          The file is parsed and the contents are checked against what that dataset is supposed to
-          contain: the headers that must be present, the values that must be numbers, the
-          identifiers that must point at something that exists.
-        </P>
-        <P>
-          Findings come back in three severities — <Term>block</Term>, <Term>warn</Term> and{" "}
-          <Term>info</Term> — and the vocabulary is the same everywhere it appears, because it comes
-          from one place in the code rather than being restated per screen.{" "}
-          <DocLink to="verify-your-inputs">Verify your inputs</DocLink> covers what each finding
-          means and how to clear it.
-        </P>
-        <Key>Nothing in your project has changed at this point. Findings are about the file.</Key>
-      </Section>
-
-      <Section id="promote" title="3. You promote it">
-        <P>
-          Once the file is acceptable, its contents are promoted into your project. This is the one
-          hop where external data crosses into your data, and it is where two things happen exactly
-          once:
-        </P>
-        <P>
-          <strong className="text-foreground">Units are normalised.</strong> A lead time given in
-          weeks and one given in days become the same kind of number here. Nothing further
-          downstream converts anything, which is what stops a value being converted twice — the
-          failure that turns a week into a month and looks completely ordinary on screen.
-        </P>
-        <P>
-          <strong className="text-foreground">Rows are matched, not appended.</strong> Each table has
-          a natural key: the combination of fields that identifies one real thing. Re-uploading a
-          corrected file updates the rows it matches instead of adding a second copy of everything.
-        </P>
-        <Callout tone="limit" title="Partly true today">
-          <p>
-            Row matching is not yet in place for the four lane and bill-of-materials tables:
-            uploading the same file twice currently adds the rows twice. It is a known defect with a
-            fix scheduled, and it is listed on{" "}
-            <DocLink to="known-limits">Known limits</DocLink> rather than left for you to discover.
-          </p>
-        </Callout>
-      </Section>
-
-      <Section id="compute" title="4. We compute from it">
-        <P>
-          With your data in place, the derived layer is built: sourcing shares, effective
-          product-to-material rows collapsed out of a deep bill of materials, expanded supply paths,
-          network summaries and structural metrics.
-        </P>
-        <P>
-          None of it is editable, and all of it can be thrown away and rebuilt. If a derived figure
-          looks wrong, the cause is in your data or in the computation — never in a stale copy, because
-          there is no copy to go stale.
-        </P>
-      </Section>
-
-      <Section id="decide" title="5. You set policies">
-        <P>
-          Policies are the decisions: how much stock to hold, when to reorder, which supplier backs
-          up which, what happens when capacity runs out. They are set once for the project and then
-          patched per node where a particular supplier or material needs different treatment.
-        </P>
-        <P>
-          Where a policy needs a number you have not supplied, the software may substitute one — and
-          when it does, it says so at the point the value is shown, with a marker telling you where
-          the number came from. A substitution that is not declared in the contract cannot exist in
-          the code at all.
-        </P>
-      </Section>
-
-      <Section id="one-source" title="Which numbers a run uses">
-        <P>
-          Your item masters — cost, MOQ, capacity, price, demand — are the base values, and they
-          stay exactly as you uploaded them. The policies page shows that base value in every cell.
-          When you change a cell there, you are not editing the master: you are setting a{" "}
-          <Term>policy override</Term> that the run uses instead of it. Clear the override and the
-          master value is back. Where a master value is blank, the page shows the number that will
-          be used instead: one derived from your uploaded lanes, or a stated default.
-        </P>
-        <P>
-          The order of work is: edit, then <strong className="text-foreground">Save changes</strong>,
-          then run and validate in Simulation Lab, then save the{" "}
-          <strong className="text-foreground">validated model</strong>. A run freezes two things — a
-          dataset version (your masters and lanes) and a policy version (your settings and
-          overrides). The validated model names the two versions its evidence run used, so anyone
-          who runs it later gets exactly those numbers — even after your data has changed. If it
-          has, the Simulation Lab offers two choices: run the validated versions, or run your
-          current data as an exploratory run. Unsaved edits on the policies page reach nothing.
-        </P>
-        <P>
-          A cell the engine does not read on its stage — the policy basis, a review period, a
-          finished-goods stock setting on a plant row — is marked <Term>not simulated</Term> where it
-          is shown, and a blank project-wide default is saved in the policy version exactly as the
-          page displays it.
-        </P>
-        <Key>The rule: the number the policies page shows is the number the run uses — and the policies page never changes your item masters.</Key>
-        <P>
-          One thing predates the rule: values an earlier version of the policies page saved into
-          your item masters are still there, and cannot be told apart from uploaded ones. See{" "}
-          <DocLink to="known-limits">Known limits</DocLink>.
-        </P>
-      </Section>
-
-      <Section id="simulate" title="6. You simulate">
-        <P>
-          A run executes the model many times rather than once, because a single run of a system
-          with randomness in it tells you almost nothing. What comes back is a distribution with a
-          confidence interval — a range, and how sure the range is.
-        </P>
-        <P>
-          The work happens on a separate worker, not in your browser. You can close the tab; the run
-          continues and the result is waiting. The worker reads only the two frozen versions the run
-          is stamped with — a change you make to your data after pressing Run is not in that run.
-        </P>
-      </Section>
-
-      <Section id="stamp" title="7. The result is stamped">
-        <P>
-          The result records the exact dataset version, the exact policy set, the scenario and the
-          engine version it ran against — together, as one stamp. Two results can then be compared
-          honestly, because you can see whether they differ because of the change you made or
-          because something underneath moved.
-        </P>
-        <Key>
-          A figure that leaves the system carries that stamp with it. A figure that cannot be
-          reproduced is treated as a figure that should not be published.
-        </Key>
-      </Section>
-    </>
-  );
+  return <>
+    <PageTitle lead="Follow a file into accepted inputs, derived views, saved versions and a simulation result—and check each boundary.">How your data flows</PageTitle>
+    <Section id="the-shape" title="A lifecycle with separate decisions">
+      <P>A downloaded template, a staged upload and a saved model are different objects. You can have a valid CSV that has never been promoted, or new accepted data alongside a validated model that still names older versions. Knowing which object you are looking at prevents an apparent update from becoming an unexplained result.</P>
+      <DocFigure id="flow" />
+      <Callout title="Scope of this diagram"><p>This is the described CSV path used by BOMs, logistics, forecasts and item masters. Node List and deep-tier network bulk uploads do not pass through every illustrated step. ERP sync has its own review behavior; see <DocLink to="csv-vs-connector">CSV versus connector</DocLink>.</p></Callout>
+    </Section>
+    <Section id="upload" title="1. Preview and original file">
+      <P>Selecting a CSV sends a parse request that returns rows and findings without landing an ingestion run. Selecting <strong>Upload</strong> on the described path retains the original file and its hash and creates the ingestion record. The original bytes answer “what was supplied?”; they do not tell you which rows later became accepted inputs.</P>
+      <P>For the control-kit example, the inbound file says 10 boards per week with a one-week lead time. Keep that file when checking a later number. The file's hash identifies its bytes, not a guarantee that the supplied demand or relationship is true.</P>
+    </Section>
+    <Section id="check" title="2. Typed rows, findings and a comparison">
+      <P>The parser and dataset rules check CSV structure, required fields, numbers and supported units. Typed staged rows carry findings and a comparison with current project data. Inspect new, changed, unchanged, superseded and held-back counts. CSV findings use <Term>error</Term>, <Term>warn</Term> and <Term>info</Term>; do not confuse these with the later model gate.</P>
+      <Key>A clean staging result means the file passed those checks. It does not prove that every ID connects correctly across datasets or that the model is adequate for a decision.</Key>
+    </Section>
+    <Section id="promote" title="3. Promotion changes accepted inputs">
+      <P><strong>Promote … rows</strong> writes eligible staged rows into the dataset. The described path matches the table's natural keys and upserts values; rows missing from the upload are not a deletion request. It recomputes the comparison when promotion occurs. This does not lock the values you saw earlier: if the project may have changed, use Re-compare with current data and review again before promoting.</P>
+      <P>Declared rates and durations are normalized at promotion. A 14-day inbound lead time becomes two weeks. Some downstream readers still convert older unit representations, so the accurate statement is that declared promoted values are canonical—not that downstream conversion never occurs. The original file, staged values and accepted values can therefore differ for a legitimate reason.</P>
+      <P>A matching key is dataset-specific. A material master matches a material ID; a lane is identified by its own combination of key fields. Read the relevant <DocLink to="data-model">table reference</DocLink> and inspect the actual diff before assuming a repeat upload is harmless.</P>
+    </Section>
+    <Section id="compute" title="4. Derived data describes a computation">
+      <P>Combining accepted BOM and logistics data builds views used to inspect the chain. Network analyses may calculate additional metrics. These are outputs of transformations, not further observations of real trade. A line drawn between two nodes is only as well-supported as the source relationship that created it.</P>
+      <P>Wait for rebuilding to finish and investigate combine failures. A visible graph may still reflect earlier derived data. Check freshness and provenance where available rather than assuming every displayed metric refreshes immediately. With the example, reconcile the 1-board and 2-housing-half consumption rates against the accepted BOM before interpreting centrality or running a scenario.</P>
+    </Section>
+    <Section id="decide" title="5. Policies add decisions to data">
+      <P>Item masters and lanes describe the chain; policies describe choices such as replenishment and how shortages are handled. Save changes before making a version. A draft cell, an effective value shown in the grid and a field actually read by the engine are not interchangeable.</P>
+      <P>Resolution is field-specific. For example, a Supplier-stage material override can change opening stock, while a similarly named value on another stage need not do so. Absolute replenishment levels and safety-stock days also interact differently. Use <DocLink to="how-policies-work">How policies work</DocLink> and the <DocLink to="field-index">field reference</DocLink> to inspect a particular value; do not infer one precedence rule for all columns.</P>
+    </Section>
+    <Section id="one-source" title="Which saved object answers which question?">
+      <Defs items={[
+        {term: "Current project data", def: "What is accepted now? Useful for correcting inputs and exploratory work. It can change after an earlier run."},
+        {term: "Dataset version", def: "Which stored dataset snapshot was bound to the work? Check the recorded scope and identifier; a file hash and a dataset-version identifier describe different things."},
+        {term: "Policy version", def: "Which saved settings and overrides were selected? Saving another version does not rewrite an earlier run's identity."},
+        {term: "Validated model", def: "Which data and policy versions have validation evidence attached? Inspect the verdict and freshness. A stored model is not a declaration that all future inputs are valid."},
+        {term: "Run record", def: "What was executed, with which scenario, engine and replication settings? Compare recorded inputs, completion status and actual outputs before interpreting a KPI."},
+      ]} />
+      <P>For the tutorial, A and B intentionally share data and policy versions while the disruption changes. C intentionally changes the board's safety-stock policy. If other identities differ, establish why before attributing the KPI difference to the buffer.</P>
+    </Section>
+    <Section id="simulate" title="6. Mapping and execution can still change the effective setup">
+      <P>The worker mapping builds the engine model from stored rows and policies. Conversion notes record substitutions, unsupported settings and time conversions. Multi-level BOM dependencies can be flattened into effective material requirements; viewing intermediate assemblies does not prove that each has separate simulated stock, capacity and processing time.</P>
+      <P>Read those notes even after validation passes. In the local control-kit check, a 364-day horizon becomes 52 weeks but the analysis window is 39 weeks. A total revenue figure therefore cannot be reconciled simply by multiplying weekly demand by 52. See <DocLink to="units-and-conventions">Units and conventions</DocLink> and <DocLink to="reading-your-results">Reading your results</DocLink> for the relevant output definitions.</P>
+    </Section>
+    <Section id="stamp" title="7. Keep evidence with the conclusion">
+      <P>Record the run IDs, data and policy versions, scenario, engine version, actual replication count and conversion notes. Export the available provenance with the results. Where a historical run lacks a field, mark that limitation instead of inferring the missing identity from today's project.</P>
+      <Key>Traceability lets you investigate how a number was obtained. It does not certify the truth of the original data, eliminate model assumptions or guarantee that every historical result can be reproduced.</Key>
+      <P>Continue with <DocLink to="dataset-versions">Dataset versions</DocLink> and <DocLink to="reproducibility-record">The reproducibility record</DocLink> when preparing a comparison for someone else to review.</P>
+    </Section>
+  </>;
 }
