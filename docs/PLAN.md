@@ -26393,14 +26393,24 @@ to the engine.
   lists exactly the versions between two engines, and the manual's suites (352) render it at
   depth with no raw markup.
 
-### WP 15.7 — The after-merge reading *(§15)*
+### WP 15.7 — The after-merge reading *(§15 · open — the reading is owed in the push AFTER the merge, D153)*
 
-- §15 probes, read in the push **after** the merge (D153):
-  - every engine version in `simulation_runs.code_version` has a ledger row;
-  - every run since WP 15.2 has `engine_build_id`;
-  - the bucket's `versions.json` lists every ledger build with a commit;
-  - no build is `+local`.
-- Record the numbers in §16. **Phase complete** when they hold on every project.
+- **The probes are in place** (`verification-sql.mjs` `phase15EngineLedger`):
+  - (0) every engine label on runs, and whether it names a build. This reads only what exists
+    before the merge, so a run from the branch is the BEFORE reading.
+  - (1) every label on a run has its ledger row (`labels_missing_from_ledger` must be 0).
+  - (2) the ledger by how each build was first seen, with digests, commits, images and
+    withdrawals.
+  - (3) the registry's current build against its ledger row (after the worker deploys: a build
+    name, the deploy's commit and image).
+  - (4) runs since the ledger, and whether each names a build.
+  - (5) the `engine` bucket: `index.json`, `versions.json` and the archived wheels.
+- (1)–(5) read `20261004000001`'s table, so before the merge they error. That is a fact about the
+  sequence, not a finding.
+- *Dropped from the plan as first written*: "no build is `+local`". WP 15.1 names a build by its
+  source digest, so there is no `+local` to find.
+- Record the numbers in §16. **Phase complete** when (1) is 0 on every project, (3) shows the
+  worker's build with its commit, and (5) shows `versions.json` beside the wheels.
 
 ### 25.4 Sequencing
 

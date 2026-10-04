@@ -5262,6 +5262,72 @@ async function phase10Versions() {
     (rows) => { out("**(16) the training set (empty is a true reading until a Validated Model's runs complete after the merge):**"); out(...table(rows)); });
 }
 
+// ── Phase 15 · WP 15.7 — the engine ledger, read before and after the merge (§25) ──
+//
+// (0) reads only what exists today, so a run from the branch is the BEFORE reading:
+// which engine labels the runs carry. (1)–(5) read `sim_engine_builds`, which
+// `20261004000001` creates, so before the merge they error — a fact about the
+// sequence, not a finding. The AFTER reading is taken in the push after the merge (D153).
+async function phase15EngineLedger() {
+  section("Phase 15 · WP 15.7 — the engine build ledger and archive");
+
+  report("(0) every engine label the runs carry, with counts (before and after)",
+    await tryQ(`
+      select coalesce(nullif(btrim(code_version), ''), '(none yet)') as code_version,
+             (position('+' in coalesce(code_version, '')) > 0) as names_a_build,
+             count(*) as runs,
+             min(created_at)::date as first_run, max(created_at)::date as last_run
+        from public.simulation_runs group by 1, 2 order by max(created_at) desc nulls last`),
+    (rows) => { out("**(0) engine labels on runs (`names_a_build` is true for every run computed since WP 15.1 deployed):**"); out(...table(rows)); });
+
+  report("(1) D291 — every engine label a run carries has its ledger row",
+    await tryQ(`
+      select count(distinct r.code_version) as labels_on_runs,
+             count(distinct r.code_version) filter (where b.id is null) as labels_missing_from_ledger
+        from public.simulation_runs r
+        left join public.sim_engine_builds b
+          on b.engine_id = coalesce(r.engine_id, public._engine_for_code_version(r.code_version))
+         and b.code_version = btrim(r.code_version)
+       where btrim(coalesce(r.code_version, '')) <> ''
+         and coalesce(r.engine_id, public._engine_for_code_version(r.code_version)) is not null`),
+    (rows) => { out("**(1) labels on runs vs the ledger (`labels_missing_from_ledger` must be 0 — the backfill and the run trigger record every one):**"); out(...table(rows)); });
+
+  report("(2) D291 — the ledger by how each build was first seen",
+    await tryQ(`
+      select first_seen_by, count(*) as builds,
+             count(*) filter (where position('+' in code_version) > 0) as content_named,
+             count(scsim_digest) as with_digests, count(commit_sha) as with_commit,
+             count(image_digest) as with_image, count(withdrawn_at) as withdrawn
+        from public.sim_engine_builds group by 1 order by 1`),
+    (rows) => { out("**(2) the ledger (`backfill` rows are history and carry no digests; a `worker_report` row after the merge carries digests, commit and image):**"); out(...table(rows)); });
+
+  report("(3) D292 — the registry's current build and its ledger row",
+    await tryQ(`
+      select e.slug, e.status, e.code_version, e.reported_at,
+             b.first_seen_by, b.commit_sha, b.image_digest is not null as has_image, b.withdrawn_at
+        from public.sim_engines e
+        left join public.sim_engine_builds b on b.engine_id = e.id and b.code_version = e.code_version
+       order by e.slug`),
+    (rows) => { out("**(3) registry vs ledger (after the worker deploys, scsim's `code_version` names a build and its row carries the deploy's commit):**"); out(...table(rows)); });
+
+  report("(4) runs computed since the ledger, and whether each names a build",
+    await tryQ(`
+      select (position('+' in code_version) > 0) as names_a_build, status, count(*) as runs
+        from public.simulation_runs
+       where created_at >= (select min(first_seen_at) from public.sim_engine_builds where first_seen_by <> 'backfill')
+       group by 1, 2 order by 1, 2`),
+    (rows) => { out("**(4) runs since the first non-backfill build (every completed one names a build):**"); out(...table(rows)); });
+
+  report("(5) D294 — the engine bucket: the two indexes and the archived wheels",
+    await tryQ(`
+      select count(*) filter (where name = 'index.json') as index_json,
+             count(*) filter (where name = 'versions.json') as versions_json,
+             count(*) filter (where name like '%.whl') as wheels,
+             count(*) filter (where name like 'scsim-%' or name like '%/scsim-%') as scsim_wheels
+        from storage.objects where bucket_id = 'engine'`),
+    (rows) => { out("**(5) the bucket (after the first publish with `--backfill`, `versions_json` is 1 and every committed wheel set is archived):**"); out(...table(rows)); });
+}
+
 // ── Phase 11 · WP 11.5 — the levels, read after the merge (§21) ───────────
 //
 // Every query here reads tables and columns `20261001000019`–`22` create, so before
@@ -5452,6 +5518,7 @@ async function main() {
   await phase10Versions();
   await phase11Levels();
   await phase12Library();
+  await phase15EngineLedger();
   await d278AccountRoleGaps();
 
   await schemaProbe();
