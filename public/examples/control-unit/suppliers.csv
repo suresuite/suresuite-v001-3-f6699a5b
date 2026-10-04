@@ -1,0 +1,3 @@
+supplier_id,name,capacity_per_week,reliability_score
+S-BOARD,Board supplier,150,1
+S-CASE,Housing supplier,300,1

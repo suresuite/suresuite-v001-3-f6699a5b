@@ -35,16 +35,15 @@ function Stub({ slug }: { slug: string }) {
       <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Badge variant="outline">Not written yet</Badge>
-          {page.wp && <Badge variant="secondary">WP {page.wp}</Badge>}
+
         </div>
         <Key>
           This page is planned and not yet written
-          {page.wp ? `. Work package ${page.wp} ships it.` : "."}
+          .
         </Key>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           It is listed in the navigation rather than left out so that you can tell the difference
-          between a feature this product does not have and a page this manual has not written. The
-          software behind it works; the explanation is what is missing.
+          between a feature this product does not have and a page this manual has not written. Consult the related guides for the workflows currently documented.
         </p>
       </div>
 
@@ -127,8 +126,7 @@ function Unknown({ slug }: { slug: string }) {
         . It may have been renamed, or the link may be from an older version of the site.
       </P>
       <P>
-        Every page the manual will ever have is in the navigation, including the ones not yet
-        written — so if it is not there, it was never here. Start at{" "}
+        Use the navigation or search to find the current guide. Start at{" "}
         <DocLink to={DEFAULT_SLUG}>{getPage(DEFAULT_SLUG)?.title}</DocLink>, or use the search box
         above, which covers all {ALL_PAGES.length} pages.
       </P>

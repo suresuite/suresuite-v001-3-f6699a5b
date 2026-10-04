@@ -1,124 +1,14 @@
-// §6.3 section 13 — project access.
+import { PageTitle, Section, P, Key, Callout, Bullets, Steps, Defs, DocLink, AppLink, Term } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
+import { ExampleDownloads } from "@/components/docs/ExampleDownloads";
 
-import { PageTitle, Section, P, Key, Callout, Term, DocLink, Provenance } from "@/components/docs/prose";
-import { refTable } from "@/components/docs/tableFacts";
-import { SuppliedAndComputed, DatabaseRules } from "@/components/docs/tableRef";
-
-export default function ProjectAccess() {
-  const members = refTable("project_members");
-  const grants = refTable("delegation_grants");
-
-  return (
-    <>
-      <PageTitle lead="Membership of a single project, as distinct from the organization around it.">
-        Project access
-      </PageTitle>
-
-      <Section id="why-separate" title="Why this is separate from the organization">
-        <Key>
-          Belonging to an organization is not the same as belonging to every project in it.
-        </Key>
-        <P>
-          Organization membership answers <em>are you inside the wall</em>. Project membership
-          answers <em>which rooms</em>. A consultant who should see one study and not the rest is
-          the case this exists for.
-        </P>
-      </Section>
-
-      <Section id="members" title="Members — every column">
-        <SuppliedAndComputed table={members} />
-        <DatabaseRules table={members} />
-      </Section>
-
-      <Section id="delegation" title="Delegation, and its two rules">
-        <P>
-          A role can be handed to somebody else for a time. Two rules are enforced rather than
-          encouraged:
-        </P>
-        <div className="space-y-2">
-          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
-            <div className="text-sm font-semibold text-foreground">It only subtracts</div>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              You cannot delegate more than you hold. Handing someone your access gives them at most
-              what you have, which means a chain of delegations cannot accumulate into something
-              nobody granted.
-            </p>
-          </div>
-          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
-            <div className="text-sm font-semibold text-foreground">It expires</div>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              An expiry is required, not optional, and the expiry is applied when access is
-              resolved. A delegation nobody remembers to revoke revokes itself.
-            </p>
-          </div>
-        </div>
-        <SuppliedAndComputed table={grants} />
-      </Section>
-
-      <Callout tone="limit" title="Read this first: there is no screen for any of this">
-        <p>
-          <strong>Nothing in the application adds a member to a project, and nothing delegates a
-          role.</strong> There is no menu item, no dialog and no button — no part of the product
-          reads or writes either table. What exists is the database design above and one automatic
-          rule: creating a project makes you its owner.
-        </p>
-        <p>
-          So the consultant in the paragraph above is a case this is <em>designed</em> for and not
-          one you can set up today. Adding somebody to a project is a request to whoever operates
-          this deployment, not something a project owner can do.
-        </p>
-        <p>
-          We are saying it here because a reference page describing two tables, their columns and
-          their rules reads as a description of a feature, and a reader would reasonably go looking
-          for the screen.
-        </p>
-      </Callout>
-
-      <Callout tone="limit" title="And membership is not what decides who can read your rows">
-        <p>
-          Project membership answers <em>which rooms</em> in the design. In the database today, one
-          live path checks a project role — the promotion that lands reviewed data — and every other
-          read and write is decided by the row rules, which ask about your organization and the
-          project's modeler instead.
-        </p>
-        <p>
-          <DocLink to="who-can-see-your-data">Who can see your data</DocLink> has the measured
-          version of this, including how many tables are readable regardless of either. Read it
-          before relying on membership to separate two pieces of work.
-        </p>
-      </Callout>
-
-      <Callout title="The write path is a function, not a table rule">
-        <p>
-          Neither table carries a write rule, so any change goes through a function that enforces
-          subtraction and expiry rather than through a direct write. That is the right design — it
-          means the two rules above cannot be bypassed by writing the row another way — and it is
-          why there is nothing to add a member <em>with</em> until something calls it.
-        </p>
-      </Callout>
-
-      <Callout tone="limit" title="A project created before membership existed may have no members">
-        <p>
-          Membership had one writer in its life and it ran once, so projects created in a window
-          afterwards had no members — including no role for their own creator. That is fixed going
-          forward by a trigger that adds the creator; a project from that window may still need a
-          member added by hand.
-        </p>
-        <p>
-          It went unnoticed because nothing had ever <em>asked</em> for a project role until the
-          promotion gate started checking one. A rule nothing reads cannot report that it is empty.
-        </p>
-      </Callout>
-
-      <Section id="related" title="Related">
-        <P>
-          <DocLink to="roles-and-capabilities">Roles and capabilities</DocLink> ·{" "}
-          <DocLink to="organizations-and-members">Organizations and members</DocLink> ·{" "}
-          <DocLink to="who-can-see-your-data">Who can see your data</DocLink>
-        </P>
-      </Section>
-
-      <Provenance from="the project_members and delegation_grants sidecars joined to the schema; the absence of a surface is an import scan over src/, where neither table appears outside this manual" />
-    </>
-  );
-}
+export default function Guide() { return <>
+<PageTitle lead="Find who can work on a project and request the right level of access.">Project access</PageTitle>
+<span id="members" />
+<span id="related" />
+<span id="why-separate" />
+<Section id="roles" title="Start with the project, not the account label"><P>A project has an owner and can have members with viewer, analyst or editor rights. Project roles are separate from account roles and organization membership. The current project-rights defaults are documented in <DocLink to="roles-and-capabilities">Roles and capabilities</DocLink>; notably, an analyst can run simulations but does not receive input editing, policy editing or export by default.</P><DocFigure id="project-access-review" /></Section>
+<Section id="check" title="Inspect effective access"><P>Use your profile's project-access information to see the effective role and rights for the selected project. Administrators can use the project-access administration screen to inspect ownership, membership and delegation. Access to that administration screen is itself restricted.</P><P>Ask for a right tied to a concrete task: 'edit input data for Control-unit tutorial' is clearer than 'make me an admin'. An editor can prepare inputs and policies without becoming the project's owner. Ownership and project-setting changes have separate checks.</P></Section>
+<Section id="delegation" title="Delegation and expiration"><P>Delegation can grant temporary project access under the application's delegation rules. Check both the effective role and expiry; a previous successful session is not proof that the grant remains valid. When a grant expires, ask the owner or administrator to review the task rather than assuming the project was deleted.</P></Section>
+<Section id="errors" title="When access and controls disagree"><P>Record the project, action, effective-right display and exact backend error. Reloading can resolve a stale interface state, but cannot correct a missing permission. The absence of a button and a denied server request are different evidence.</P><Callout title="Enforcement has known gaps"><p>The current source does not establish uniform enforcement across every browser and backend path. The browser simulation dispatch gap is described in <DocLink to="roles-and-capabilities">Roles and capabilities</DocLink>. This documentation records it; it does not change access control or certify a live deployment.</p></Callout><P>Documentation release access is separate. Being unable to open a manual section is not itself evidence that your project role changed.</P></Section>
+</>; }

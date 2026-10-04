@@ -1,155 +1,17 @@
-import { PageTitle, Section, P, Key, Callout, Defs, DocLink } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Callout, Bullets, Steps, Defs, DocLink, AppLink, Term } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
+import { ExampleDownloads } from "@/components/docs/ExampleDownloads";
 
-export default function KnownLimits() {
-  return (
-    <>
-      <PageTitle lead="What this tool does not model, and what is not yet true of it. Near the front of the manual on purpose.">
-        Known limits
-      </PageTitle>
-
-      <Section id="why-at-the-front" title="Why this is page seven and not page seventy">
-        <P>
-          A modelling tool that lists its limitations in an appendix is relying on you not reading
-          the appendix. The limits below change how some results should be read, so they belong
-          before the results, not after them.
-        </P>
-        <Key>
-          None of this is a reason not to use the tool. It is the information you need in order to
-          know which questions it can answer well.
-        </Key>
-      </Section>
-
-      <Section id="model-limits" title="What the model does not represent">
-        <Defs
-          items={[
-            {
-              term: "The chain runs at steady state",
-              def: "The simulation settles the chain into a regular rhythm, then disrupts it and measures the recovery. There is no growth trend, no seasonality and no structural change over the horizon. This is the right shape for 'how badly does a shock hurt, and how fast do we recover' and the wrong shape for 'what does the next three years look like'.",
-            },
-            {
-              term: "Prices do not move",
-              def: "Unit prices and costs are held at the values you supply for the whole run. There is no price-volatility model, no commodity index and no exchange-rate movement. A scenario in which the disruption's main effect is a price spike is not one this tool can answer today — the quantity effects will be right and the cost effects will be understated.",
-            },
-            {
-              term: "Demand is drawn, not forecast",
-              def: "Weekly demand is sampled from the distribution you specify for each product. The model does not learn a pattern from history, and it does not represent correlated demand across products.",
-            },
-            {
-              term: "One plant per project",
-              def: "A project models a single plant and the chain around it. Multi-site networks are represented through the supplier and customer structure rather than as several plants running their own production.",
-            },
-          ]}
-        />
-      </Section>
-
-      <Section id="data-limits" title="Where the data layer is not yet complete">
-        <P>
-          These are known defects with fixes scheduled, not design choices. They are here because
-          finding out about them from a wrong number is worse than reading about them now.
-        </P>
-
-        <Callout tone="limit" title="Re-uploading a file can duplicate rows">
-          <p>
-            The four lane and bill-of-materials tables — inbound lanes, outbound lanes, and both
-            bill-of-materials shapes — have no uniqueness rule beyond an internal row identifier.
-            Uploading the same file a second time adds a second copy of every row rather than
-            updating the first.
-          </p>
-          <p>
-            <strong className="text-foreground">Until it is fixed:</strong> replace a dataset rather
-            than re-uploading on top of it, and treat an unexpected doubling of volumes as this
-            defect until you have ruled it out.
-          </p>
-        </Callout>
-
-        <Callout tone="limit" title="The dataset fingerprint does not cover everything">
-          <p>
-            Each run records a fingerprint of the data it ran against, so that two results can be
-            told apart. That fingerprint currently covers the single-level bill of materials and not
-            the multi-level one, nor the deep-tier network tables.
-          </p>
-          <p>
-            <strong className="text-foreground">What this means:</strong> if you edit a multi-level
-            bill of materials and rerun, the two runs will carry the same data fingerprint even
-            though the data differed. The results are correct; it is the claim that they ran against
-            identical inputs that is not.
-          </p>
-        </Callout>
-
-        <Callout tone="limit" title="The audit trail names the identity the browser presented">
-          <p>
-            Administrative changes, data changes, sign-ins and exports are all recorded, and the
-            record cannot be edited or deleted. Who is named is the user the request said it came
-            from: this application signs people in against its own user list, so that identity is
-            asserted by the browser rather than proven. Some service writes name nobody.
-          </p>
-          <p>
-            <strong className="text-foreground">What this means:</strong> the record reliably says
-            what changed and when, and under whose asserted identity — not who in the sense a court
-            would want. See <DocLink to="audit-log">Audit log</DocLink>.
-          </p>
-        </Callout>
-
-        <Callout tone="limit" title="An unlimited supplier capacity displays as zero">
-          <p>
-            Leaving a supplier's capacity blank means “no limit” to the engine. The policy grid
-            renders that blank as <span className="font-mono">0</span>, which reads as “this
-            supplier can supply nothing” — the opposite of what it means — and the marker that would
-            normally flag a substituted value does not appear for this case.
-          </p>
-          <p>
-            <strong className="text-foreground">Until it is fixed:</strong> a zero capacity in the
-            supplier grid means the field is empty, not that capacity is zero. The simulation treats
-            it as unlimited, which is the intended behaviour.
-          </p>
-        </Callout>
-
-        <Callout tone="limit" title="Values saved into item masters before the policies page stopped writing them">
-          <p>
-            Every run is computed from two frozen versions — your data and your policies as they were
-            when you pressed Run — a validated model replays the versions it was validated on, and the
-            policies page no longer writes your item masters. But values an earlier version of the
-            page saved into a master are still in it: they cannot be told apart from uploaded ones,
-            so nothing moved them back. Separately, the browser's Back button leaves the policies page
-            without asking, so unsaved edits there are lost.
-          </p>
-          <p>
-            <strong className="text-foreground">Until it is fixed:</strong> if you changed a cost,
-            MOQ, capacity, price or demand on the policies page before October 2026, check the item
-            master and re-upload the original value if needed. See{" "}
-            <DocLink to="how-your-data-flows">How your data flows</DocLink>.
-          </p>
-        </Callout>
-      </Section>
-
-      <Section id="documentation-limits" title="Where this manual is not yet complete">
-        <P>
-          Most of this manual is generated from the same description the software reads, which is
-          what makes it trustworthy. The parts that are not yet written are listed in the navigation
-          with the work package that will write them, rather than being left out.
-        </P>
-        <P>
-          <DocLink to="data-model">The data model at a glance</DocLink> does the same for the
-          schema: every table appears, either with its description or with the package that owes
-          one. If you are looking for a page and cannot find it in the navigation, it is not a
-          missing page — it is a page that does not exist yet and says so.
-        </P>
-      </Section>
-
-      <Section id="how-to-use" title="How to use this page">
-        <P>
-          Before you put a figure in front of someone who will act on it, check whether any limit
-          above touches it. The two that most often matter are the steady-state assumption — which
-          makes this a tool for shock and recovery rather than for long-range planning — and the
-          absence of price movement, which understates the cost side of scenarios whose main effect
-          is on price.
-        </P>
-        <P>
-          <DocLink to="what-happens-to-your-data">What happens to your data</DocLink> explains why
-          this page exists at all: publishing our own blind spots is the third of five standing
-          commitments, not an act of unusual candour.
-        </P>
-      </Section>
-    </>
-  );
-}
+export default function Guide() { return <>
+<PageTitle lead="Use these boundaries when deciding what a result can support.">Known limits</PageTitle>
+<span id="data-limits" />
+<span id="documentation-limits" />
+<span id="how-to-use" />
+<span id="model-limits" />
+<span id="why-at-the-front" />
+<Section id="model" title="Model fidelity"><P>The current engine uses weekly steps and fluid quantities, with suppliers, materials, one focal production stage and customers. Multi-level BOMs are flattened into root-to-leaf requirements for simulation. Intermediate stock, work-in-progress and independent subassembly capacities are not represented just because the process graph displays them.</P><P>Company relationships in the deep-tier graph do not automatically become simulated upstream dependencies. Network centrality indicates structure within the supplied graph; it is not a measured loss or a causal disruption ranking.</P><DocFigure id="trust-boundaries" /></Section>
+<Section id="data" title="Data and mapping"><P>Contract-driven CSV uploads have staging and natural-key promotion. Node-list and deep-tier bulk uploads are exceptions. Missing optional values can invoke defaults, and generated/derived values can differ from original cells. Inspect promotion diffs and run conversion notes.</P><P>Changing accepted data can make analyses and validation stale. Current frozen-input execution improves run provenance, but older runs and derived records may not carry complete versions. A generated reference also requires regeneration and review when its source changes.</P></Section>
+<Section id="policies" title="Policy support and results"><P>Some controls are stored or reserved without affecting the current engine. Use the per-field stage reference and engine status rather than inferring support from a field's presence. Finished-goods controls apply to MTS products; MTO does not hold FG stock through that policy.</P><P>The Resilience Index belongs to the engine stress-battery library and is not emitted by ordinary application runs. Unavailable fill rate, recovery time or a series is not zero. Read measurement-window and censoring information before reporting a conclusion.</P></Section>
+<Section id="security" title="Access-control and deployment limits"><P>Source review identified incomplete caller authorization on the browser simulation endpoint. <DocLink to="roles-and-capabilities">Roles and capabilities</DocLink> distinguishes this from the scoped public API gateway. The documentation changes do not fix this issue, and no production bypass test was run.</P><P>The reviewed source and a live deployment can differ. The tutorial's CSV validation and engine execution are local; hosted upload promotion and browser-to-worker execution remain unverified for the sample.</P></Section>
+<Section id="decision" title="What to report with a decision"><P>State the model boundary, data coverage, important assumed values, completed replication count, measured window and changed experimental factor. A confidence interval measures Monte Carlo precision conditional on these assumptions; it does not certify real-world validity.</P><P>When a limitation can reverse the decision, collect the missing evidence or test alternative assumptions before recommending action. See <DocLink to="reading-your-results">Reading your results</DocLink> and <DocLink to="experiments-and-comparison">Experiments &amp; comparison</DocLink>.</P></Section>
+</>; }

@@ -50,43 +50,18 @@ export type FigureSlot = {
 export const FIGURE_SLOTS: FigureSlot[] = [
   // ── 1 · Overview & architecture ─────────────────────────────────────────
   {
-    id: "tiers",
-    page: "how-suresuite-is-designed",
-    file: "tiers.svg",
-    title: "The six tiers",
-    alt:
-      "Six stacked tiers read from the bottom up — the bytes you sent, staging, your canonical " +
-      "data, computed data, your decisions, and results — with a single arrow running up the " +
-      "side and one mark on the bottom tier labelled as the only way in.",
-    caption:
-      "Data only ever moves up. Nothing below a tier can be edited from above it, so a result " +
-      "can never quietly rewrite the data it used.",
-    shows:
-      "Tiers 0–5 as a stack, each labelled with what a USER would call it, the upward-only " +
-      "arrow, and the rule that makes the picture worth drawing — external data never enters " +
-      "above tier 1, drawn as a single entry point rather than stated underneath. Supersedes " +
-      "the `TierJourney` schematic, which stays as the fallback and must not be deleted.",
+    id: "tiers", page: "how-suresuite-is-designed", file: "tiers.svg",
+    title: "Keep inputs, decisions and results distinct",
+    alt: "Illustration: Landing and staging: Raw upload, parsed rows, findings Review before promotion.. Accepted data and derived views: BOM, lanes and masters → graphs Inputs and derived measures differ.. Decisions and versions: Policies + frozen inputs + validation Record what the run will use.. Results: KPIs, replications and weekly series Review assumptions and provenance.",
+    caption: "Illustration. These are data responsibilities; not every upload follows the same ingestion path.",
+    shows: "Illustration: Landing and staging: Raw upload, parsed rows, findings Review before promotion.. Accepted data and derived views: BOM, lanes and masters → graphs Inputs and derived measures differ.. Decisions and versions: Policies + frozen inputs + validation Record what the run will use.. Results: KPIs, replications and weekly series Review assumptions and provenance.",
   },
   {
-    id: "flow",
-    page: "how-your-data-flows",
-    file: "flow.svg",
-    title: "One row's journey",
-    alt:
-      "A single spreadsheet row followed down the page: uploaded, parsed and checked, diffed " +
-      "against your existing data, approved by a person, promoted, computed from, governed by " +
-      "policies and finally used by a stamped run. The approval step is filled solid, and two " +
-      "arrows come in from the right marking the only two places a number you did not supply " +
-      "can enter.",
-    caption:
-      "Every uploaded value takes this path, and the approval step is a person every time. The " +
-      "two inbound arrows are the only places a number you did not type can join it.",
-    shows:
-      "ONE row, not the whole system, with the tier each step lands in beside it. The approval " +
-      "gate marked as HUMAN and visually unlike every other step. And the brief's third ask, " +
-      "which the fallback never carried: where a substitution can enter — a derived fallback " +
-      "and a policy default, both ABOVE your data and neither able to reach down into it. " +
-      "Supersedes the `DataFlow` schematic, which stays as the fallback.",
+    id: "flow", page: "how-your-data-flows", file: "flow.svg",
+    title: "A file is not yet a simulation input",
+    alt: "Illustration: Raw file → staged rows: Original cells + parsed values + findings Contract-driven CSV path only. Review → promotion: Upsert eligible rows by natural key Held rows remain out of accepted inputs.. Accepted inputs → derived views: Refresh affected lanes and analyses Check freshness and input coverage.. Frozen dataset + policy versions: Scenario and engine bind the run The worker reads the frozen snapshots.. Result → review: Completed replications, notes and KPIs Older records may have less provenance.",
+    caption: "Illustration. Node-list and deep-tier bulk uploads follow separate paths.",
+    shows: "Illustration: Raw file → staged rows: Original cells + parsed values + findings Contract-driven CSV path only. Review → promotion: Upsert eligible rows by natural key Held rows remain out of accepted inputs.. Accepted inputs → derived views: Refresh affected lanes and analyses Check freshness and input coverage.. Frozen dataset + policy versions: Scenario and engine bind the run The worker reads the frozen snapshots.. Result → review: Completed replications, notes and KPIs Older records may have less provenance.",
   },
   {
     id: "boundary",
@@ -159,18 +134,11 @@ export const FIGURE_SLOTS: FigureSlot[] = [
 
   // ── 5 · Policies ────────────────────────────────────────────────────────
   {
-    id: "resolution-order",
-    page: "how-policies-work",
-    file: "resolution-order.svg",
-    title: "What wins",
-    alt:
-      "The resolver's nine steps as a ladder, checked top to bottom, with the first match " +
-      "winning and everything below it unconsulted.",
-    caption: "The first rung with an answer decides. Nothing lower is consulted.",
-    shows:
-      "The nine steps in order, as a ladder rather than a list. The row-level value ABOVE the " +
-      "policy bundle, because that is the one that surprises people and the one that makes a " +
-      "re-upload behave the way it does.",
+    id: "resolution-order", page: "how-policies-work", file: "resolution-order.svg",
+    title: "Two fields, different resolution paths",
+    alt: "Illustration: Material cost · M-BOARD: Saved override 25 replaces master 20 Removing it returns to the next source.. MTS finished-goods target: Explicit S is used as the target Missing S can trigger a derived target.. Check before running: A draft cell is not a saved run input Inspect the field chain and conversion notes.",
+    caption: "Illustration. These examples are not a universal precedence ladder.",
+    shows: "Illustration: Material cost · M-BOARD: Saved override 25 replaces master 20 Removing it returns to the next source.. MTS finished-goods target: Explicit S is used as the target Missing S can trigger a derived target.. Check before running: A draft cell is not a saved run input Inspect the field chain and conversion notes.",
   },
   {
     id: "provenance-dots",
@@ -237,86 +205,32 @@ export const FIGURE_SLOTS: FigureSlot[] = [
 
   // ── 8 · Networks ────────────────────────────────────────────────────────
   {
-    id: "product-network",
-    page: "product-level-network",
-    file: "product-network.svg",
-    title: "The product-level view",
-    alt:
-      "A DRAWN product-level network: supplier, material, product and customer nodes joined " +
-      "left to right by flow arcs. Two nodes are outlined rather than joined — a material " +
-      "with no supplier behind it, and a customer with nothing arriving — and each is called " +
-      "out beneath.",
-    caption:
-      "A representation, not a screenshot. Every node and every arc in the real view is a row " +
-      "you uploaded, and the two loose nodes are what a missing row looks like.",
-    shows:
-      "**A SCHEMATIC, declared as one (F5).** The brief asked for a capture of a real project " +
-      "at readable label size and this package had no project to capture; a drawing presented " +
-      "as a screenshot is a fabricated record, so the `alt` and the caption say it is drawn. " +
-      "**Supersede it with a real capture rather than redrawing it.** What the drawing does " +
-      "carry is the argument: the four groups left to right, and TWO faults visible at a " +
-      "glance, because spotting those is what the page says this screen is for.",
+    id: "product-network", page: "product-level-network", file: "product-network.svg",
+    title: "The control-unit chain",
+    alt: "Illustration: Two materials feed one product: One board + two housings per control unit This example has no subassembly stage.",
+    caption: "Illustration. Synthetic sample; links read top to bottom. Both BOM depth and units matter.",
+    shows: "Illustration: Two materials feed one product: One board + two housings per control unit This example has no subassembly stage.",
   },
   {
-    id: "process-network",
-    page: "process-level-network",
-    file: "process-network.svg",
-    title: "The process-level view",
-    alt:
-      "A DRAWN process-level network: a product on level 0 with sub-assemblies stacked on " +
-      "labelled levels beneath it, one sub-assembly feeding another, and raw materials at the " +
-      "bottom of each branch. Beneath it, the two meanings of the word level set against each " +
-      "other.",
-    caption:
-      "A representation, not a screenshot. Levels here are stages of manufacture and can all " +
-      "sit in one factory; tiers in the firm graph are companies away from you. The two " +
-      "numbers are unrelated.",
-    shows:
-      "**A SCHEMATIC, declared as one (F5)** — see `product-network` for why, and supersede it " +
-      "the same way. The LEVELS must be labelled and the drawing must be visibly unlike the " +
-      "firm-level picture, because confusing the two kinds of depth is the mistake this page " +
-      "exists to prevent — which is why the distinction is spelled out in the figure rather " +
-      "than left to the caption.",
+    id: "process-network", page: "process-level-network", file: "process-network.svg",
+    title: "The control-unit chain",
+    alt: "Illustration: Two materials feed one product: One board + two housings per control unit This example has no subassembly stage.",
+    caption: "Illustration. Synthetic sample; links read top to bottom. Both BOM depth and units matter.",
+    shows: "Illustration: Two materials feed one product: One board + two housings per control unit This example has no subassembly stage.",
   },
   {
-    id: "firm-network",
-    page: "firm-level-network",
-    file: "firm-network.svg",
-    title: "The deep-tier firm graph",
-    alt:
-      "A DRAWN firm-level network: companies arranged in tiers away from you, with node size " +
-      "standing for a computed prominence. Two tier-1 suppliers, A and B, are joined by " +
-      "separate paths that converge on one large tier-3 firm, which is ringed.",
-    caption:
-      "A representation, not a screenshot. Two suppliers you dual-sourced on purpose can meet " +
-      "at a single firm three steps back — and nothing in your own purchasing data would show " +
-      "it, because you have never bought from that firm.",
-    shows:
-      "**A SCHEMATIC, declared as one (F5)** — see `product-network` for why, and supersede it " +
-      "the same way. The SHARED upstream firm is the whole point and must be unmissable: two " +
-      "paths, one destination, drawn heavier than the rest. Node size carries a COMPUTED " +
-      "measure, so the page can point at it and say which columns are not yours.",
+    id: "firm-network", page: "firm-level-network", file: "firm-network.svg",
+    title: "Operational data is not a deep-tier graph",
+    alt: "Illustration: Tutorial operational relationships: S-BOARD and S-CASE → Assembly Assembly → C-ASSEMBLY. Separate firm graph requires evidence: Company-node IDs and company edges The tutorial ships no deep-tier files.. Interpret coverage before concentration: Missing edges can mean missing evidence No automatic upstream simulation follows.",
+    caption: "Illustration. The operational relationships here summarize the sample; they are not uploaded firm-graph edges.",
+    shows: "Illustration: Tutorial operational relationships: S-BOARD and S-CASE → Assembly Assembly → C-ASSEMBLY. Separate firm graph requires evidence: Company-node IDs and company edges The tutorial ships no deep-tier files.. Interpret coverage before concentration: Missing edges can mean missing evidence No automatic upstream simulation follows.",
   },
   {
-    id: "interactive-space",
-    page: "interactive-network-space",
-    file: null,
-    title: "The interactive space",
-    alt:
-      "The interactive network canvas with nodes pulled apart by hand into a layout the user " +
-      "arranged.",
-    caption: "No fixed layout. What you arrange is for looking at, not for quoting.",
-    shows:
-      "The canvas mid-exploration, ideally a cluster pulled apart, so it reads as something a " +
-      "person is doing rather than a finished diagram. **DELIBERATELY STILL OPEN, and WP 5.2k " +
-      "decided it rather than ran out of budget.** The other three capture slots were drawn as " +
-      "declared schematics because each carries a STRUCTURAL argument a drawing makes as well " +
-      "as a photograph — an orphaned node, a level, a shared firm. This one does not: its " +
-      "brief asks for something that reads as a person part-way through a thought, and a " +
-      "hand-authored SVG is the precise opposite of that. A tidy drawing here would illustrate " +
-      "the fixed layout the page exists to contrast itself with, so it would be worse than the " +
-      "placeholder, which at least says out loud what is missing (§5.3 T3). **This slot needs " +
-      "a capture and nothing else.**",
+    id: "interactive-space", page: "interactive-network-space", file: "interactive-space.svg",
+    title: "Explore without confusing views",
+    alt: "Illustration: Select a project and network level: Product dependencies, BOM depth or firms Each level reads different relationships.. Focus a node: Inspect its connected path and details Filters can hide otherwise valid edges.. Restore the full view: Check inputs and coverage before conclusions Visual connectivity is not evidence quality.",
+    caption: "Illustration. A workflow illustration, not an application screenshot.",
+    shows: "Illustration: Select a project and network level: Product dependencies, BOM depth or firms Each level reads different relationships.. Focus a node: Inspect its connected path and details Filters can hide otherwise valid edges.. Restore the full view: Check inputs and coverage before conclusions Visual connectivity is not evidence quality.",
   },
 
   // ── 11 · Results & statistics ───────────────────────────────────────────
@@ -477,26 +391,11 @@ export const FIGURE_SLOTS: FigureSlot[] = [
       "Duration rounds the same way and is worth one line rather than a second ruler.",
   },
   {
-    id: "kpi-vocabulary-gap",
-    page: "reading-your-results",
-    file: "kpi-vocabulary-gap.svg",
-    title: "Measures and labels",
-    alt:
-      "Two columns. What the engine emits joins across to what the results table can label, " +
-      "with a second block of labels on the right that nothing writes to, its incoming arrow " +
-      "crossed out. Below, the five objectives the Setup form offers, of which only Fill rate " +
-      "is a measure a run produces.",
-    caption:
-      "A row with no data is dropped rather than shown as zero, so this costs you measures " +
-      "without ever showing a wrong number. Four of the five objectives you can optimise for " +
-      "produce no chart at all.",
-    shows:
-      "The join between the engine's emitted keys and the results table's labels, as BLOCKS " +
-      "rather than lists — and with NO totals lettered in, because the page renders the counts " +
-      "from RUN_KPIS beside the figure and a number drawn here goes stale the first time the " +
-      "engine gains a measure (F2). **This slot's original brief is superseded**: it asked for " +
-      "'two lines' against §4 D113, which WP 6.3 CLOSED — the table is driven by the run now. " +
-      "The live gap is the objective list, and that is what the lower half draws.",
+    id: "kpi-vocabulary-gap", page: "reading-your-results", file: "kpi-vocabulary-gap.svg",
+    title: "Read the evidence in this order",
+    alt: "Illustration: 1 · Run status and identity: Done? Expected replications? Which versions and measurement window?. 2 · Conversion notes: Defaults, substitutions and clamping Do these alter the question?. 3 · KPIs and uncertainty: Engine-returned keys drive the table Unavailable is not zero.. 4 · Weekly traces and comparison: When did service fall and recover? What changed against the baseline?",
+    caption: "Illustration. Ordinary application runs do not produce the library Resilience Index.",
+    shows: "Illustration: 1 · Run status and identity: Done? Expected replications? Which versions and measurement window?. 2 · Conversion notes: Defaults, substitutions and clamping Do these alter the question?. 3 · KPIs and uncertainty: Engine-returned keys drive the table Unavailable is not zero.. 4 · Weekly traces and comparison: When did service fall and recover? What changed against the baseline?",
   },
   {
     id: "delete-reach",
@@ -538,24 +437,11 @@ export const FIGURE_SLOTS: FigureSlot[] = [
       "drawing rather than in prose beside it.",
   },
   {
-    id: "capability-layers",
-    page: "roles-and-capabilities",
-    file: "capability-layers.svg",
-    title: "Five layers, two answers",
-    alt:
-      "The five capability layers as a chain — you, your role on this project, your " +
-      "organization, your platform role, nobody — each with two different exits: a solid " +
-      "arrow out to the side when a row exists, true or false, and a dashed arrow down to " +
-      "the next layer when no row does.",
-    caption:
-      "A denial is not a missing grant. Removing a grant hands the decision back down the " +
-      "chain; setting it to false takes it away outright.",
-    shows:
-      "The five layers narrowest first — the project layer sits between the person and " +
-      "their organization and is consulted when the question is about a project — and the " +
-      "two kinds of arrow drawn DIFFERENTLY: 'a row exists, so stop' against 'no row, ask " +
-      "the next layer'. That difference is the whole figure, and it is the thing " +
-      "administrators get wrong.",
+    id: "capability-layers", page: "roles-and-capabilities", file: "capability-layers.svg",
+    title: "Different roles, different questions",
+    alt: "Illustration: Account and organization: Application access and organization context These do not name one project role.. Project role: Viewer · analyst · editor · owner Check effective rights for this project.. Request authorization: Browser RPC or API gateway → server UI visibility alone is not enforcement.. Known boundary gap: Browser simulation dispatch needs review Do not infer complete server enforcement.",
+    caption: "Illustration. The API key gateway and browser simulation path have different checks.",
+    shows: "Illustration: Account and organization: Application access and organization context These do not name one project role.. Project role: Viewer · analyst · editor · owner Check effective rights for this project.. Request authorization: Browser RPC or API gateway → server UI visibility alone is not enforcement.. Known boundary gap: Browser simulation dispatch needs review Do not infer complete server enforcement.",
   },
   {
     id: "validation-binding",
@@ -594,6 +480,55 @@ export const FIGURE_SLOTS: FigureSlot[] = [
       "could walk into — because the point is that nobody decides it. Rejected stays on the " +
       "diagram, faded, for the same reason it stays in the thread.",
   },
+  {
+    id: "first-comparison", page: "your-first-project", file: "first-comparison.svg",
+    title: "One model, two controlled questions",
+    alt: "Illustration: A · Baseline: No disruption; original stock policy Check normal service first.. B · Board disruption: Same inputs and policies; S-BOARD at 20% Compare B with A: event impact.. C · Same disruption + buffer: Change only material safety stock Compare C with B: policy effect.",
+    caption: "Illustration. Compare adjacent variants. A versus C changes both event and policy.",
+    shows: "Illustration: A · Baseline: No disruption; original stock policy Check normal service first.. B · Board disruption: Same inputs and policies; S-BOARD at 20% Compare B with A: event impact.. C · Same disruption + buffer: Change only material safety stock Compare C with B: policy effect.",
+  },
+  {
+    id: "controlled-comparison", page: "experiments-and-comparison", file: "controlled-comparison.svg",
+    title: "Keep the comparison attributable",
+    alt: "Illustration: Hold fixed: Dataset · engine · seed · CRN Warm-up · measurement window. Choose one changed component: A to B: disruption schedule B to C: policy version. Pair completed replications: Read the difference and its interval Review service and cost together",
+    caption: "Illustration. A passing comparison gate still requires a review of inputs and assumptions.",
+    shows: "Illustration: Hold fixed: Dataset · engine · seed · CRN Warm-up · measurement window. Choose one changed component: A to B: disruption schedule B to C: policy version. Pair completed replications: Read the difference and its interval Review service and cost together",
+  },
+  {
+    id: "upload-review", page: "uploading-data", file: "upload-review.svg",
+    title: "Review a correction before accepting it",
+    alt: "Illustration: CSV · P-CONTROL / M-CASE: Old consumption: 2 units/product Corrected file: 3 units/product. Staged review · changed row: Same product/material key Inspect parsed value and findings.. Promote eligible rows: One matching line updated to 3 Omitted rows are not deletions.",
+    caption: "Illustration. This is an illustrative correction, not a change required by the tutorial.",
+    shows: "Illustration: CSV · P-CONTROL / M-CASE: Old consumption: 2 units/product Corrected file: 3 units/product. Staged review · changed row: Same product/material key Inspect parsed value and findings.. Promote eligible rows: One matching line updated to 3 Omitted rows are not deletions.",
+  },
+  {
+    id: "system-components", page: "how-suresuite-is-designed", file: "system-components.svg",
+    title: "Execution and control boundaries",
+    alt: "Illustration: React interface: Project Manager · Policies · Simulation Lab Browser controls guide the workflow.. Supabase control plane: Edge requests · RPCs · stored versions Authorization must hold at each boundary.. Worker or local execution: Frozen data + policies + scenario Shared mapping into scsim. scsim → result records: Weekly simulation and replication KPIs Version bindings and notes support review.",
+    caption: "Illustration. The local verifier exercises the mapping and engine, not hosted authorization.",
+    shows: "Illustration: React interface: Project Manager · Policies · Simulation Lab Browser controls guide the workflow.. Supabase control plane: Edge requests · RPCs · stored versions Authorization must hold at each boundary.. Worker or local execution: Frozen data + policies + scenario Shared mapping into scsim. scsim → result records: Weekly simulation and replication KPIs Version bindings and notes support review.",
+  },
+  {
+    id: "api-request", page: "getting-an-api-key", file: "api-request.svg",
+    title: "Start with a scoped read",
+    alt: "Illustration: Client · Bearer API key: GET /projects with read:data Use the deployment gateway base URL.. Gateway: Key → scope → tenancy → limits An organization key may be project-limited.. Response: data array + next_cursor An empty page can be a valid result.. Then submit work: write:runs submits; read:runs retrieves 202 acceptance is not completion.",
+    caption: "Illustration. Source-checked request flow; no live authenticated call was made.",
+    shows: "Illustration: Client · Bearer API key: GET /projects with read:data Use the deployment gateway base URL.. Gateway: Key → scope → tenancy → limits An organization key may be project-limited.. Response: data array + next_cursor An empty page can be a valid result.. Then submit work: write:runs submits; read:runs retrieves 202 acceptance is not completion.",
+  },
+  {
+    id: "project-access-review", page: "project-access", file: "project-access-review.svg",
+    title: "Resolve access for a particular task",
+    alt: "Illustration: Select the project: Check effective role on your profile Roles can differ across projects.. Name the task: Edit inputs, edit policies, run or export Project settings are a separate action.. Inspect the boundary: Unavailable control or backend denial? Record the exact error for the owner.",
+    caption: "Illustration. The role display guides diagnosis; it does not prove server enforcement.",
+    shows: "Illustration: Select the project: Check effective role on your profile Roles can differ across projects.. Name the task: Edit inputs, edit policies, run or export Project settings are a separate action.. Inspect the boundary: Unavailable control or backend denial? Record the exact error for the owner.",
+  },
+  {
+    id: "trust-boundaries", page: "known-limits", file: "trust-boundaries.svg",
+    title: "Three checks before a recommendation",
+    alt: "Illustration: Coverage: Do the inputs represent the dependency? Missing edges are not proof of independence.. Mechanism: Does the engine simulate the response? A stored control can still be unsupported.. Evidence: Was the run completed and comparable? Precision does not establish validity.",
+    caption: "Illustration. If a missing assumption can reverse the decision, test or investigate it.",
+    shows: "Illustration: Coverage: Do the inputs represent the dependency? Missing edges are not proof of independence.. Mechanism: Does the engine simulate the response? A stored control can still be unsupported.. Evidence: Was the run completed and comparable? Precision does not establish validity.",
+  }
 ];
 
 /** Slots for one page, in manifest order. */

@@ -1,0 +1,11 @@
+{
+  "status": "blocked",
+  "pixel_verified_pages": 0,
+  "screenshots": [],
+  "reasons": [
+    "Local Playwright Chromium was absent; official browser download returned an empty/invalid archive.",
+    "Cloud Browser could not open the loopback preview: net::ERR_BLOCKED_BY_CLIENT."
+  ],
+  "next_step": "On a machine with Chromium, start scripts/preview-manual.mjs, run scripts/verify-manual-render.mjs, then visually inspect its screenshots and all changed pages in both themes and widths.",
+  "scope": "React server rendering and source assertions passed; these do not establish pixel layout, browser interaction, or hosted workflow correctness."
+}

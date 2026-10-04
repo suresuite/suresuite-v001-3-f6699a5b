@@ -1,0 +1,2 @@
+customer_id,name,segment,priority_weight,sla_fill_floor_pct
+C-ASSEMBLY,Assembly customer,standard,1,95

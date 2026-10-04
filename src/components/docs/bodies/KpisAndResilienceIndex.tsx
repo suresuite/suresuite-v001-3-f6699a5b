@@ -13,7 +13,7 @@ type Kpi = { name: string; symbol: string; unit: string; definition: string };
 const WHY: Record<string, string> = {
   fill_rate: "The headline service measure. Weighted by value, so missing an expensive product hurts more than missing a cheap one.",
   lost_sales_value: "What the unserved demand was worth. The number a commercial reader will ask for first.",
-  cost_of_resilience: "Everything you spent to be resilient — extra stock, backup suppliers, expediting, overtime — in one figure, so protection can be compared against what it costs.",
+  cost_of_resilience: "The engine-defined sum of resilience-cost components, including lost-sales cost. Review the components before treating it as extra cash expenditure.",
   delta_cost: "How much a strategy changed the cost of resilience, against the baseline.",
   delta_revenue: "How much it changed revenue, against the baseline. Read with delta_cost, never alone.",
   ttr_weeks: "Time to recover: how long until the chain is working normally again after a shock.",
@@ -40,11 +40,20 @@ export default function KpisAndResilienceIndex() {
           each one is the engine's own, read from its export rather than restated.
         </Key>
         <P>
-          The archived manual carried hand-copied KPI definitions and they drifted. This page cannot
-          — a measure added, renamed or redefined in the engine changes here with nobody editing it.
+          The definitions below come from the committed engine registry export. Regeneration checks help keep the reference aligned; the run record identifies which engine actually produced your result.
         </P>
       </Section>
 
+
+      <Section id="window-and-availability" title="Window, units and availability">
+        <P>Ordinary run KPIs use the engine's analysis window after warm-up, not necessarily the whole requested horizon. Fill rate is fulfilled value divided by demand value; higher is better, and no demand produces an unavailable measure. Lost sales and resilience costs are monetary amounts; lower is generally better when the service comparison is held fixed. Inventory is averaged over the window. Utilization has no universally preferred direction.</P>
+        <P>The registry also defines library measures that ordinary application runs do not emit. In particular, the Resilience Index below is calculated by the engine's stress-battery library, not the standard Results dashboard.</P>
+      </Section>
+      <Section id="index-formula" title="Resilience Index: formula and worked arithmetic">
+        <P>RI = 100 × [0.35(1 − L) + 0.25(1 − R) + 0.15S + 0.25(1 − C)]. L is service-loss area divided by window weeks; R is recovery weeks divided by window weeks; S is survival weeks divided by window weeks; C is resilience cost divided by clean-baseline revenue. Each normalized component is clipped to [0, 1]. The implementation guards the window denominator with at least 1 and revenue with at least 10⁻⁹.</P>
+        <P>Illustrative arithmetic only: a 20-week window, service-loss area 2, recovery time 4, survival time 3 and cost 10 against clean revenue 100 give L=0.10, R=0.20, S=0.15 and C=0.10. The default weighted score is 76.25. These are invented teaching inputs, not a simulation result.</P>
+        <P>Weights sum to one; their choice encodes priorities. Changing the window, clean baseline or weights changes the meaning of the score. Compare underlying measures alongside it. A near-zero clean revenue makes the guarded ratio numerically defined but economically difficult to interpret.</P>
+      </Section>
       <Section id="three-as-regions" title="Three of them are shapes, not numbers">
         <P>
           <Term>ttr_weeks</Term>, <Term>tts_weeks</Term> and <Term>service_loss_area</Term> are

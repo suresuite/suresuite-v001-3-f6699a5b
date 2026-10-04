@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 324" aria-hidden="true">
+<text x="12" y="18" font-size="13" fill="hsl(var(--foreground))">Execution and control boundaries</text>
+<rect x="8" y="32" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="47" font-size="12" fill="hsl(var(--foreground))">React interface</text>
+<text x="18" y="62" font-size="11" fill="hsl(var(--foreground))">Project Manager · Policies · Simulation Lab</text>
+<text x="18" y="77" font-size="11" fill="hsl(var(--foreground))">Browser controls guide the workflow.</text>
+<path d="M160 84v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="101" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="116" font-size="12" fill="hsl(var(--foreground))">Supabase control plane</text>
+<text x="18" y="131" font-size="11" fill="hsl(var(--foreground))">Edge requests · RPCs · stored versions</text>
+<text x="18" y="146" font-size="11" fill="hsl(var(--foreground))">Authorization must hold at each boundary.</text>
+<path d="M160 153v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="170" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="185" font-size="12" fill="hsl(var(--foreground))">Worker or local execution</text>
+<text x="18" y="200" font-size="11" fill="hsl(var(--foreground))">Frozen data + policies + scenario</text>
+<text x="18" y="215" font-size="11" fill="hsl(var(--foreground))">Shared mapping into scsim</text>
+<path d="M160 222v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="239" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="254" font-size="12" fill="hsl(var(--foreground))">scsim → result records</text>
+<text x="18" y="269" font-size="11" fill="hsl(var(--foreground))">Weekly simulation and replication KPIs</text>
+<text x="18" y="284" font-size="11" fill="hsl(var(--foreground))">Version bindings and notes support review.</text>
+</svg>

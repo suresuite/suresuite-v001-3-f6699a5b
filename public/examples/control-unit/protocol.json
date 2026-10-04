@@ -1,0 +1,42 @@
+{
+  "project_model": "Make-To-Order",
+  "scenario": {
+    "horizon_days": 455,
+    "time_step": "week",
+    "replications": 3,
+    "seed": 42,
+    "crn": true,
+    "warmup_mode": "manual",
+    "warmup_days": 56,
+    "primary_kpi": "fill_rate",
+    "disruption_schedule": []
+  },
+  "policy_snapshot": {
+    "schema_version": 2,
+    "fulfillment_strategy": "Make-To-Order",
+    "defaults": {
+      "inventory": {
+        "type": "min_max",
+        "coverage_weeks": 2,
+        "safety_stock_method": "fixed_days",
+        "safety_stock_days": 0
+      },
+      "fulfillment": {
+        "backorder_allowed": false
+      }
+    },
+    "overrides": []
+  },
+  "event": {
+    "target_type": "node",
+    "target": "supplier:S-BOARD",
+    "start_day": 112,
+    "duration_days": 28,
+    "magnitude_pct": 80
+  },
+  "response": {
+    "family": "inventory",
+    "field": "safety_stock_days",
+    "value": 28
+  }
+}
