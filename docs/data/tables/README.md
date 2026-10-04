@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-76 of 93 tables are covered,
-995 columns in all. A table that is not here is listed
+77 of 94 tables are covered,
+1008 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -74,6 +74,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`run_usage`](run_usage.md) | 5 | `engine` | 9 | One capacity event of one run: its reservation when it was dispatched (`dispatch`), what it actually used when it finished (`complete`), or the release of its series storage when the sweep expired them (`expire`). The ledger a month's compute is read from. |
 | [`scenario_templates`](scenario_templates.md) | 4 | `engine` | 15 | One shipped starting point for a scenario: a named disruption shape with its schedule, its suggested playbook and the run settings that go with it. A template is not a scenario — applying one WRITES a scenario, and the two diverge from that moment. |
 | [`scenarios`](scenarios.md) | 4 | `engine` | 23 | One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole. |
+| [`sim_engine_builds`](sim_engine_builds.md) | reference | `engine` | 13 | One row per engine build that produced a result or was reported running, keyed by (engine, code_version). Append-only: `last_seen_at` moves forward, a part the row did not know is filled once, and a build found wrong is WITHDRAWN with a reason, never deleted. The CURRENT build is not stored here — it is `sim_engines.code_version`, which the worker's boot report authors. |
 | [`sim_engines`](sim_engines.md) | reference | `engine` | 9 | One row per simulation engine the platform knows: whether dispatch may use it (`status`) and which build the worker last reported running. scsim is the one active engine; the legacy worker engine is registered RETIRED — it stays frozen (CLAUDE.md's standing law) and is never offered. A run row names its engine (`simulation_runs.engine_id`) and the build is part of its RunKey. |
 | [`simulation_cache`](simulation_cache.md) | 5 | `engine` | 13 | One cached payload of the RETIRED batch pipeline, per project and cache key: baseline data, scenario data, network analysis or risk factors that the legacy `simulation-cache-manager` stored with a time-to-live so the next legacy run could skip recomputing it. Tier 5 — derived, disposable, input to nothing that still runs. DORMANT IN THE REPOSITORY: no code in `src/`, `supabase/functions/`, `sim-worker/` or `scsim/` reads or writes it. The current product's cache is a different mechanism entirely — `analysis_get_or_start` keyed on the graph hash, and the run reuse that `simulation_runs` performs. |
 | [`simulation_job_magnitudes`](simulation_job_magnitudes.md) | 5 | `engine` | 13 | One disruption effect as one legacy job actually applied it: the job, the legacy disruption profile, the effect type, and the magnitude and unit used — with whether that magnitude came from the stored profile or from a slider the user had moved. It was the legacy pipeline's record of "what was this run told", written beside each `simulation_jobs` row. Tier 5 — run bookkeeping, input to nothing. DORMANT IN THE REPOSITORY: no code in `src/`, `supabase/functions/`, `sim-worker/` or `scsim/` reads or writes it. |
@@ -91,4 +92,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `4c80c3d64438`, engine `0.6.1`.*
+*Generated from data contract `9313436a6d19`, engine `0.6.1`.*

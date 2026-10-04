@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import threading
+import os
 import time
 from typing import Any, Callable
 
@@ -81,11 +82,22 @@ def engine_report_payload(scsim_on: bool) -> dict[str, Any]:
     if scsim_on:
         from scsim import ENGINE_VERSION
 
-        from sim_worker.build import code_version
+        from sim_worker.build import code_version, engine_build
 
         # WP 15.1 · §4 D292 — the build, by content (`scsim-0.6.1+<digest>`).
+        # WP 15.2 · §4 D291 — and its parts, for the build ledger. The commit and
+        # image are the deploy's (`GIT_SHA` is a build arg, `FLY_IMAGE_REF` is set
+        # by Fly); absent, the ledger records them as unknown rather than guessed.
+        b = engine_build()
+        build = {
+            "scsim_digest": b["scsim_digest"],
+            "sim_worker_digest": b["sim_worker_digest"],
+            "commit": (os.environ.get("GIT_SHA") or "").strip().lower() or None,
+            "image_digest": (os.environ.get("FLY_IMAGE_REF") or "").strip() or None,
+        }
         return {"p_slug": "scsim", "p_version": ENGINE_VERSION,
-                "p_code_version": code_version(), "p_capabilities": None}
+                "p_code_version": code_version(), "p_capabilities": None,
+                "p_build": {k: v for k, v in build.items() if v}}
     return {"p_slug": "legacy-worker", "p_version": None,
             "p_code_version": "worker-legacy", "p_capabilities": None}
 
@@ -869,15 +881,20 @@ class SimWorker:
         fatal: a registry the migration has not reached yet, or a slow PostgREST,
         must not keep the worker from consuming its queue."""
         try:
-            r = await self._http.post(
-                f"{self._supabase_url}/rest/v1/rpc/sim_engine_report",
-                headers={
-                    "apikey": self._service_role_key,
-                    "Authorization": f"Bearer {self._service_role_key}",
-                    "Content-Type": "application/json",
-                },
-                json=engine_report_payload(scsim_enabled()),
-            )
+            url = f"{self._supabase_url}/rest/v1/rpc/sim_engine_report"
+            headers = {
+                "apikey": self._service_role_key,
+                "Authorization": f"Bearer {self._service_role_key}",
+                "Content-Type": "application/json",
+            }
+            payload = engine_report_payload(scsim_enabled())
+            r = await self._http.post(url, headers=headers, json=payload)
+            if r.status_code == 404 and "p_build" in payload:
+                # WP 15.2 — the deploy window: this worker can be live before the
+                # migration that adds `p_build`. Report the build without its parts
+                # rather than not at all; the next boot fills them (filled once).
+                payload = {k: v for k, v in payload.items() if k != "p_build"}
+                r = await self._http.post(url, headers=headers, json=payload)
             if r.status_code >= 300:
                 log.warning("engine report failed %s %s", r.status_code, r.text)
         except Exception:

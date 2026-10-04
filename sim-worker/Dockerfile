@@ -7,6 +7,12 @@
 # (CI does exactly this — see .github/workflows/deploy-sim-worker.yml.)
 FROM python:3.12-slim
 
+# PLAN.md §25 · WP 15.2/15.3 — the commit this image was built from. The worker
+# reports it with its build (`sim_engine_report` p_build), so the engine build
+# ledger knows which deploy first ran each build. Empty outside CI.
+ARG GIT_SHA=""
+ENV GIT_SHA=${GIT_SHA}
+
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

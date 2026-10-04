@@ -207,7 +207,9 @@ BEGIN
   END IF;
   IF has_function_privilege('anon', 'public.create_simulation_run(jsonb,boolean,boolean,uuid)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.create_simulation_run(jsonb,boolean,boolean,uuid)', 'EXECUTE')
-     OR has_function_privilege('anon', 'public.sim_engine_report(text,text,text,jsonb)', 'EXECUTE') THEN
+     OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.proname = 'sim_engine_report' AND p.pronamespace = 'public'::regnamespace
+                -- any signature: WP 15.2 (`20261004000001`) added `p_build`
+                AND has_function_privilege('anon', p.oid, 'EXECUTE')) THEN
     RAISE EXCEPTION 'R590 §7: a service-only RPC is executable through the API';
   END IF;
   IF NOT has_function_privilege('service_role', 'public.create_simulation_run(jsonb,boolean,boolean,uuid)', 'EXECUTE') THEN

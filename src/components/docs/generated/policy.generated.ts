@@ -3964,7 +3964,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 76,
+  "described": 77,
   "open": [
     {
       "table": "analysis_kinds",
@@ -4149,6 +4149,13 @@ export const READ_EXPOSURE: ReadExposure = {
       ]
     },
     {
+      "table": "sim_engine_builds",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
       "table": "sim_engines",
       "roles": [
         "anon",
@@ -4196,6 +4203,7 @@ export const READ_EXPOSURE: ReadExposure = {
     "run_item_series",
     "run_replications",
     "scenarios",
+    "sim_engine_builds",
     "sim_engines",
     "simulation_runs",
     "suppliers"

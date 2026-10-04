@@ -70,12 +70,14 @@ jobs:
 
       # Repo-root build context: the Dockerfile COPYs both sim-worker/ and
       # scsim/ (see sim-worker/Dockerfile). Config + Dockerfile are passed
-      # explicitly since neither lives at the context root.
+      # explicitly since neither lives at the context root. GIT_SHA names the
+      # commit the image is built from, for the engine build ledger (PLAN.md §25).
       - name: Deploy
         run: |
           flyctl deploy . --remote-only --app "$FLY_APP" \
             --config sim-worker/fly.toml \
-            --dockerfile sim-worker/Dockerfile
+            --dockerfile sim-worker/Dockerfile \
+            --build-arg GIT_SHA=${{ github.sha }}
 
       # A rolling update leaves machines in their prior state — a machine that
       # crashed out before the deploy stays "stopped" and consumes nothing.

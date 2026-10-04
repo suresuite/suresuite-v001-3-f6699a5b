@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "4c80c3d64438";
+export const CONTRACT_VERSION = "9313436a6d19";
 export const ENGINE_VERSION = "0.6.1";
-export const LAST_MIGRATION = "20261003000002_fg_policy_per_product.sql";
+export const LAST_MIGRATION = "20261004000001_engine_build_ledger.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 93,
-  "tablesDescribed": 76,
-  "columnsDescribed": 995,
+  "tablesInSchema": 94,
+  "tablesDescribed": 77,
+  "columnsDescribed": 1008,
   "tablesUndescribed": 17
 } as const;
 
@@ -533,6 +533,12 @@ export const TIERS: GlanceTier[] = [
         "grain": "One country's current risk class, as one named publisher graded it in one named edition. NOT project-scoped: two projects sourcing from the same country see the same row, which is the point — a per-project copy drifts.",
         "columns": 9,
         "owner": "reference-data"
+      },
+      {
+        "table": "sim_engine_builds",
+        "grain": "One row per engine build that produced a result or was reported running, keyed by (engine, code_version). Append-only: `last_seen_at` moves forward, a part the row did not know is filled once, and a build found wrong is WITHDRAWN with a reason, never deleted. The CURRENT build is not stored here — it is `sim_engines.code_version`, which the worker's boot report authors.",
+        "columns": 13,
+        "owner": "engine"
       },
       {
         "table": "sim_engines",
