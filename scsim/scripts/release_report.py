@@ -98,6 +98,11 @@ def _changelog():
 
 
 def reference_cases() -> dict[str, dict]:
+    # The worker is not an installed package in CI — its own tests import it from
+    # the sim-worker/ directory — and running this script puts scripts/ first on
+    # the path, not the working directory. Say where it is, as its tests do.
+    if str(WORKER) not in sys.path:
+        sys.path.insert(0, str(WORKER))
     g = _load("golden_runs", WORKER / "tests" / "test_golden_runs.py")
     return {name: {"dataset": ds, "policy": pol, "scenario": {**sc, "replications": REPLICATIONS}}
             for name, (ds, pol, sc) in sorted(g.CASES.items())}
