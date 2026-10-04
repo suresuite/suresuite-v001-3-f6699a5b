@@ -111,7 +111,7 @@ describe("the figure files", () => {
       // A slot pointing at a file that is not there is an OPEN slot, and the
       // page says so. What must not happen is a slot pointing at a file that
       // IS there under a name the glob will not match.
-      if (!files.includes(s.file)) continue;
+
       expect(files, `slot "${s.id}"`).toContain(s.file);
     }
   });
@@ -134,7 +134,7 @@ describe("the pages that carry figures", () => {
     //
     // It renders the body now and looks for the slot's own anchor, which
     // `DocFigure` writes as `figure-<id>` on the `<figure>` element whether the
-    // slot is filled, falling back, or an empty placeholder. So this fails for
+    // slot is filled or falling back. Unfilled authoring slots stay hidden. So this fails for
     // a slot no page asks for, and keeps passing while a figure is still being
     // drawn — which is the asymmetry the rest of this file is built on.
     const pages = [...new Set(FIGURE_SLOTS.map((s) => s.page))];
@@ -154,6 +154,10 @@ describe("the pages that carry figures", () => {
         ),
       );
       for (const s of slotsFor(page)) {
+        if (!s.file) {
+          expect(html).not.toContain(s.shows);
+          continue;
+        }
         expect(
           html.includes(`figure-${s.id}`),
           `slot "${s.id}" is declared on "${page}" and that page renders no <DocFigure id="${s.id}" />. ` +

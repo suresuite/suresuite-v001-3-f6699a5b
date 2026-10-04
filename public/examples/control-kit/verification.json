@@ -1,0 +1,338 @@
+{
+  "verification_scope": "Local worker mapper and scsim; CSV parsing and promotion are separate checks. No production run.",
+  "runs": {
+    "baseline": {
+      "engine_version": "0.6.1",
+      "engine_build": "scsim-0.6.1+77b8c27865c3",
+      "n_reps": 2,
+      "below_replication_floor": true,
+      "mapping_warnings": [
+        {
+          "level": "info",
+          "entity": "scenario",
+          "field": "analysis_window",
+          "reason": "52 wk is outside the engine range [13, 39] wk \u2192 39 wk used"
+        },
+        {
+          "level": "info",
+          "entity": "policy:inventory_control",
+          "field": "order_up_to",
+          "reason": "project-wide s/S are the formulas s = E[D]\u00b7T_s, S = E[D]\u00b7(T_s+\u03ba); a supplier-grid row's absolute s/S IS that material's level, with no safety stock added on top"
+        },
+        {
+          "level": "info",
+          "entity": "policy:safety_stock_materials",
+          "field": "safety_stock_days",
+          "reason": "2 material(s) carry a Supplier-stage safety-stock days value \u2014 applied per material, over the project-wide method"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.cost",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.initial_on_hand",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.moq",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_cv",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_mean",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.production_capacity",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.sell_price",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.capacity_per_week",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.reliability_score",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        }
+      ],
+      "warmup_detected_at": 4,
+      "mean_fill_rate": 1.0,
+      "ci_fill_rate": 0.0,
+      "mean_revenue": 23400.0,
+      "ci_revenue": 0.0,
+      "mean_lost_sales_value": 0.0,
+      "ci_lost_sales_value": 0.0,
+      "mean_cost_of_resilience": 45.0,
+      "ci_cost_of_resilience": 0.0,
+      "mean_max_backlog": 0.0,
+      "ci_max_backlog": 0.0,
+      "mean_lost_inbound_units": 0.0,
+      "ci_lost_inbound_units": 0.0,
+      "mean_avg_on_hand_value": 1300.0,
+      "ci_avg_on_hand_value": 0.0,
+      "mean_avg_fg_value": 0.0,
+      "ci_avg_fg_value": 0.0,
+      "mean_avg_on_hand_units": 130.0,
+      "ci_avg_on_hand_units": 0.0,
+      "mean_avg_fg_units": 0.0,
+      "ci_avg_fg_units": 0.0,
+      "mean_capacity_utilization": 0.6667,
+      "ci_capacity_utilization": 0.0,
+      "mean_supplier_capacity_utilization": 0.5256,
+      "ci_supplier_capacity_utilization": 0.0,
+      "mean_products_capacity_bound": 0.0,
+      "ci_products_capacity_bound": 0.0,
+      "mean_suppliers_capacity_bound": 2.0,
+      "ci_suppliers_capacity_bound": 0.0
+    },
+    "outage": {
+      "engine_version": "0.6.1",
+      "engine_build": "scsim-0.6.1+77b8c27865c3",
+      "n_reps": 2,
+      "below_replication_floor": true,
+      "mapping_warnings": [
+        {
+          "level": "info",
+          "entity": "scenario",
+          "field": "analysis_window",
+          "reason": "52 wk is outside the engine range [13, 39] wk \u2192 39 wk used"
+        },
+        {
+          "level": "info",
+          "entity": "policy:inventory_control",
+          "field": "order_up_to",
+          "reason": "project-wide s/S are the formulas s = E[D]\u00b7T_s, S = E[D]\u00b7(T_s+\u03ba); a supplier-grid row's absolute s/S IS that material's level, with no safety stock added on top"
+        },
+        {
+          "level": "info",
+          "entity": "policy:safety_stock_materials",
+          "field": "safety_stock_days",
+          "reason": "2 material(s) carry a Supplier-stage safety-stock days value \u2014 applied per material, over the project-wide method"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.cost",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.initial_on_hand",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.moq",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_cv",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_mean",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.production_capacity",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.sell_price",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.capacity_per_week",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.reliability_score",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        }
+      ],
+      "warmup_detected_at": 4,
+      "mean_fill_rate": 0.9744,
+      "ci_fill_rate": 0.0,
+      "mean_revenue": 22800.0,
+      "ci_revenue": 0.0,
+      "mean_lost_sales_value": 600.0,
+      "ci_lost_sales_value": 0.0,
+      "mean_cost_of_resilience": 645.0,
+      "ci_cost_of_resilience": 0.0,
+      "mean_max_backlog": 0.0,
+      "ci_max_backlog": 0.0,
+      "mean_lost_inbound_units": 0.0,
+      "ci_lost_inbound_units": 0.0,
+      "mean_ttr_weeks": 4.0,
+      "ci_ttr_weeks": 0.0,
+      "mean_tts_weeks": 3.0,
+      "ci_tts_weeks": 0.0,
+      "mean_avg_on_hand_value": 1246.1538,
+      "ci_avg_on_hand_value": 0.0,
+      "mean_avg_fg_value": 0.0,
+      "ci_avg_fg_value": 0.0,
+      "mean_avg_on_hand_units": 127.6923,
+      "ci_avg_on_hand_units": 0.0,
+      "mean_avg_fg_units": 0.0,
+      "ci_avg_fg_units": 0.0,
+      "mean_capacity_utilization": 0.6496,
+      "ci_capacity_utilization": 0.0,
+      "mean_supplier_capacity_utilization": 0.5128,
+      "ci_supplier_capacity_utilization": 0.0,
+      "mean_products_capacity_bound": 0.0,
+      "ci_products_capacity_bound": 0.0,
+      "mean_suppliers_capacity_bound": 2.0,
+      "ci_suppliers_capacity_bound": 0.0
+    },
+    "buffer": {
+      "engine_version": "0.6.1",
+      "engine_build": "scsim-0.6.1+77b8c27865c3",
+      "n_reps": 2,
+      "below_replication_floor": true,
+      "mapping_warnings": [
+        {
+          "level": "info",
+          "entity": "scenario",
+          "field": "analysis_window",
+          "reason": "52 wk is outside the engine range [13, 39] wk \u2192 39 wk used"
+        },
+        {
+          "level": "info",
+          "entity": "policy:inventory_control",
+          "field": "order_up_to",
+          "reason": "project-wide s/S are the formulas s = E[D]\u00b7T_s, S = E[D]\u00b7(T_s+\u03ba); a supplier-grid row's absolute s/S IS that material's level, with no safety stock added on top"
+        },
+        {
+          "level": "info",
+          "entity": "policy:safety_stock_materials",
+          "field": "safety_stock_days",
+          "reason": "2 material(s) carry a Supplier-stage safety-stock days value \u2014 applied per material, over the project-wide method"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.cost",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.initial_on_hand",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "materials.moq",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_cv",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.demand_mean",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.production_capacity",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "products.sell_price",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 1"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.capacity_per_week",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        },
+        {
+          "level": "info",
+          "entity": "source",
+          "field": "suppliers.reliability_score",
+          "reason": "value sources (override \u2192 item master \u2192 lanes \u2192 default): master 2"
+        }
+      ],
+      "warmup_detected_at": 4,
+      "mean_fill_rate": 1.0,
+      "ci_fill_rate": 0.0,
+      "mean_revenue": 23400.0,
+      "ci_revenue": 0.0,
+      "mean_lost_sales_value": 0.0,
+      "ci_lost_sales_value": 0.0,
+      "mean_cost_of_resilience": 135.0,
+      "ci_cost_of_resilience": 0.0,
+      "mean_max_backlog": 0.0,
+      "ci_max_backlog": 0.0,
+      "mean_lost_inbound_units": 0.0,
+      "ci_lost_inbound_units": 0.0,
+      "mean_ttr_weeks": 0.0,
+      "ci_ttr_weeks": 0.0,
+      "mean_avg_on_hand_value": 1848.7179,
+      "ci_avg_on_hand_value": 0.0,
+      "mean_avg_fg_value": 0.0,
+      "ci_avg_fg_value": 0.0,
+      "mean_avg_on_hand_units": 157.4359,
+      "ci_avg_on_hand_units": 0.0,
+      "mean_avg_fg_units": 0.0,
+      "ci_avg_fg_units": 0.0,
+      "mean_capacity_utilization": 0.6667,
+      "ci_capacity_utilization": 0.0,
+      "mean_supplier_capacity_utilization": 0.5128,
+      "ci_supplier_capacity_utilization": 0.0,
+      "mean_products_capacity_bound": 0.0,
+      "ci_products_capacity_bound": 0.0,
+      "mean_suppliers_capacity_bound": 2.0,
+      "ci_suppliers_capacity_bound": 0.0
+    }
+  }
+}

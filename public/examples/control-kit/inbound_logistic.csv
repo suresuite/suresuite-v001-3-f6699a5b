@@ -1,0 +1,3 @@
+supplier_id,material_id,volume,time_unit,lead_time,lead_time_unit,unit_price
+S-BOARD,M-BOARD,10,weekly,1,weeks,20
+S-CASE,M-CASE,20,weekly,1,weeks,5

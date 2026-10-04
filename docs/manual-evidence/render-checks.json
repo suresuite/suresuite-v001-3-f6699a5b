@@ -1,0 +1,110 @@
+[
+  {
+    "slug": "your-first-project",
+    "mode": "desktop-light",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "figures": 2,
+    "title": "Your first project",
+    "errors": []
+  },
+  {
+    "slug": "your-first-project",
+    "mode": "desktop-dark",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "figures": 2,
+    "title": "Your first project",
+    "errors": []
+  },
+  {
+    "slug": "your-first-project",
+    "mode": "mobile-light",
+    "width": 390,
+    "scrollWidth": 390,
+    "figures": 2,
+    "title": "Your first project",
+    "errors": []
+  },
+  {
+    "slug": "your-first-project",
+    "mode": "mobile-dark",
+    "width": 390,
+    "scrollWidth": 390,
+    "figures": 2,
+    "title": "Your first project",
+    "errors": []
+  },
+  {
+    "slug": "uploading-data",
+    "mode": "desktop-light",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "figures": 1,
+    "title": "Uploading data",
+    "errors": []
+  },
+  {
+    "slug": "uploading-data",
+    "mode": "desktop-dark",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "figures": 1,
+    "title": "Uploading data",
+    "errors": []
+  },
+  {
+    "slug": "uploading-data",
+    "mode": "mobile-light",
+    "width": 390,
+    "scrollWidth": 390,
+    "figures": 1,
+    "title": "Uploading data",
+    "errors": []
+  },
+  {
+    "slug": "uploading-data",
+    "mode": "mobile-dark",
+    "width": 390,
+    "scrollWidth": 390,
+    "figures": 1,
+    "title": "Uploading data",
+    "errors": []
+  },
+  {
+    "slug": "how-your-data-flows",
+    "mode": "desktop-light",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "figures": 1,
+    "title": "How your data flows",
+    "errors": []
+  },
+  {
+    "slug": "how-your-data-flows",
+    "mode": "desktop-dark",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "figures": 1,
+    "title": "How your data flows",
+    "errors": []
+  },
+  {
+    "slug": "how-your-data-flows",
+    "mode": "mobile-light",
+    "width": 390,
+    "scrollWidth": 390,
+    "figures": 1,
+    "title": "How your data flows",
+    "errors": []
+  },
+  {
+    "slug": "how-your-data-flows",
+    "mode": "mobile-dark",
+    "width": 390,
+    "scrollWidth": 390,
+    "figures": 1,
+    "title": "How your data flows",
+    "errors": []
+  }
+]

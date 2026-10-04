@@ -614,6 +614,26 @@ engine derives from tier 2 by its own rules.
 
 ---
 
+### 4.9 Documentation onboarding review — 2026-10-04
+
+Initial source baseline: `32aa35b8f4f525ce9c75c49685d0866803840af3`; refreshed against `9accfc898cdee27e3d6f6d7c9d77bf69a64c396e` before publication. Upstream additions to model planning periods, version labels and engine build identity are preserved; the sample was rerun against the refreshed compute path. This is a source and isolated local execution review, not deployment certification. The following evidence owns the claims in the first-project, uploading-data and data-flow revisions.
+
+| Claim / boundary | Implementation evidence | Verification |
+|---|---|---|
+| Project creation fields; ready badge is core dataset presence | `src/pages/DataManager.tsx`: creation form and project status calculation | Source inspection; tutorial render |
+| Preview, landing, review and promotion are separate; dataset exceptions exist | `src/components/UploadWizard.tsx`: templateTypes, parseOnServer, handleUpload; `src/components/ingest/IngestRunReview.tsx` | Source inspection; sample parser/validator tests; no live promotion |
+| CSV dialect, numeric values and dataset constraints | `supabase/functions/_shared/csvParse.ts`, `ingestValidate.ts`, `ingestSpec.generated.ts` | Seven real CSV fixtures through parser and generated validator; cross-file ID/BOM assertions |
+| Promotion upserts natural keys, recomputes the current diff and checks role against supplied actor | `supabase/migrations/20260917000001_diff_before_promotion.sql`: ingest_apply_run; `20260919000001_customers_land.sql`: promotion plan; `20261003000001_demand_per_row.sql`: target extensions | Source inspection; no database rehearsal |
+| Review text overstates stale-review protection | `src/components/ingest/IngestRunReview.tsx` footer vs ingest_apply_run above: current diff/write counts are compared, not a token binding the previously reviewed values | Unresolved product wording; guide asks users to recompare when data may have changed |
+| Caller identity binding needs separate security review | `supabase/functions/ingest-file/index.ts`: form user_id, service-role client, forwarded _actor_user_id; `supabase/config.toml`: functions.ingest-file verify_jwt=true | Handler does not itself bind asserted user_id to a verified application session. Platform JWT verification is enabled; its deployed caller-token contract and exploitability were NOT tested. Do not equate project-role checks on a claimed actor with proof of caller identity. No auth changes in this batch |
+| Safety-stock field uses days; explicit material levels and field-specific resolution matter | `src/lib/policies/columnSpecs.ts`; `scsim/scsim/io/project_map.py`: _supplier_row_values, _map_policies | Local baseline/outage/buffer runs through actual mapper |
+| Validated model is distinct from draft policy and saved policy version | `src/components/policies/RunValidateStage.tsx`; StagePolicyTable save actions; SimulationLab model selection | Source inspection; tutorial names actual validation controls; live adoption workflow unexecuted |
+| Scenario and event UI uses weeks; persisted scenario values use days | `src/components/sim/ScenarioSetupForm.tsx`; `DisruptionScheduleEditor.tsx`; `scsim/scsim/io/project_map.py`: _map_events, _map_settings | Tutorial corrected to weekly control values; source inspection |
+| Local sample engine results and analysis window | `sim-worker/sim_worker/datamap.py`: build_project_data; `sim-worker/sim_worker/scsim_bridge.py`: compute_run_from_project; `scsim/scsim/io/project_map.py`: from_project_data, _map_settings; `scsim/scsim/kpi/compute.py`: KPI window | Six completed local deterministic replications; 52-week horizon, 4-week warm-up, 39-week analysis window; outputs and warnings in sample verification.json |
+| Unfinished figure briefs must stay out of published DOM | `src/components/docs/DocFigure.tsx`, figureManifest.ts | docs figure tests; 12 local rendered combinations; missing named assets fail |
+
+Gap check: three page bodies are complete for this batch, not the entire manual. Field-by-field policies, all three network views, full KPI/Resilience Index derivation, roles and API first request remain for later batches. The page checklist and rendered evidence are in [manual-improvement-status.md](manual-improvement-status.md). No generated table or engine reference was hand-edited.
+
 ## 5. The transparency standard
 
 **Non-negotiable.** Every WP is measured against it.
@@ -23756,6 +23776,12 @@ call, and that the period does not move `model_hash`. **Named limits:** the Lab'
 mint one new scenario per existing model; the snapshot (`dataset_versions`) keeps `vN`, shown
 only on hover; a deleted code can be re-issued once EVERY code of its day is gone; and production
 has not seen the migration — the after-reading belongs to the push after the merge (D153).
+
+### 2026-10-04 — Documentation onboarding implementation batch
+
+The previous manual had first-project/upload/lifecycle bodies and a figure manifest, but did not provide a connected downloadable worked example or a locally executed comparison. This batch rewrites those three bodies, adds four reader entry questions, supplies seven synthetic CSVs and real local mapper/engine output, replaces the lifecycle figure and adds three teaching diagrams. Unfilled figure briefs no longer publish authoring instructions. Routes, access filters, generated references and production behavior are preserved.
+
+The gap check found two important distinctions: the scenario interface asks for weeks while stored settings use days; promotion re-diffs current inputs but does not bind writes to a previously reviewed snapshot. The latter product wording and an asserted-actor identity-binding concern are recorded in §4.9 without changing permissions. Full desktop/mobile and light/dark body rendering passed in 12 combinations. Signed-in upload, validation adoption, queue persistence and comparison remain unverified. See the batch status report for commands, observed results, screenshots and the exact remaining page checklist. The next batch should extend the same example through the three network levels and verify policy resolution field by field; later batches cover simulation/results/trust and roles/API/developer onboarding.
 
 ## 17. Sequencing
 
