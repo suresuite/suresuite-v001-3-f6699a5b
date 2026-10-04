@@ -54,23 +54,30 @@ def from_source() -> dict[str, str]:
     return _result(version, s, w)
 
 
-def _wheel_sources(path: Path, package: str, modules=None) -> list[tuple[str, bytes]]:
+def _wheel_sources(path: Path, package: str, modules=None, lenient: bool = False) -> list[tuple[str, bytes]]:
     with zipfile.ZipFile(path) as z:
         names = [n for n in z.namelist() if n.startswith(f"{package}/") and n.endswith(".py")]
         if modules is not None:
             wanted = {f"{package}/{m.replace('.', '/')}.py" for m in modules}
             missing = wanted - set(names)
-            if missing:
+            if missing and not lenient:
                 raise SystemExit(f"{path.name} lacks {', '.join(sorted(missing))}")
-            names = sorted(wanted)
+            names = sorted(wanted & set(names))
         return [(n, z.read(n)) for n in names]
 
 
-def from_wheels(scsim_whl: Path, worker_whl: Path) -> dict[str, str]:
+def from_wheels(scsim_whl: Path, worker_whl: Path, lenient: bool = False) -> dict[str, str]:
+    """A build's name from its two wheels.
+
+    ``lenient`` names a HISTORIC wheel set (WP 15.3's backfill): one built before
+    some of today's compute-path modules existed is named by the ones it has. The
+    name is then an identity for the archive, not something any run recorded —
+    `publish_engine_wheels.mjs` marks such an entry `named_retroactively`.
+    """
     s_items = _wheel_sources(scsim_whl, "scsim")
     init = dict(s_items)["scsim/__init__.py"].decode()
     s = BUILD.digest_files(s_items)
-    w = BUILD.digest_files(_wheel_sources(worker_whl, "sim_worker", WORKER_BUILD.COMPUTE_MODULES))
+    w = BUILD.digest_files(_wheel_sources(worker_whl, "sim_worker", WORKER_BUILD.COMPUTE_MODULES, lenient))
     return _result(_version_from(init), s, w)
 
 
@@ -88,11 +95,12 @@ def main(argv=None) -> int:
     ap.add_argument("wheels", nargs="*", type=Path)
     ap.add_argument("--source", action="store_true")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--lenient", action="store_true", help="name a historic wheel set by the compute modules it has")
     a = ap.parse_args(argv)
     if a.source:
         r = from_source()
     elif len(a.wheels) == 2:
-        r = from_wheels(*a.wheels)
+        r = from_wheels(*a.wheels, lenient=a.lenient)
     else:
         ap.error("give --source, or the scsim and sim_worker wheels")
     print(json.dumps(r, indent=2) if a.json else r["code_version"])

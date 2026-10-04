@@ -15,6 +15,8 @@ on:
     paths:
       - "public/engine/**"
       - "scripts/publish_engine_wheels.mjs"
+      - "scripts/engine_build_id.py"
+      - "scsim/CHANGELOG.yaml"
       - ".github/workflows/engine-distribution.yml"
   workflow_dispatch:
 
@@ -26,10 +28,17 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # PLAN.md §25 · WP 15.3 — `contents: write` for the engine-v<version> tags only.
+    permissions:
+      contents: write
     env:
       PROJECT_REF: wckdrutwkytwcomrlpib
     steps:
       - uses: actions/checkout@v4
+        with:
+          # WP 15.3 — the backfill publishes every wheel set in `public/engine/`'s
+          # history, and the tags resolve each version's commit: both need it all.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -37,6 +46,29 @@ jobs:
 
       - name: The index the wheels produce
         run: node scripts/publish_engine_wheels.mjs --dry-run
+
+      # PLAN.md §25 · WP 15.3 · §4 D294 — every version gets a tag at the commit that
+      # set it, read from scsim/CHANGELOG.yaml. A tag that already exists is NEVER
+      # moved: if it points elsewhere, say so and leave it (a moved tag would make
+      # "engine 0.4.0" mean two things).
+      - name: The change record's reader (PyYAML) for the tag step
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: Tag every engine version (engine-v<version>, never moved)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          new=0
+          while read -r tag sha; do
+            if have=$(git rev-parse -q --verify "refs/tags/$tag^{commit}"); then
+              [ "$have" = "$sha" ] || echo "::warning::$tag points at ${have:0:12}, the change record says ${sha:0:12} — not moved"
+              continue
+            fi
+            git tag -a "$tag" "$sha" -m "scsim engine ${tag#engine-v} (scsim/CHANGELOG.yaml)"
+            new=$((new + 1))
+          done < <(python3 scsim/scripts/engine_changelog.py tags)
+          if [ "$new" -gt 0 ]; then git push origin --tags; fi
+          echo "$new new engine tag(s)"
 
       - name: Resolve the service-role key (masked)
         env:
@@ -52,4 +84,7 @@ jobs:
       - name: Publish to the private engine bucket
         env:
           SUPABASE_URL: https://${{ env.PROJECT_REF }}.supabase.co
-        run: node scripts/publish_engine_wheels.mjs
+        # --backfill: every committed wheel set is published as the build it is
+        # (content-addressed, a file already there is skipped), so versions.json
+        # lists every build ever shipped — WP 15.3.
+        run: node scripts/publish_engine_wheels.mjs --backfill

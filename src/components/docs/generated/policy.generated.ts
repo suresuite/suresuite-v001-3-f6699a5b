@@ -2296,6 +2296,12 @@ export const API_ERRORS: ApiErrorCode[] = [
     "sites": 1
   },
   {
+    "code": "engine_version_not_published",
+    "status": 404,
+    "message": "engine ${wanted} was never published; published versions: ${publishedVersions(versions).join(\", \")}",
+    "sites": 1
+  },
+  {
     "code": "key_not_found",
     "status": 404,
     "message": "key not found",

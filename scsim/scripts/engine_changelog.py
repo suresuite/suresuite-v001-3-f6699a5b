@@ -21,6 +21,7 @@ Usage (from ``scsim/``)::
     python scripts/engine_changelog.py check --base auto     # … and rules 2, 3, 6, 7 against the base
     python scripts/engine_changelog.py generate              # (re)write the two views
     python scripts/engine_changelog.py generate --check      # CI: fail on drift
+    python scripts/engine_changelog.py tags                  # `engine-v<version> <sha>`, for CI's tags (WP 15.3)
 
 ``--base auto`` compares against the first parent on ``main`` and against the
 merge base with ``origin/main`` anywhere else; it needs history, so CI checks
@@ -567,6 +568,33 @@ def cmd_generate(check: bool) -> int:
     return 0
 
 
+def version_commit(entry: dict[str, Any]) -> str | None:
+    """The full sha of the commit that set this version: the entry's own, or — for an
+    entry written before its commit existed — the first commit whose ENGINE_VERSION
+    line reads it. None when history cannot say (a shallow clone)."""
+    if entry.get("commit"):
+        r = _git("rev-parse", "--verify", f"{entry['commit']}^{{commit}}")
+        return r.stdout.strip() if r.returncode == 0 else None
+    pattern = f'^ENGINE_VERSION = "{re.escape(entry["version"])}"'
+    r = _git("log", "--reverse", "--format=%H", "-G", pattern, "--", INIT.relative_to(ROOT).as_posix())
+    for sha in r.stdout.split():
+        text = _git("show", f"{sha}:{INIT.relative_to(ROOT).as_posix()}").stdout
+        if text and engine_version_of(text) == entry["version"]:
+            return sha
+    return None
+
+
+def cmd_tags() -> int:
+    """`engine-v<version> <sha>` per entry — what CI tags (WP 15.3), never moving one."""
+    for e in load_entries(CHANGELOG.read_text()):
+        sha = version_commit(e)
+        if sha:
+            print(f"engine-v{e['version']} {sha}")
+        else:
+            print(f"# engine-v{e['version']}: no commit found in this clone", file=sys.stderr)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -574,7 +602,10 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--base", help="git ref to compare with, or 'auto'")
     g = sub.add_parser("generate")
     g.add_argument("--check", action="store_true")
+    sub.add_parser("tags", help="print `engine-v<version> <sha>` for every version (WP 15.3)")
     a = ap.parse_args(argv)
+    if a.cmd == "tags":
+        return cmd_tags()
     return cmd_check(a.base) if a.cmd == "check" else cmd_generate(a.check)
 
 

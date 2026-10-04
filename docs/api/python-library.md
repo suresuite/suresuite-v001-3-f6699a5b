@@ -97,7 +97,7 @@ ss.simulate(ss.with_tables(data, suppliers=sup), pol)
 | `ss.pick_project(api, project_id="")` | The given project, or the first one your key sees |
 | `ss.dataset(api, pid, version="latest")` | A dataset version with its rows; `.tables` gives pandas DataFrames |
 | `ss.policy(api, pid, version="latest")` | A policy version; `.snapshot` is the configuration |
-| `ss.install_engine(api)` / `ss.engine_available()` | Install the engine (sha256-checked) / check it is installed |
+| `ss.install_engine(api, version=None)` / `ss.engine_available()` | Install the engine — the current one, or an earlier version or exact build (sha256-checked) / check it is installed |
 
 **Simulate locally**
 
@@ -142,9 +142,15 @@ When you report a number, keep these with it. Anyone with access to the project 
 pull the same versions and get the same result. Data edited with `with_tables` has no
 `graph_hash` — say so if you report from it.
 
-If a local run does not match the platform, compare `engine_version` with the
-platform run's `code_version`; after a platform upgrade, run `ss.install_engine(api)`
-again.
+If a local run does not match the platform, compare the build your run recorded
+(`run["run"]["code_version"]`, `scsim-<version>+<digest>`) with the platform run's
+`code_version`; after a platform upgrade, run `ss.install_engine(api)` again.
+
+To re-run a stored result on the engine that produced it, install that build:
+`ss.install_engine(api, version=platform_run["code_version"])`, or a version such as
+`version="0.4.0"` for the newest build of it. Every build the platform has published
+stays installable; the list, and what each version changed, is on the
+"Engine versions & changes" page of the manual.
 
 ## Rules and limits
 

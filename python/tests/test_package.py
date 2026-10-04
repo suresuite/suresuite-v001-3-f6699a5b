@@ -97,3 +97,35 @@ def test_the_demo_does_not_hand_out_the_engine(api):
     with pytest.raises(ss.SuReSuiteError) as e:
         api.engine()
     assert e.value.code == "demo_no_engine"
+
+
+def test_install_engine_asks_for_the_version_it_is_given(monkeypatch):
+    # PLAN.md §25 · WP 15.3 — re-run a stored result on the engine that produced it.
+    import hashlib
+
+    body = b"wheel bytes"
+    asked: list = []
+
+    class FakeApi:
+        def engine(self, version=None):
+            asked.append(version)
+            return {"engine_version": "0.4.0", "engine_build": "scsim-0.4.0+aaaaaaaaaaaa",
+                    "wheels": [{"file": "scsim-0.4.0-py3-none-any.whl", "sha256": hashlib.sha256(body).hexdigest(),
+                                "bytes": len(body), "url": "https://example.invalid/w"}]}
+
+    class Resp:
+        content = body
+
+    monkeypatch.setattr(ss.local.requests, "get", lambda *a, **k: Resp())
+    monkeypatch.setattr(ss.local.subprocess, "check_call", lambda cmd: 0)
+    assert ss.install_engine(FakeApi(), version="scsim-0.4.0+aaaaaaaaaaaa") == "0.4.0"
+    assert asked == ["scsim-0.4.0+aaaaaaaaaaaa"]
+
+
+def test_the_client_sends_the_version_as_a_query_parameter(monkeypatch):
+    client = ss.SuReSuite.__new__(ss.SuReSuite)
+    seen = {}
+    monkeypatch.setattr(ss.SuReSuite, "get", lambda self, path, **params: seen.update(path=path, **params) or {})
+    client.engine(version="0.4.0")
+    assert seen == {"path": "/engine", "version": "0.4.0"}
+
