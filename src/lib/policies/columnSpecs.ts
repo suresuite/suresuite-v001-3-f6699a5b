@@ -3,7 +3,11 @@ import { fieldEngineStatus } from "./fieldStatus";
 import type { StageKey } from "./stages";
 import type { FitCol } from "./columnFit";
 import { emptyMeansFor } from "./registryAccess";
-import { engineWholeWeeks } from "../../../supabase/functions/_shared/grading";
+import { engineWholeWeeks, pyRound } from "../../../supabase/functions/_shared/grading";
+
+/** A production lead time as the engine carries it: whole weeks, half to even,
+ *  0–26 (`project_map._product_lead_time`). */
+export const prodWholeWeeks = (weeks: number): number => Math.min(26, Math.max(0, pyRound(weeks)));
 
 export interface ColSpecCtx {
   fulfillmentStrategy?: string;
@@ -30,6 +34,8 @@ export const GATE_FIELDS = [
   // PLAN.md §25 WP 15.3 — a Supplier row's lead-time shape and bounds: which
   // parameter cells show, and whether the Lead time cell is the bounds' mean.
   "lane_lead_time_dist", "lane_lead_time_min_weeks", "lane_lead_time_mode_weeks", "lane_lead_time_max_weeks",
+  // WP 15.5 — the Plant row's production lead time, the same rule.
+  "prod_lead_time_dist", "prod_lead_time_min_weeks", "prod_lead_time_mode_weeks", "prod_lead_time_max_weeks",
 ] as const;
 
 /** `projects.supply_chain_model` as the mapper reads it (`_fulfillment_mode`):
@@ -485,6 +491,35 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // number here could only ever speak by disagreeing (the WP 0.1 gap
       // check's second divergence).
       col("utilization_cap_pct", "production", { readOnly: true }),
+      // P-P.13 PRODUCTION LEAD TIME (PLAN.md §25 WP 15.5): weeks from the start
+      // of production to the finished good, chosen like a lane's lead time —
+      // a mean, a shape, and only the parameters the shape reads, through the
+      // SAME helper (`leadTimeParamFor`, `single-source`). Overrides of the
+      // `products` master; empty = 0 weeks (completes in the week it starts). On
+      // a triangular or uniform row the lead time is the bounds' mean, derived.
+      col("prod_lead_time_weeks", "production", {
+        master: { table: "products", field: "production_lead_time", idFrom: "product_id" },
+        round: prodWholeWeeks,
+      }),
+      col("prod_lead_time_dist", "production", {
+        master: { table: "products", field: "production_lead_time_dist", idFrom: "product_id" },
+      }),
+      col("prod_lead_time_cv", "production", {
+        visibleWhen: leadTimeParamFor("cv", "prod_lead_time_dist"),
+        master: { table: "products", field: "production_lead_time_cv", idFrom: "product_id" },
+      }),
+      col("prod_lead_time_min_weeks", "production", {
+        visibleWhen: leadTimeParamFor("min", "prod_lead_time_dist"),
+        master: { table: "products", field: "production_lead_time_min", idFrom: "product_id" },
+      }),
+      col("prod_lead_time_mode_weeks", "production", {
+        visibleWhen: leadTimeParamFor("mode", "prod_lead_time_dist"),
+        master: { table: "products", field: "production_lead_time_mode", idFrom: "product_id" },
+      }),
+      col("prod_lead_time_max_weeks", "production", {
+        visibleWhen: leadTimeParamFor("max", "prod_lead_time_dist"),
+        master: { table: "products", field: "production_lead_time_max", idFrom: "product_id" },
+      }),
       // P-P.9 per-product allocation priority (recovery response opt-in).
       col("allocation_priority_weight", "production", { visibleWhen: wantsMaterialAllocation, defaultWhenMissing: 1 }),
       // Fulfillment (backorder, allocation, service level) is a customer-stage
@@ -744,6 +779,13 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   lane_lead_time_min_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
   lane_lead_time_mode_weeks: { sub: "weeks · triangular", w: 84, kind: "num", dec: 1, prio: 5 },
   lane_lead_time_max_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
+  // ---- plant · production lead time (WP 15.5)
+  prod_lead_time_weeks: { sub: "weeks · start → finished · 0–26", w: 96, kind: "int", keep: true },
+  prod_lead_time_dist: { sub: "shape · per product", w: 112, kind: "text", keep: true, align: "left" },
+  prod_lead_time_cv: { sub: "CV · normal, lognormal, gamma", w: 92, kind: "num", dec: 2, prio: 5 },
+  prod_lead_time_min_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
+  prod_lead_time_mode_weeks: { sub: "weeks · triangular", w: 84, kind: "num", dec: 1, prio: 5 },
+  prod_lead_time_max_weeks: { sub: "weeks · triangular, uniform", w: 84, kind: "num", dec: 1, prio: 5 },
   // ---- inventory (shared by supplier + plant)
   type: { sub: "s,S · S · R,Q · T,S", w: 152, kind: "type", keep: true, filterable: false, align: "left" },
   __inv_params: { sub: "levels & lot sizes", w: 184, kind: "vector", keep: true, filterable: false, align: "left" },
@@ -810,6 +852,12 @@ export const SHORT_LABEL: Record<string, string> = {
   lane_lead_time_min_weeks: "LT min",
   lane_lead_time_mode_weeks: "LT mode",
   lane_lead_time_max_weeks: "LT max",
+  prod_lead_time_weeks: "Prod. lead time",
+  prod_lead_time_dist: "Prod. LT shape",
+  prod_lead_time_cv: "Prod. LT CV",
+  prod_lead_time_min_weeks: "Prod. LT min",
+  prod_lead_time_mode_weeks: "Prod. LT mode",
+  prod_lead_time_max_weeks: "Prod. LT max",
   type: "Policy type",
   __inv_params: "Replenishment",
   initial_on_hand: "Initial stock",

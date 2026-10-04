@@ -189,6 +189,14 @@ def build_project_data(
                 fg_reorder_point=_num(r.get("fg_reorder_point")),
                 fg_cover_days=_num(r.get("fg_cover_days")),
                 fg_initial_on_hand=_num(r.get("fg_initial_on_hand")),
+                # WP 15.5 (§25, D292) — P-P.13 production lead time and its shape.
+                production_lead_time=_num(r.get("production_lead_time")),
+                production_lead_time_unit=r.get("production_lead_time_unit"),
+                production_lead_time_dist=r.get("production_lead_time_dist"),
+                production_lead_time_cv=_num(r.get("production_lead_time_cv")),
+                production_lead_time_min=_num(r.get("production_lead_time_min")),
+                production_lead_time_mode=_num(r.get("production_lead_time_mode")),
+                production_lead_time_max=_num(r.get("production_lead_time_max")),
             )
             for r in products if r.get("product_id")
         ],

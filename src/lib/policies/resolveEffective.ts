@@ -5,7 +5,7 @@ import { reducerLabel, type DerivedValue } from "./effectiveEconomics";
 import { shadowedBy } from "./registryAccess";
 import { entityOverride, masterOverrideRule, type ResolvedOverride } from "./masterOverrides";
 import { isEnumDomain } from "../../../supabase/functions/_shared/entityOverrides.ts";
-import { boundedLeadTimeMean, engineWholeWeeks } from "../../../supabase/functions/_shared/grading.ts";
+import { boundedLeadTimeMean, engineWholeWeeks, pyRound } from "../../../supabase/functions/_shared/grading.ts";
 import type { Provenance } from "@/components/policies/policyGridUi";
 
 /**
@@ -224,11 +224,19 @@ export function derivedRawFor(
  * shows this, derived and read-only. `resolved` is the row's gate context (the
  * shape and bounds as the cells show them, drafts included).
  */
-export function rowBoundedLeadTime(ctx: ColSpecCtx | undefined): number | undefined {
+export function rowBoundedLeadTime(
+  ctx: ColSpecCtx | undefined,
+  /** `lane` — a Supplier row's lead time (1–51 weeks); `prod` — a Plant row's
+   *  production lead time (0–26 weeks, PLAN.md §25 WP 15.5). */
+  which: "lane" | "prod" = "lane",
+): number | undefined {
   const r = ctx?.resolved;
   if (!r) return undefined;
-  const m = boundedLeadTimeMean(r.lane_lead_time_dist, r.lane_lead_time_min_weeks, r.lane_lead_time_mode_weeks, r.lane_lead_time_max_weeks);
-  return m === undefined ? undefined : engineWholeWeeks(m);
+  const k = `${which}_lead_time`;
+  const m = boundedLeadTimeMean(r[`${k}_dist`], r[`${k}_min_weeks`], r[`${k}_mode_weeks`], r[`${k}_max_weeks`]);
+  if (m === undefined) return undefined;
+  if (which === "prod") return m > 26 ? undefined : Math.min(26, Math.max(0, pyRound(m)));
+  return engineWholeWeeks(m);
 }
 
 /** The registry step behind a derived master value, when there is one and the
@@ -551,8 +559,8 @@ export function resolveCell(args: {
 
   // A BOUNDED lane's lead time is its bounds' mean and the engine reads no
   // override or upload for it (§25.2 rule 3): the cell shows that, derived.
-  if (col.field === "lead_time_weeks" && col.master) {
-    const bounded = rowBoundedLeadTime(args.gate);
+  if ((col.field === "lead_time_weeks" || col.field === "prod_lead_time_weeks") && col.master) {
+    const bounded = rowBoundedLeadTime(args.gate, col.field === "prod_lead_time_weeks" ? "prod" : "lane");
     if (bounded !== undefined) {
       return {
         value: bounded, provenance: "derived", cellValue: bounded, liveDefault: bounded,

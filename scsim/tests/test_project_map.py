@@ -1330,3 +1330,53 @@ def test_without_any_spread_the_run_log_is_unchanged():
     assert not any(w.entity == "source" and w.field.startswith("inbound_logistics.lead_time_")
                    for w in res.warnings)
     assert all(l.lead_time_dist.value == "deterministic" for l in res.scenario.network.supplier_links)
+
+
+# ── A product's production lead time — PLAN.md §25 WP 15.5, §4 D292 ───────────
+
+def _prod(res):
+    return res.scenario.network.products[0]
+
+
+def test_a_product_that_states_no_production_lead_time_maps_as_before():
+    res = from_project_data(_base())
+    p = _prod(res)
+    assert (p.production_lead_time_weeks, p.production_lead_time_dist.value) == (0, "deterministic")
+    assert res.resolved["products.production_lead_time"]["p1"] == {"source": "default", "value": 0}
+    assert not any(w.entity == "source" and w.field.startswith("products.production_lead_time")
+                   for w in res.warnings)
+    # …and the Product carries no new key, so it serializes exactly as before.
+    assert "production_lead_time_weeks" not in _prod(res).model_dump(exclude_defaults=True)
+
+
+def test_the_master_in_days_is_converted_and_the_plant_row_beats_it():
+    d = _base()
+    d.products[0].production_lead_time, d.products[0].production_lead_time_unit = 14, "day"
+    res = from_project_data(d)
+    assert _prod(res).production_lead_time_weeks == 2
+    assert res.resolved["products.production_lead_time"]["p1"] == {"source": "master", "value": 2}
+    d.policies = {"node:plant::p1": {"production": {"prod_lead_time_weeks": 3}}}
+    res = from_project_data(d)
+    assert _prod(res).production_lead_time_weeks == 3
+    assert res.resolved["products.production_lead_time"]["p1"] == {"source": "override", "value": 3}
+
+
+def test_a_bounded_production_lead_time_plans_on_its_mean():
+    d = _base()
+    d.policies = {"node:plant::p1": {"production": {
+        "prod_lead_time_weeks": 9, "prod_lead_time_dist": "triangular",
+        "prod_lead_time_min_weeks": 1, "prod_lead_time_mode_weeks": 2, "prod_lead_time_max_weeks": 6}}}
+    res = from_project_data(d)
+    p = _prod(res)
+    assert p.production_lead_time_weeks == 3 and p.production_lead_time_dist.value == "triangular"
+    assert res.resolved["products.production_lead_time"]["p1"] == {"source": "derived", "value": 3}
+    assert any(w.field == "prod_lead_time_weeks" and "bounds' mean" in w.reason for w in res.warnings)
+
+
+def test_a_production_shape_missing_its_cv_runs_deterministic_with_a_warning():
+    d = _base()
+    d.products[0].production_lead_time, d.products[0].production_lead_time_dist = 2, "gamma"
+    res = from_project_data(d)
+    p = _prod(res)
+    assert p.production_lead_time_dist.value == "deterministic" and p.production_lead_time_weeks == 2
+    assert any(w.field == "production_lead_time_dist" and "needs a CV" in w.reason for w in res.warnings)

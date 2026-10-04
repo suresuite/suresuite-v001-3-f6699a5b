@@ -59,6 +59,7 @@ export type StatusKey =
   | "product_demand_mean"
   | "product_capacity"
   | "product_fulfillment_mode"
+  | "product_production_lead_time" // WP 15.5 — P-P.13 production lead time and its shape
   | "product_demand_distribution"
   | "product_demand_cv"
   | "product_demand_min"
@@ -176,6 +177,13 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "products", field: "sell_price", engineField: "Product.unit_price (u_p)", chain: "master (when > 0; a 0 counts as blank) → demand-weighted outbound unit_price (info) → 1.0 (warn)", statusKey: "product_sell_price" },
   { dataset: "products", field: "demand_mean", engineField: "Product.demand_mode (b_p)", chain: "master (when > 0; a 0 counts as blank) → Σ weekly outbound volume → 0 (warn: never ordered)", statusKey: "product_demand_mean" },
   { dataset: "products", field: "production_capacity", engineField: "Product.production_capacity (O_p)", chain: "master (units/week, when > 0) → Plant grid line capacity/day × 7 × utilization → max(2·demand, 1000) (warn: never binds)", statusKey: "product_capacity" },
+  { dataset: "products", field: "production_lead_time", engineField: "Product.production_lead_time_weeks", chain: "P-P.13: the Plant row's override → this × production_lead_time_unit (weeks after promotion), rounded, clamped 0–26 → 0 (completes in the week it starts). A triangular or uniform product plans on the mean of its bounds (PLAN.md §25 WP 15.5)", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_unit", engineField: "production lead-time unit", chain: "the unit of production_lead_time and its bounds (day / week …); blank → weeks", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_dist", engineField: "Product.production_lead_time_dist", chain: "the Plant row's override → this → deterministic; a shape missing a parameter runs deterministic (warn)", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_cv", engineField: "Product.production_lead_time_cv", chain: "CV 0–1 for normal, lognormal, gamma; the Plant row's value wins", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_min", engineField: "Product.production_lead_time_min_weeks", chain: "triangular and uniform: the lower bound, weeks after promotion", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_mode", engineField: "Product.production_lead_time_mode_weeks", chain: "triangular: the most likely value, weeks after promotion", statusKey: "product_production_lead_time" },
+  { dataset: "products", field: "production_lead_time_max", engineField: "Product.production_lead_time_max_weeks", chain: "triangular and uniform: the upper bound, weeks after promotion, at most 26", statusKey: "product_production_lead_time" },
   { dataset: "products", field: "fulfillment_mode", engineField: "Product.fulfillment_mode", chain: "master → projects.supply_chain_model → MTO. The Policies page's fulfillment strategy is NOT read by the server engine (§4 D197)", statusKey: "product_fulfillment_mode" },
   { dataset: "products", field: "demand_distribution", engineField: "Product demand model", chain: "master → the SCENARIO's demand_model.kind (scenarios created in the app are Poisson) → triangular. The engine models triangular, poisson, negbin and deterministic; any other value runs as triangular (warned)", statusKey: "product_demand_distribution" },
   { dataset: "products", field: "demand_cv", engineField: "demand variability", chain: "master → scenario demand_model.cv → 0.30. Sets the spread under triangular and the dispersion under negbin; no effect under poisson (variance = mean) or deterministic", statusKey: "product_demand_cv" },

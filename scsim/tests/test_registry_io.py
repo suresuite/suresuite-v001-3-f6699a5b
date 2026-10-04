@@ -503,6 +503,13 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         "fg_initial_on_hand": ("products.fg_initial_on_hand", "plant"),
         # Whether the product holds FG stock at all — the Plant row's MTS / MTO.
         "fulfillment_mode": ("products.fulfillment_mode", "plant"),
+        # PLAN.md §25 WP 15.5 — the product's production lead time (P-P.13).
+        "prod_lead_time_weeks": ("products.production_lead_time", "plant"),
+        "prod_lead_time_dist": ("products.production_lead_time_dist", "plant"),
+        "prod_lead_time_cv": ("products.production_lead_time_cv", "plant"),
+        "prod_lead_time_min_weeks": ("products.production_lead_time_min", "plant"),
+        "prod_lead_time_mode_weeks": ("products.production_lead_time_mode", "plant"),
+        "prod_lead_time_max_weeks": ("products.production_lead_time_max", "plant"),
     }
     for k in POLICY_BUNDLE_KEYS:
         assert bool(k.get("master")) == bool(k.get("rows")) == bool(k.get("domain")), k
@@ -545,6 +552,16 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
                                     lead_time_mode=2, lead_time_max=4),
     }
 
+    # WP 15.5 — likewise for a product's production lead-time keys (P1's master).
+    product_lt = {
+        "prod_lead_time_dist": dict(production_lead_time_min=1, production_lead_time_max=5),
+        "prod_lead_time_cv": dict(production_lead_time_dist="normal", production_lead_time_cv=0.1,
+                                  production_lead_time=2),
+        **{k: dict(production_lead_time_dist="triangular", production_lead_time_min=0.5,
+                   production_lead_time_mode=2, production_lead_time_max=4)
+           for k in ("prod_lead_time_min_weeks", "prod_lead_time_mode_weeks", "prod_lead_time_max_weeks")},
+    }
+
     def project(key=None):
         return ProjectData(
             suppliers=[SupplierRow("S1"), SupplierRow("S3")],
@@ -552,7 +569,8 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
             # WP 14.4 — the master states s, S and D so every FG override has a
             # complete policy to land in.
             products=[ProductRow("P1", sell_price=100.0, demand_mean=50.0, fulfillment_mode="mts",
-                                 fg_base_stock=400.0, fg_reorder_point=100.0, fg_cover_days=10.0)],
+                                 fg_base_stock=400.0, fg_reorder_point=100.0, fg_cover_days=10.0,
+                                 **product_lt.get(key, {}))],
             supply_arcs=[
                 SupplyArc("S1", "M1", unit_price=10, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
                 SupplyArc("S3", "M1", unit_price=11, lead_time=2, lead_time_unit="week", volume=60, time_unit="week",
@@ -604,6 +622,8 @@ def test_declared_scopes_are_the_scopes_the_mapper_reads():
         "row_priority": 4, "price": 55, "sla_fill_floor_pct": 70,
         "fg_policy": "min_max", "fg_base_stock": 500, "fg_reorder_point": 50, "fg_cover_days": 21,
         "fg_initial_on_hand": 250, "fulfillment_mode": "mto",
+        "prod_lead_time_weeks": 3, "prod_lead_time_dist": "uniform", "prod_lead_time_cv": 0.3,
+        "prod_lead_time_min_weeks": 1, "prod_lead_time_mode_weeks": 3, "prod_lead_time_max_weeks": 6,
     }
     keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1",
             "customer": "node:C1::P1"}

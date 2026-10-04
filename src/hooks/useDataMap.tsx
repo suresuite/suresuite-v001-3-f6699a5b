@@ -254,6 +254,8 @@ export function useDataMap(projectId: string | null | undefined) {
         { status: "default", detail: "the Plant grid's line capacity if set, else max(2·demand, 1000) — capacity never binds" },
       ),
       product_fulfillment_mode: masterField(prods, "fulfillment_mode", { status: "default", detail: "projects.supply_chain_model, else MTO" }),
+      // WP 15.5 — a product with no production lead time completes in the week it starts.
+      product_production_lead_time: masterField(prods, "production_lead_time", { status: "default", detail: "0 weeks — completes in the week it starts" }),
       product_identity: (() => {
         if (prods.length === 0) return { status: "missing" as const, detail: "no product rows" };
         const sub = prods.filter((p) => bomConsumed.has(String(p.product_id ?? "").trim())).length;

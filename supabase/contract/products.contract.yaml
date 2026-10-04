@@ -505,6 +505,176 @@ fields:
       rule: {kind: numeric, min: 0, blank: 'null'}
     surfaces: []
     resolution: null
+  production_lead_time:
+    type: "numeric"
+    unit: "weeks"
+    unit_source: column
+    unit_column: production_lead_time_unit
+    normalize_at_promotion: {conversion: duration, canonical: week}
+    meaning: >-
+      How long this product takes to make at the focal plant: output started in a
+      week is finished stock L weeks later (P-P.13, PLAN.md §25 WP 15.5). A duration
+      in `production_lead_time_unit` (blank = weeks); weeks after promotion. Empty is
+      0 — the product completes in the week it starts, which is how every product ran
+      before Phase 15. For deterministic, normal, lognormal and gamma it is the mean;
+      a triangular or uniform product plans on the mean of its bounds instead.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_product_lead_time -> Product.production_lead_time_weeks"
+      transform: "the Plant-stage override, else _duration_to_weeks(this, production_lead_time_unit); rounded half to even, clamped 0–26"
+      missing_default: "0 weeks — completes in the week it starts"
+    substitutions:
+      - when: "NULL"
+        value: "0 weeks"
+        provenance: default
+        visible_as: "the Plant cell's empty default"
+    ingest:
+      csv_header: "production_lead_time"
+      required: false
+      validate: "numeric >= 0; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: 'null'}
+    surfaces: []
+    resolution: null
+  production_lead_time_unit:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The period `production_lead_time` and its bounds are quoted in — day, week,
+      month, … (PLAN.md §25 WP 15.5). Blank means WEEKS, the convention
+      `inbound_logistics.lead_time_unit` set. After promotion it reads `week`.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_product_lead_time -> _duration_to_weeks(…, production_lead_time_unit)"
+      transform: "looked up in the one unit table; an unknown value falls to a 7-day basis"
+      missing_default: "weeks"
+    substitutions:
+      - when: "NULL or blank"
+        value: "weeks"
+        provenance: contract
+        visible_as: null
+    ingest:
+      csv_header: "production_lead_time_unit"
+      required: false
+      validate: "one of the units public.unit_days() knows — enforced by the column's CHECK constraint"
+      rule: {kind: unit, blank: "null"}
+    surfaces: []
+    resolution: null
+  production_lead_time_dist:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The SHAPE of this product's production lead time — deterministic, normal,
+      lognormal, gamma, triangular or uniform, chosen like a lane's lead time
+      (PLAN.md §25 WP 15.5). Blank is deterministic.
+    grain: metadata
+    engine:
+      consumed_by: "project_map.py::_product_lead_time -> Product.production_lead_time_dist"
+      transform: "lower-cased; an unknown value, or a shape missing a parameter it needs, is warned and the product runs deterministic"
+      missing_default: "deterministic"
+    substitutions:
+      - when: "blank"
+        value: "deterministic"
+        provenance: default
+        visible_as: "the Plant table's production lead-time distribution cell"
+      - when: "a shape whose parameters are missing or unusable"
+        value: "deterministic"
+        provenance: default
+        visible_as: "MappingWarning on the run's mapping report"
+    ingest:
+      csv_header: "production_lead_time_dist"
+      required: false
+      validate: "one of deterministic, normal, lognormal, gamma, triangular, uniform — enforced by the column's CHECK constraint; blank lands nothing"
+      rule: {kind: enum, values: [deterministic, normal, lognormal, gamma, triangular, uniform], blank: "null"}
+    surfaces: []
+    resolution: null
+  production_lead_time_cv:
+    type: "numeric"
+    unit: "coefficient of variation (dimensionless)"
+    unit_source: fixed
+    meaning: >-
+      How much the production lead time varies — read by normal, lognormal and
+      gamma only (PLAN.md §25 WP 15.5). Bounded 0–1, as the engine bounds it.
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_product_lead_time -> Product.production_lead_time_cv"
+      transform: "float(); the Plant row's CV on /policies wins"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "production_lead_time_cv"
+      required: false
+      validate: "numeric 0–1 — enforced by the column's CHECK constraint; blank lands nothing"
+      rule: {kind: numeric, min: 0, max: 1, blank: "null"}
+    surfaces: []
+    resolution: null
+  production_lead_time_min:
+    type: "numeric"
+    unit: "weeks"
+    unit_source: column
+    unit_column: production_lead_time_unit
+    normalize_at_promotion: {conversion: duration, canonical: week}
+    meaning: >-
+      A triangular or uniform product's shortest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks
+      after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.5, P-P.13).
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_product_lead_time -> Product.production_lead_time_min_weeks"
+      transform: "_duration_to_weeks(production_lead_time_min, production_lead_time_unit); the Plant row's bound on /policies wins"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "production_lead_time_min"
+      required: false
+      validate: "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: 'null'}
+    surfaces: []
+    resolution: null
+  production_lead_time_mode:
+    type: "numeric"
+    unit: "weeks"
+    unit_source: column
+    unit_column: production_lead_time_unit
+    normalize_at_promotion: {conversion: duration, canonical: week}
+    meaning: >-
+      A triangular product's most likely production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks
+      after promotion. Read by triangular only (PLAN.md §25 WP 15.5, P-P.13).
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_product_lead_time -> Product.production_lead_time_mode_weeks"
+      transform: "_duration_to_weeks(production_lead_time_mode, production_lead_time_unit); the Plant row's bound on /policies wins"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "production_lead_time_mode"
+      required: false
+      validate: "numeric >= 0; triangular only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: 'null'}
+    surfaces: []
+    resolution: null
+  production_lead_time_max:
+    type: "numeric"
+    unit: "weeks"
+    unit_source: column
+    unit_column: production_lead_time_unit
+    normalize_at_promotion: {conversion: duration, canonical: week}
+    meaning: >-
+      A triangular or uniform product's longest production lead time — a duration in `production_lead_time_unit` (blank = weeks); weeks
+      after promotion. Read by triangular and uniform only (PLAN.md §25 WP 15.5, P-P.13).
+    grain: level
+    engine:
+      consumed_by: "project_map.py::_product_lead_time -> Product.production_lead_time_max_weeks"
+      transform: "_duration_to_weeks(production_lead_time_max, production_lead_time_unit); the Plant row's bound on /policies wins"
+      missing_default: null
+    substitutions: []
+    ingest:
+      csv_header: "production_lead_time_max"
+      required: false
+      validate: "numeric >= 0; triangular and uniform only; min <= mode <= max — enforced by the column's CHECK constraint; blank lands nothing"
+      rule: {kind: numeric, min: 0, blank: 'null'}
+    surfaces: []
+    resolution: null
   updated_at:
     type: "timestamp with time zone"
     unit: null

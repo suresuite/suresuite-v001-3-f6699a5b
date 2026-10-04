@@ -170,6 +170,15 @@ class ProductRow:
     fg_reorder_point: Optional[float] = None   # s (units), min_max
     fg_cover_days: Optional[float] = None      # D (days), days_of_cover
     fg_initial_on_hand: Optional[float] = None  # FG opening stock (units), RFC 4
+    # P-P.13 production lead time (PLAN.md §25 WP 15.5): the lead time and its
+    # bounds in `production_lead_time_unit` (weeks after promotion).
+    production_lead_time: Optional[float] = None
+    production_lead_time_unit: Optional[str] = None
+    production_lead_time_dist: Optional[str] = None
+    production_lead_time_cv: Optional[float] = None
+    production_lead_time_min: Optional[float] = None
+    production_lead_time_mode: Optional[float] = None
+    production_lead_time_max: Optional[float] = None
 
 
 @dataclass
@@ -1004,6 +1013,94 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
                      "no FG stock). Order: the Plant-stage row -> products.fulfillment_mode -> "
                      "projects.supply_chain_model -> mto",
     },
+    # ── P-P.13 production lead time (PLAN.md §25 WP 15.5, D292) ─────────────
+    # The Plant row's Production group, over the `products` master, chosen like a
+    # lane's lead time (one grid helper, `leadTimeParamFor`). Named `prod_…`: the
+    # legacy `production` family already carries an unread
+    # `production_lead_time_min/max` in days with Zod defaults. A bounded shape's
+    # planning lead time is its bounds' mean, so the row's lead time is then not
+    # read (§25.2 rule 3). A product that sets none completes in the week it starts.
+    {
+        "key": "prod_lead_time_weeks",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.production_lead_time_weeks",
+        "catalog_ref": None,
+        "master": "products.production_lead_time",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": 0.0,
+        "transform": "weeks, >= 0: output started in a week completes this many weeks later; "
+                     "rounded half to even, clamped 0-26. Order: the Plant-stage row -> "
+                     "products.production_lead_time x production_lead_time_unit -> 0",
+    },
+    {
+        "key": "prod_lead_time_dist",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.production_lead_time_dist",
+        "catalog_ref": None,
+        "master": "products.production_lead_time_dist",
+        "rows": "plant",
+        "domain": "lead_time_distribution",
+        "empty_default": None,
+        "empty_note": "deterministic",
+        "transform": "enum deterministic | normal | lognormal | gamma | triangular | uniform. "
+                     "Order: the Plant-stage row -> products.production_lead_time_dist -> "
+                     "deterministic. A shape missing a parameter runs deterministic, warned",
+    },
+    {
+        "key": "prod_lead_time_cv",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.production_lead_time_cv",
+        "catalog_ref": None,
+        "master": "products.production_lead_time_cv",
+        "rows": "plant",
+        "domain": "fraction",
+        "empty_default": None,
+        "empty_note": "none — normal, lognormal and gamma need one",
+        "transform": "fraction 0-1, read by normal, lognormal and gamma. Order: the Plant-stage row -> products.production_lead_time_cv",
+    },
+    {
+        "key": "prod_lead_time_min_weeks",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.production_lead_time_min_weeks",
+        "catalog_ref": None,
+        "master": "products.production_lead_time_min",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular and uniform need it",
+        "transform": "weeks, >= 0; triangular and uniform. Order: the Plant-stage row -> products.production_lead_time_min x production_lead_time_unit",
+    },
+    {
+        "key": "prod_lead_time_mode_weeks",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.production_lead_time_mode_weeks",
+        "catalog_ref": None,
+        "master": "products.production_lead_time_mode",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular needs it",
+        "transform": "weeks, >= 0; triangular. Order: the Plant-stage row -> products.production_lead_time_mode x production_lead_time_unit",
+    },
+    {
+        "key": "prod_lead_time_max_weeks",
+        "scopes": ("plant",),
+        "family": "production",
+        "target": "Product.production_lead_time_max_weeks",
+        "catalog_ref": None,
+        "master": "products.production_lead_time_max",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "none — triangular and uniform need it",
+        "transform": "weeks, >= 0, at most 26; triangular and uniform. Order: the Plant-stage row -> products.production_lead_time_max x production_lead_time_unit",
+    },
     # ── Per-row fulfillment (PLAN.md §24 WP 14.3, D284 c) ───────────────────
     # Backorder, its window and cost are read at the project default AND on a
     # Customer row (`node:<customer>::<product>`, an existing row only); a row
@@ -1455,6 +1552,113 @@ def _lane_lead_time_spread(
     return out, None, _resolved()
 
 
+# ── P-P.13 production lead time (PLAN.md §25 WP 15.5, D292) ───────────────────
+
+def _product_lead_time(
+    p: "ProductRow", row: dict, tally: "_SourceTally", w: list[MappingWarning],
+) -> dict[str, Any]:
+    """The product's production lead time and shape as the engine receives them,
+    and every part's source for page-equals-run.
+
+    Order, per part: the Plant row → the product master (in
+    `production_lead_time_unit`) → the default (0 weeks, deterministic). A shape
+    lacking a parameter it reads runs deterministic, warned; a bounded shape plans
+    on its bounds' mean (§25.2 rule 3) and the row's lead time is then not read.
+    Returns only the fields that differ from the entity defaults, so a product
+    that states nothing maps — and serializes — exactly as before Phase 15. The
+    sources are counted in the run log only when the product states something.
+    """
+    ent = f"product:{p.id}"
+    src: dict[str, tuple[str, Any]] = {}
+
+    def num(key: str, col: Optional[float], domain: str, convert: bool) -> tuple[Optional[float], str]:
+        rv = row.get(key)
+        if rv not in (None, ""):
+            n = _override_num(rv, entity=ent, field=key, domain=domain, w=w)
+            if n is not None:
+                return n, "override"
+        if col is not None:
+            v = float(col)
+            return (_duration_to_weeks(v, p.production_lead_time_unit) if convert else v), "master"
+        return None, "default"
+
+    lt, lt_src = num("prod_lead_time_weeks", p.production_lead_time, "nonnegative", True)
+    cv, cv_src = num("prod_lead_time_cv", p.production_lead_time_cv, "fraction", False)
+    lo, lo_src = num("prod_lead_time_min_weeks", p.production_lead_time_min, "nonnegative", True)
+    mo, mo_src = num("prod_lead_time_mode_weeks", p.production_lead_time_mode, "nonnegative", True)
+    hi, hi_src = num("prod_lead_time_max_weeks", p.production_lead_time_max, "nonnegative", True)
+    dist, dist_src = "deterministic", "default"
+    rv = row.get("prod_lead_time_dist")
+    if rv not in (None, ""):
+        t = str(rv).strip().lower()
+        if t in _LANE_LT_DISTS:
+            dist, dist_src = t, "override"
+        else:
+            w.append(MappingWarning("warn", ent, "prod_lead_time_dist",
+                                    f"/policies override {rv!r} is not one of {', '.join(_LANE_LT_DISTS)} "
+                                    f"— ignored, the item master decides"))
+    if dist_src == "default" and p.production_lead_time_dist not in (None, ""):
+        t = str(p.production_lead_time_dist).strip().lower()
+        if t in _LANE_LT_DISTS:
+            dist, dist_src = t, "master"
+        else:
+            w.append(MappingWarning("warn", ent, "production_lead_time_dist",
+                                    f"products.production_lead_time_dist {t!r} is not a lead-time "
+                                    f"shape — ignored"))
+
+    def _fallback(why: str) -> None:
+        nonlocal dist, dist_src
+        w.append(MappingWarning("warn", ent, "production_lead_time_dist",
+                                f"{dist} production lead time {why} → runs deterministic"))
+        dist, dist_src = "deterministic", "default"
+
+    planning = lt if lt is not None else 0.0
+    planning_src = lt_src
+    out: dict[str, Any] = {}
+    if dist in ("normal", "lognormal", "gamma"):
+        if cv is None:
+            _fallback("needs a CV and none is stated")
+    elif dist in ("triangular", "uniform"):
+        mode_ok = dist == "uniform" or mo is not None
+        if lo is None or hi is None or not mode_ok:
+            _fallback("needs " + ("min, mode and max" if dist == "triangular" else "min and max"))
+        elif hi > 26:
+            _fallback(f"max {hi:g} wk is above the engine's 26 weeks")
+        elif not (lo <= (mo if dist == "triangular" else lo) <= hi and lo <= hi):
+            _fallback("needs its bounds in order (min ≤ mode ≤ max)")
+        else:
+            mean = lead_time_bounds_mean(LeadTimeDist(dist), lo, mo if dist == "triangular" else None, hi)
+            if lt_src == "override":
+                w.append(MappingWarning(
+                    "info", ent, "prod_lead_time_weeks",
+                    f"the row's production lead time is not read on a {dist} product — it plans "
+                    f"on the bounds' mean, {mean:g} wk"))
+            planning, planning_src = mean, "derived"
+            out.update(production_lead_time_min_weeks=lo, production_lead_time_max_weeks=hi)
+            if dist == "triangular":
+                out["production_lead_time_mode_weeks"] = mo
+    weeks = int(_clamp(round(planning), 0, 26, w=w, field="production_lead_time", unit=" wk",
+                       entity=ent))
+    if weeks:
+        out["production_lead_time_weeks"] = weeks
+    if dist != "deterministic":
+        out["production_lead_time_dist"] = LeadTimeDist(dist)
+        if dist in ("normal", "lognormal", "gamma"):
+            out["production_lead_time_cv"] = cv
+    stated = any(s_ in ("override", "master")
+                 for s_ in (lt_src, cv_src, lo_src, mo_src, hi_src, dist_src))
+    for field, source, val in (
+            ("production_lead_time", planning_src, weeks),
+            ("production_lead_time_dist", dist_src, dist),
+            ("production_lead_time_cv", cv_src, cv),
+            ("production_lead_time_min", lo_src, lo),
+            ("production_lead_time_mode", mo_src, mo),
+            ("production_lead_time_max", hi_src, hi)):
+        tally.add(f"products.{field}", source, p.id, count=stated)
+        tally.value(f"products.{field}", p.id, val)
+    return out
+
+
 def _apply_primary_choice(
     links: list[SupplierLink], policies: dict, w: list[MappingWarning],
 ) -> None:
@@ -1720,12 +1924,17 @@ def _build_product(
     row: ProductRow, *, price: float, capacity: float, mode: FulfillmentMode,
     mean: float, cv: float, kind: str, warnings: list[MappingWarning],
     fg: Optional[dict[str, Any]] = None,
+    production_lead_time: Optional[dict[str, Any]] = None,
 ) -> Product:
     common = dict(
         id=row.id, name=str(row.name or row.id),
         unit_price=max(price, 1e-9), production_capacity=max(capacity, 1e-6),
         fulfillment_mode=mode,
     )
+    # P-P.13 — only what a product states; one that states none keeps the entity
+    # defaults (0, deterministic), so it serializes exactly as before.
+    if production_lead_time:
+        common.update(production_lead_time)
     # FG policy and levels reach an MTS product only (WP 14.4); an MTO product
     # holds no FG stock. A product that sets none keeps the entity defaults.
     if fg and mode == FulfillmentMode.MTS:
@@ -2516,8 +2725,18 @@ def from_project_data(data: ProjectData) -> MappingResult:
             w.append(MappingWarning("info", f"product:{p.id}", "fg_policy",
                                     "FG policy / levels are set but the product is MTO — an MTO "
                                     "product holds no finished-goods stock, so they are not read"))
+        # P-P.13 (§25 WP 15.5) — each override read as a literal (the D90 gate).
+        plt = _product_lead_time(p, {
+            "prod_lead_time_weeks": prod_row.get("prod_lead_time_weeks"),
+            "prod_lead_time_dist": prod_row.get("prod_lead_time_dist"),
+            "prod_lead_time_cv": prod_row.get("prod_lead_time_cv"),
+            "prod_lead_time_min_weeks": prod_row.get("prod_lead_time_min_weeks"),
+            "prod_lead_time_mode_weeks": prod_row.get("prod_lead_time_mode_weeks"),
+            "prod_lead_time_max_weeks": prod_row.get("prod_lead_time_max_weeks"),
+        }, tally, w)
         products.append(_build_product(p, price=price, capacity=cap, mode=mode,
-                                       mean=mean, cv=cv, kind=kind, warnings=w, fg=fg))
+                                       mean=mean, cv=cv, kind=kind, warnings=w, fg=fg,
+                                       production_lead_time=plt))
     if not products:
         raise ValueError("project has no products to simulate")
 

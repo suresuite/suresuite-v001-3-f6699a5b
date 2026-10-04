@@ -4252,6 +4252,95 @@
       "transform": "enum \u2014 mts (holds FG stock, the FG policy applies) \u00b7 mto (built to order, no FG stock). Order: the Plant-stage row -> products.fulfillment_mode -> projects.supply_chain_model -> mto"
     },
     {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": 0.0,
+      "family": "production",
+      "key": "prod_lead_time_weeks",
+      "master": "products.production_lead_time",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_weeks",
+      "transform": "weeks, >= 0: output started in a week completes this many weeks later; rounded half to even, clamped 0-26. Order: the Plant-stage row -> products.production_lead_time x production_lead_time_unit -> 0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "lead_time_distribution",
+      "empty_default": null,
+      "empty_note": "deterministic",
+      "family": "production",
+      "key": "prod_lead_time_dist",
+      "master": "products.production_lead_time_dist",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_dist",
+      "transform": "enum deterministic | normal | lognormal | gamma | triangular | uniform. Order: the Plant-stage row -> products.production_lead_time_dist -> deterministic. A shape missing a parameter runs deterministic, warned"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "fraction",
+      "empty_default": null,
+      "empty_note": "none \u2014 normal, lognormal and gamma need one",
+      "family": "production",
+      "key": "prod_lead_time_cv",
+      "master": "products.production_lead_time_cv",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_cv",
+      "transform": "fraction 0-1, read by normal, lognormal and gamma. Order: the Plant-stage row -> products.production_lead_time_cv"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular and uniform need it",
+      "family": "production",
+      "key": "prod_lead_time_min_weeks",
+      "master": "products.production_lead_time_min",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_min_weeks",
+      "transform": "weeks, >= 0; triangular and uniform. Order: the Plant-stage row -> products.production_lead_time_min x production_lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular needs it",
+      "family": "production",
+      "key": "prod_lead_time_mode_weeks",
+      "master": "products.production_lead_time_mode",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_mode_weeks",
+      "transform": "weeks, >= 0; triangular. Order: the Plant-stage row -> products.production_lead_time_mode x production_lead_time_unit"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "none \u2014 triangular and uniform need it",
+      "family": "production",
+      "key": "prod_lead_time_max_weeks",
+      "master": "products.production_lead_time_max",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_lead_time_max_weeks",
+      "transform": "weeks, >= 0, at most 26; triangular and uniform. Order: the Plant-stage row -> products.production_lead_time_max x production_lead_time_unit"
+    },
+    {
       "catalog_ref": "P-C.1",
       "family": "fulfillment",
       "key": "backorder_allowed",

@@ -384,6 +384,47 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     verdict: "info",
   },
   // Whether the product holds FG stock — the switch the FG columns sit behind.
+  "plant:prod_lead_time_weeks": {
+    shows: "your override → products.production_lead_time × production_lead_time_unit (weeks) → 0; on a triangular or uniform row the bounds' mean (derived, read-only)",
+    savedTo: "override production.prod_lead_time_weeks (per Plant row — /policies never writes the product master)",
+    engine: "P-P.13: output started in a week completes this many weeks later; the plan starts that many weeks ahead (expected value only)",
+    verdict: "works",
+    note: "PLAN.md §25 WP 15.5. 0 = completes in the week it starts.",
+  },
+  "plant:prod_lead_time_dist": {
+    shows: "your override → products.production_lead_time_dist → empty (deterministic)",
+    savedTo: "override production.prod_lead_time_dist (per Plant row)",
+    engine: "override → master → deterministic; a shape missing a parameter runs deterministic (warn)",
+    verdict: "works",
+  },
+  "plant:prod_lead_time_cv": {
+    shows: "your override → products.production_lead_time_cv",
+    savedTo: "override production.prod_lead_time_cv (per Plant row)",
+    engine: "read by normal, lognormal and gamma; 0–1",
+    verdict: "conditional",
+    note: "Shown only on a row whose shape reads it.",
+  },
+  "plant:prod_lead_time_min_weeks": {
+    shows: "your override → products.production_lead_time_min (weeks)",
+    savedTo: "override production.prod_lead_time_min_weeks (per Plant row)",
+    engine: "the triangular or uniform row's lower bound",
+    verdict: "conditional",
+    note: "Shown only on a triangular or uniform row.",
+  },
+  "plant:prod_lead_time_mode_weeks": {
+    shows: "your override → products.production_lead_time_mode (weeks)",
+    savedTo: "override production.prod_lead_time_mode_weeks (per Plant row)",
+    engine: "the triangular row's most likely value",
+    verdict: "conditional",
+    note: "Shown only on a triangular row.",
+  },
+  "plant:prod_lead_time_max_weeks": {
+    shows: "your override → products.production_lead_time_max (weeks)",
+    savedTo: "override production.prod_lead_time_max_weeks (per Plant row)",
+    engine: "the triangular or uniform row's upper bound, at most 26 weeks",
+    verdict: "conditional",
+    note: "Shown only on a triangular or uniform row.",
+  },
   "plant:fulfillment_mode": {
     shows: "your override → products.fulfillment_mode → projects.supply_chain_model → MTO",
     savedTo: "override production.fulfillment_mode (Plant row — /policies never writes the master)",

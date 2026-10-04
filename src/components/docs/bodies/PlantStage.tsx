@@ -36,6 +36,17 @@ export default function PlantStage() {
         <StageColumns
           stage="plant"
           notes={{
+            prod_lead_time_weeks: (
+              <>
+                How many weeks a product takes to make: what the plant starts in a week is finished
+                that many weeks later. Materials are used when production starts, the plan starts
+                each batch that many weeks ahead of the demand it serves, and the units in between
+                are work in progress (shown in inspection runs, charged no holding cost). Empty is 0
+                — finished in the week it starts. Choose a shape beside it to make it vary, exactly
+                as on the Supplier stage; a triangular or uniform product plans on the mean of its
+                bounds.
+              </>
+            ),
             fulfillment_mode: (
               <>
                 MTS holds finished-goods stock and shows the FG columns; MTO builds to order and

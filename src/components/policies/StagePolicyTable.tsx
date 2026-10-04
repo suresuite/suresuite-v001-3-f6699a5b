@@ -2044,7 +2044,7 @@ export function StagePolicyTable({
                 <Select value={String(cellValue ?? liveDefault ?? "")} onValueChange={commit}>
                   <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
                     {/* An empty distribution runs the PRODUCT's, × the row's share. */}
-                    <SelectValue placeholder={col.field === "row_demand_distribution" ? "product's" : col.field === "lane_lead_time_dist" ? "deterministic" : "—"} />
+                    <SelectValue placeholder={col.field === "row_demand_distribution" ? "product's" : col.field === "lane_lead_time_dist" || col.field === "prod_lead_time_dist" ? "deterministic" : "—"} />
                   </SelectTrigger>
                   <SelectContent>
                     {(col.field === "sourcing_firm" && firms

@@ -413,6 +413,8 @@ export const ENUM_OPTIONS: Record<string, readonly string[]> = {
   row_demand_distribution: ["deterministic", "normal", "triangular", "triangular_av", "poisson"],
   // PLAN.md §25 WP 15.3 — a Supplier row's lead-time shape (`project_map._LANE_LT_DISTS`).
   lane_lead_time_dist: ["deterministic", "normal", "lognormal", "gamma", "triangular", "uniform"],
+  // WP 15.5 — a Plant row's production lead-time shape, the same six.
+  prod_lead_time_dist: ["deterministic", "normal", "lognormal", "gamma", "triangular", "uniform"],
   // PLAN.md §24 WP 14.4 — the Plant row's FG policy (MTS).
   fg_policy: ["base_stock", "min_max", "days_of_cover"],
   // Whether the product holds FG stock — the Plant row's switch over
@@ -639,6 +641,12 @@ export const FIELD_LABELS: Record<string, string> = {
   lane_lead_time_min_weeks: "Lead time min (weeks)",
   lane_lead_time_mode_weeks: "Lead time mode (weeks)",
   lane_lead_time_max_weeks: "Lead time max (weeks)",
+  prod_lead_time_weeks: "Production lead time (weeks)",
+  prod_lead_time_dist: "Production lead-time distribution",
+  prod_lead_time_cv: "Production lead-time CV (normal, lognormal, gamma)",
+  prod_lead_time_min_weeks: "Production lead time min (weeks)",
+  prod_lead_time_mode_weeks: "Production lead time mode (weeks)",
+  prod_lead_time_max_weeks: "Production lead time max (weeks)",
   // inventory extensions
   moq: "MOQ",
   // production extensions

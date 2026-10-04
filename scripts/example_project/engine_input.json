@@ -69,12 +69,12 @@
      "fg_reorder_point": null,
      "fg_cover_days": null,
      "fg_initial_on_hand": null,
-     "production_lead_time_weeks": 0,
-     "production_lead_time_dist": "deterministic",
+     "production_lead_time_weeks": 2,
+     "production_lead_time_dist": "uniform",
      "production_lead_time_cv": 0.0,
-     "production_lead_time_min_weeks": null,
+     "production_lead_time_min_weeks": 1.0,
      "production_lead_time_mode_weeks": null,
-     "production_lead_time_max_weeks": null,
+     "production_lead_time_max_weeks": 4.0,
      "forecast_model": "ma",
      "forecast_window": 8,
      "forecast_bias": 0.0
@@ -98,9 +98,9 @@
      "fg_reorder_point": null,
      "fg_cover_days": 10.0,
      "fg_initial_on_hand": null,
-     "production_lead_time_weeks": 0,
-     "production_lead_time_dist": "deterministic",
-     "production_lead_time_cv": 0.0,
+     "production_lead_time_weeks": 3,
+     "production_lead_time_dist": "normal",
+     "production_lead_time_cv": 0.2,
      "production_lead_time_min_weeks": null,
      "production_lead_time_mode_weeks": null,
      "production_lead_time_max_weeks": null,
@@ -1036,6 +1036,36 @@
      "value": 200.0,
      "master": "products.production_capacity"
     },
+    "production_lead_time_weeks": {
+     "source": "derived",
+     "value": 2,
+     "master": "products.production_lead_time"
+    },
+    "production_lead_time_cv": {
+     "source": "default",
+     "value": null,
+     "master": "products.production_lead_time_cv"
+    },
+    "production_lead_time_dist": {
+     "source": "master",
+     "value": "uniform",
+     "master": "products.production_lead_time_dist"
+    },
+    "production_lead_time_max_weeks": {
+     "source": "master",
+     "value": 4.0,
+     "master": "products.production_lead_time_max"
+    },
+    "production_lead_time_min_weeks": {
+     "source": "master",
+     "value": 1.0,
+     "master": "products.production_lead_time_min"
+    },
+    "production_lead_time_mode_weeks": {
+     "source": "default",
+     "value": null,
+     "master": "products.production_lead_time_mode"
+    },
     "unit_price": {
      "source": "override",
      "value": 120.0,
@@ -1077,6 +1107,36 @@
      "source": "derived",
      "value": 5950.0,
      "master": "products.production_capacity"
+    },
+    "production_lead_time_weeks": {
+     "source": "override",
+     "value": 3,
+     "master": "products.production_lead_time"
+    },
+    "production_lead_time_cv": {
+     "source": "override",
+     "value": 0.2,
+     "master": "products.production_lead_time_cv"
+    },
+    "production_lead_time_dist": {
+     "source": "override",
+     "value": "normal",
+     "master": "products.production_lead_time_dist"
+    },
+    "production_lead_time_max_weeks": {
+     "source": "default",
+     "value": null,
+     "master": "products.production_lead_time_max"
+    },
+    "production_lead_time_min_weeks": {
+     "source": "default",
+     "value": null,
+     "master": "products.production_lead_time_min"
+    },
+    "production_lead_time_mode_weeks": {
+     "source": "default",
+     "value": null,
+     "master": "products.production_lead_time_mode"
     },
     "unit_price": {
      "source": "lanes",
@@ -1649,6 +1709,90 @@
    "entity": "P2",
    "source": "derived",
    "value": 5950.0
+  },
+  {
+   "target": "Product.production_lead_time_weeks",
+   "master": "products.production_lead_time",
+   "entity": "P1",
+   "source": "derived",
+   "value": 2
+  },
+  {
+   "target": "Product.production_lead_time_weeks",
+   "master": "products.production_lead_time",
+   "entity": "P2",
+   "source": "override",
+   "value": 3
+  },
+  {
+   "target": "Product.production_lead_time_cv",
+   "master": "products.production_lead_time_cv",
+   "entity": "P1",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Product.production_lead_time_cv",
+   "master": "products.production_lead_time_cv",
+   "entity": "P2",
+   "source": "override",
+   "value": 0.2
+  },
+  {
+   "target": "Product.production_lead_time_dist",
+   "master": "products.production_lead_time_dist",
+   "entity": "P1",
+   "source": "master",
+   "value": "uniform"
+  },
+  {
+   "target": "Product.production_lead_time_dist",
+   "master": "products.production_lead_time_dist",
+   "entity": "P2",
+   "source": "override",
+   "value": "normal"
+  },
+  {
+   "target": "Product.production_lead_time_max_weeks",
+   "master": "products.production_lead_time_max",
+   "entity": "P1",
+   "source": "master",
+   "value": 4.0
+  },
+  {
+   "target": "Product.production_lead_time_max_weeks",
+   "master": "products.production_lead_time_max",
+   "entity": "P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Product.production_lead_time_min_weeks",
+   "master": "products.production_lead_time_min",
+   "entity": "P1",
+   "source": "master",
+   "value": 1.0
+  },
+  {
+   "target": "Product.production_lead_time_min_weeks",
+   "master": "products.production_lead_time_min",
+   "entity": "P2",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Product.production_lead_time_mode_weeks",
+   "master": "products.production_lead_time_mode",
+   "entity": "P1",
+   "source": "default",
+   "value": null
+  },
+  {
+   "target": "Product.production_lead_time_mode_weeks",
+   "master": "products.production_lead_time_mode",
+   "entity": "P2",
+   "source": "default",
+   "value": null
   },
   {
    "target": "Product.unit_price",
@@ -2537,6 +2681,42 @@
    "entity": "source",
    "field": "products.production_capacity",
    "reason": "value sources (override → item master → lanes → default): master 1 · derived 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.production_lead_time",
+   "reason": "value sources (override → item master → lanes → default): override 1 · derived 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.production_lead_time_cv",
+   "reason": "value sources (override → item master → lanes → default): override 1 · default 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.production_lead_time_dist",
+   "reason": "value sources (override → item master → lanes → default): override 1 · master 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.production_lead_time_max",
+   "reason": "value sources (override → item master → lanes → default): master 1 · default 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.production_lead_time_min",
+   "reason": "value sources (override → item master → lanes → default): master 1 · default 1"
+  },
+  {
+   "level": "info",
+   "entity": "source",
+   "field": "products.production_lead_time_mode",
+   "reason": "value sources (override → item master → lanes → default): default 2"
   },
   {
    "level": "info",

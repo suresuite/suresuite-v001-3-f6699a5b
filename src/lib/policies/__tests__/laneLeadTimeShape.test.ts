@@ -125,3 +125,47 @@ describe("§25.2 rule 3 — a bounded row plans on its bounds' mean", () => {
     expect(link.spread).toEqual({ dist: "triangular", cv: null, min: 2, mode: 3, max: 7 });
   });
 });
+
+describe("§25 WP 15.5 — the Plant row's production lead time, through the same helper", () => {
+  const pspec = STAGE_TABLE_SPEC.plant;
+  const pcols = new Map<string, ColSpec>(pspec.cols.filter((c) => c.master).map((c) => [c.field, c]));
+  const products: Row[] = [
+    { product_id: "P1", production_lead_time: 2, production_lead_time_dist: "uniform",
+      production_lead_time_min: 1, production_lead_time_max: 4 },
+    { product_id: "P2" },
+  ];
+  const pm: MasterRowMaps = {
+    materials: new Map(), suppliers: new Map(),
+    products: new Map(products.map((p) => [String(p.product_id), p])),
+  };
+  const pd: DerivedMaps = { materialCost: new Map(), sellPrice: new Map(), demandMean: new Map() };
+  const pfam = familiesForStage("plant") as PolicyFamily[];
+  const prow = (pid: string) => ({ key: `Plant::${pid}`, item_id: "Plant", product_id: pid });
+  const pgate = (pid: string, draft?: Row) =>
+    rowGateCtx({
+      rowKey: `Plant::${pid}`, row: prow(pid), draft, projectFulfillmentMode: "mto", families: pfam,
+      masterColByField: pcols, masterRowById: pm, derived: pd, defaults: DEFAULT_BUNDLE, overrides: [], scope: "node",
+    });
+  const shown = (pid: string, draft?: Row) =>
+    visibleColsForRow("plant", pgate(pid, draft)).map((c) => c.field).filter((f) => f.startsWith("prod_lead_time"));
+  const ltCell = (pid: string, draft?: Row) =>
+    resolveCell({
+      rowKey: `Plant::${pid}`, row: prow(pid), col: pcols.get("prod_lead_time_weeks")!, families: pfam,
+      masterColByField: pcols, masterRowById: pm, derived: pd, defaults: DEFAULT_BUNDLE, overrides: [],
+      scope: "node", familyDefault: () => undefined, gate: pgate(pid, draft),
+    });
+
+  it("a uniform product shows min and max; one with no shape shows only the lead time and the shape", () => {
+    expect(shown("P1")).toEqual(["prod_lead_time_weeks", "prod_lead_time_dist", "prod_lead_time_min_weeks", "prod_lead_time_max_weeks"]);
+    expect(shown("P2")).toEqual(["prod_lead_time_weeks", "prod_lead_time_dist"]);
+    expect(shown("P2", { prod_lead_time_dist: "gamma" })).toEqual(["prod_lead_time_weeks", "prod_lead_time_dist", "prod_lead_time_cv"]);
+  });
+
+  it("an empty production lead time is the engine's 0 weeks; a bounded one is its bounds' mean", () => {
+    const empty = ltCell("P2");
+    expect(empty.value).toBe(0);
+    const bounded = ltCell("P1");
+    expect(bounded.value).toBe(2); // (1 + 4) / 2 = 2.5 → 2, half to even
+    expect(bounded.provenance).toBe("derived");
+  });
+});
