@@ -3,7 +3,7 @@
   "engine_build": "scsim-0.6.1+ce3483abda4e",
   "pyodide_version": "0.26.4",
   "wheels": ["scsim-0.6.1-py3-none-any.whl", "sim_worker-0.1.0-py3-none-any.whl"],
-  "wheel_sha256": {"scsim-0.6.1-py3-none-any.whl": "b236e621504caf53488054671397255d4d34c0fe6432643ef4ad2a394a396081", "sim_worker-0.1.0-py3-none-any.whl": "0c5591e509bde7145529e0d3610a61b36288994dba1a33470fed3eb4d98436e3"},
+  "wheel_sha256": {"scsim-0.6.1-py3-none-any.whl": "81f5b1dd2ef3ca11539a2b5e43e462f85bae8a7d0d1d0d065eb703e6d8ea0273", "sim_worker-0.1.0-py3-none-any.whl": "80a501af76117daa504a5ea417d1974a1c944610186d7badae0c4144d01157ee"},
   "pyodide_packages": ["numpy", "scipy", "pydantic", "micropip"],
   "micropip_packages": []
 }

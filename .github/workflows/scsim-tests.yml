@@ -168,6 +168,8 @@ jobs:
         run: |
           pip install -r sim-worker/requirements.txt pytest
           pip install ./scsim
+          # PLAN.md §25 · WP 15.5 — the release report reads scsim/CHANGELOG.yaml.
+          pip install pyyaml
 
       - name: Worker test suite (legacy engine + scsim bridge + validation parity)
         run: python -m pytest tests -q
