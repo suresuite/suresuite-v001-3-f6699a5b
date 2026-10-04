@@ -479,6 +479,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D288** | **The replenishment cells on /policies were not what the run used.** A Supplier-row s or S was meant to be the material's level, and P-P.3 added its safety stock ON TOP of it at PH-70, so a typed s = 400 ran as 400 + SS — while the greyed placeholder for an EMPTY level showed the bare formula without the safety stock the run adds. A formula s above a typed S raised S to it. The periodic type's T (`review_period_days`) was read by no scsim mapping: every periodic material was reviewed every 4 weeks whatever the row said. An (R,Q) row with a lot still sized its S — and so its opening stock — from κ, so the grid showed κ on rows where it should not matter; a value stored under an earlier type (an S left on a row switched to (R,Q), an s on a base-stock row) reached the engine although the page no longer showed it; Eq. 21 read the project κ, not the row's; a project Q was ignored unless the project's own type was (R,Q); and an MRP row rendered dead s / S / κ inputs. Found by the owner from the Replenishment column ("what is κ?") | `scsim/scsim/policies/strategic/p_p3_safety_stock.py` (`on_phase`, Eq. 21), `scsim/scsim/policies/builtin/p_p1_inventory_control.py` (`_set_levels`, `_release`), `scsim/scsim/io/project_map.py` (the inventory branch of `_map_policies`), `src/components/policies/policyGridUi.tsx` (`ReplenishmentCell`), all before this fix | **✅ CLOSED (2026-10-03, engine 0.6.1)** — a stated level is the level (no buffer added, never raised); T reaches `periodic_review_weeks` per material and at the project default; (R,Q) with a lot has S = R + Q; a row applies only the parameters its type shows (warned); κ is shown only where the run reads it (`kappaIsRead`) — never on (R,Q), whose Q is required (`rowNeedsLot` flags a row without one); the level placeholders include the days-based safety stock. `scsim/tests/test_stated_levels.py` (13, twelve of which fail on 0.6.0), `kappaIsRead.test.ts` |
 | **D289** | **A policy version's Export was neither readable nor the engine's input.** The version-history Export wrote the stored bundle one column per family key, every value row followed by a "provenance" row, JSON in cells — and it re-parsed the stored families through the page's Zod schemas, so a key the version did not store was written as the page's default rather than as stored. More important, a run reads the policy version TOGETHER WITH a dataset version through the mapper (`run_from_snapshots`, §23 WP 13.2), and the file carried neither the dataset nor the mapping: a cost, MOQ, capacity or demand in it was the policy override, never the number the run used when the override was empty, and nothing in the file tied its content to the `policy_hash` it printed. Reported by the owner ("super hard to read … not 100% the single source of truth for the data and the hash") | `src/hooks/usePolicies.tsx` (`exportVersion`, before this fix); `src/lib/policies/verifiableExports.ts` (`buildPolicyVersionWorkbook`, removed) | **✅ CLOSED (2026-10-03, no migration, engine unchanged)** — the Export is now the engine's own input: `sim_worker.local.engine_input_from_snapshots` runs the same two calls a run makes (`project_data_from_snapshots` → `from_project_data`) and stops before simulating, in the browser engine (`_inputs` in `engine.worker.ts`), on the version and the dataset version its latest run read (else the project's data as a run would freeze it now — the file says which). `engineInputWorkbook.ts` lays it out as Read me (both versions, both hashes, the hash RE-CHECKED from `snapshot::text` in the browser), one sheet per network list with units in the header and a source column beside every value the mapper resolved, Policies (every parameter, "this version" vs "engine default"), Settings, Disruptions, Where values came from, Mapping notes, Field guide, Policy as saved and Policy JSON (hashed). `sim-worker/tests/test_engine_input.py` captures the `Scenario` a real run hands `run_scenario` and requires the export's to equal it, worker and browser driver both (mutation-tested: dropping the overrides turns it red); `engineInputWorkbook.test.ts` requires every field of every row, every policy parameter and every setting to be in the file unchanged |
 | **D290** | **A Supplier row's lead time could not be changed on /policies.** The lane lead time — the T_s of every s / S the Replenishment column shows — was a READ-ONLY cell: the only way to plan with a different lead time was to edit `inbound_logistics.lead_time` in the inbound file and upload it again. It was read-only for a sound reason (an editable copy with no engine reader is a second author, the trap `material_price` documents), but the reader was missing, not the need. The cell also showed a blank lane as an AVERAGE of other lanes while the run used 2 weeks, and converted weeks to days without `lead_time_unit` (D189 (a)(b)). Reported by the owner from the Supplier grid: "the input data from the project could serve as the initial suggestion, but the user could edit" | `src/lib/policies/columnSpecs.ts` (`col("lead_time_days", …, { readOnly: true })`), `src/hooks/useStageRows.tsx` (the lane enrichment and its imputation), `scsim/scsim/io/project_map.py` (the arc loop, upload or 2 weeks only), all before this fix | **✅ CLOSED (2026-10-03, no migration, engine stays 0.6.1)** — `lead_time_weeks` joins `POLICY_BUNDLE_KEYS` (scope `supplier`, master `inbound_logistics.lead_time`, domain `positive`, empty default 2): the arc loop reads the Supplier row `node:<supplier>::<material>` first, for THAT link only, rounded and clamped as the upload is. The grid cell is master-backed on the lane (`supplierLaneMasters`, the engine's own link build), so it suggests the upload, saves an override, and resets to it; a typed value is rounded at entry (`ColSpec.round`). `test_project_map.py` (six), `laneLeadTimeOverride.test.ts`, and `page-equals-run` over a fixture lane with an override and one with no lead time |
+| **D291** | **A customer's requested delivery schedule could not be entered.** A Customer row's demand was a forecast series (uploaded, the centre of a distribution) or a model (mean + variation + distribution). A customer that states the quantities it wants delivered week by week — firm demand, with no spread — could be approximated only by uploading those quantities as a forecast and choosing `deterministic`, through Project manager rather than the page where demand is set, and with the row's mean (or its last value) standing in past the end. Reported by the owner from the Customer grid: add a requested delivery schedule beside forecast and model, and let the user enter a weekly demand for the whole run | `scsim/scsim/io/project_map.py` (`row_demand_mode`: forecast · model only); `src/lib/policies/schemas.ts` (`row_demand_mode` enum), both before this fix | **✅ CLOSED (2026-10-04, no migration, engine core unchanged)** — `row_demand_mode` gains `schedule`, and `row_demand_schedule` joins `POLICY_BUNDLE_KEYS` (scope `customer`, family `demand`, target `CustomerLink.forecast`, P-C.4): an array of units per week from week 1, typed on /policies and saved as the row's override. The mapper (`_apply_row_demand_overrides`, `_row_schedule`) runs it as deterministic demand with forecast = the schedule and mean 0, so a week past its end has none; the distribution, its parameters and any uploaded forecast are set aside. It runs when the mode is `schedule` or empty; `model` / `forecast` set it aside. The Customer grid shows a Delivery schedule cell (an editor with one input per week, paste and fill) and hides the distribution and parameters under it. The pre-run gate blocks `schedule` with nothing entered or a negative week and warns on one shorter than the run. `test_demand_rows.py` (four), `deliverySchedule.test.ts`, and the scope probe in `test_registry_io.py` |
 
 ### 4.1 Code map — the data layer
 
@@ -23334,6 +23335,48 @@ saved) still breaks an exact cost tie on the UPLOADED lead time — `useStageRow
 overrides — so on that tie an override can make the suggestion and the run differ; a saved
 primary is unaffected. Open, unchanged: D189's price imputation and its (c).
 
+### D291 — /policies: the Customer row's requested delivery schedule · 2026-10-04 · no migration · engine core unchanged
+
+**What the previous package promised.** WP 14.2 gave each customer × product row its demand as a
+forecast series or a model, and WP 14.8 made the Customer grid's demand mode the one the run uses.
+A forecast is uploaded in Project manager and is the CENTRE of the row's distribution; a model is
+a constant mean drawn from a distribution.
+
+**What this found (§4 D291).** The owner, from the Customer grid: add a requested delivery schedule
+as a third option beside forecast and model, where the user enters the demand of every week of
+the run. Neither mode says that. A forecast has spread around it unless `deterministic` is also
+chosen, cannot be typed on /policies, and past its end runs on the row's mean or its last value.
+
+**What it did.**
+- **Engine.** No change to the core: `CustomerLink.forecast` with `demand_model = deterministic`
+  and `demand_mean = 0` is exactly a firm schedule that ends with no demand (`context.py`'s row
+  centre). The mapper does the rest. `row_demand_mode` gains `schedule`, and `row_demand_schedule`
+  is declared (scope `customer`, family `demand`, target `CustomerLink.forecast`, P-C.4). It runs
+  when the mode is `schedule` or empty. The empty rule is a saved schedule, else an uploaded
+  forecast, else the model, so the scope probe sees the key read on its own. `model` or
+  `forecast` set it aside. A non-array, or a week that is not a quantity ≥ 0, is warned and the
+  row keeps its data. A project that sets none maps exactly as before (frozen digests and the
+  worker's golden runs unchanged).
+- **Grid.** The mode is a three-way choice. Under `schedule` the row shows one Delivery schedule
+  cell (weeks, total, first values) and hides the distribution, its parameters and the forecast.
+  The cell opens an editor sized to the project's window (else 52 weeks), with one input per week,
+  dates on hover, paste from a spreadsheet column or row, and fill-all. It saves the array as the
+  row's override (`demand.row_demand_schedule`).
+- **Gate and agent surface.** `demandRowFindings` blocks `schedule` with nothing entered or a
+  negative week, warns when the schedule is shorter than the run, and skips the distribution
+  checks for a row that runs one. Its findings walk to the cell. `policyFields.ts` gains a
+  `number_array` kind, so an agent can propose a schedule and gets the same checks.
+
+**Gap check.** `test_declared_scopes_are_the_scopes_the_mapper_reads` probes the new key at every
+scope; `resolutionChains` now counts 15 declared chains (was 14); `page-equals-run` is unaffected
+(the key is not master-backed). `plan-from-demand` holds as stated: the plan reads the row's
+centre, which for a schedule is the schedule, and the draw is that same value. A requested
+schedule is known in advance, so planning on it is not reading a future draw. **Named limits:**
+the schedule is weekly only (the planning unit is fixed to weeks); week 1 is the run's first
+simulated week, not a calendar date, so a run whose window differs from the project's
+`simulation_start` shifts it; the stage's Excel export does not carry it (nor any other
+Customer-row demand cell, which are not project defaults).
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -25822,3 +25865,7 @@ frozen digests are unchanged.
 **Follow-up (§4 D288, engine 0.6.1).** The Supplier stage's Replenishment column: a typed s / S
 is the level the run uses (no safety stock on top), T reaches the engine, (R,Q) with a lot has
 S = R + Q, a row applies only what its type shows, and κ is shown only where the run reads it.
+
+**Follow-up (§4 D291).** The Customer row's demand mode gains `schedule`: the customer's requested
+delivery schedule, typed week by week on /policies (`row_demand_schedule`), run exactly as firm
+demand with nothing past its end.

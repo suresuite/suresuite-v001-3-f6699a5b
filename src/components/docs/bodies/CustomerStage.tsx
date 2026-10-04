@@ -58,8 +58,19 @@ export default function CustomerStage() {
                 <Term>forecast</Term> — the row plans week by week on an uploaded series (a{" "}
                 <DocLink to="demand-forecasts">Demand Forecast</DocLink>: a quantity per period for this
                 customer × product, spread evenly to weeks); the distribution only adds spread around
-                it. <Term>model</Term> — a constant mean per week, drawn from the distribution. Forecast
-                is offered only on a row that has a series; empty follows the data.
+                it. <Term>model</Term> — a constant mean per week, drawn from the distribution.{" "}
+                <Term>schedule</Term> — the customer's requested delivery schedule: you type the
+                quantity for every week of the run, and the row's demand is exactly that, with no
+                spread around it. Forecast is offered only on a row that has a series; empty follows
+                the data (a schedule if one is entered, else the forecast, else the model).
+              </>
+            ),
+            row_demand_schedule: (
+              <>
+                Units per week, from week 1 of the run. Open the cell to type each week, paste a column
+                from a spreadsheet, or fill every week with one value. A week past the schedule's end has
+                no demand, and the pre-run check warns when the schedule is shorter than the run. The
+                schedule is saved as an override on the row; the upload is never changed.
               </>
             ),
             row_forecast: <>The uploaded series, summarized — buckets, first date, first weekly values. Read-only here.</>,

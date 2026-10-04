@@ -458,18 +458,32 @@ export function rowGateCtx(args: {
       defaults: args.defaults, overrides: args.overrides, scope: args.scope,
     });
   }
-  // The Customer row's demand mode, as the ENGINE resolves it: a draft or saved
-  // override of `row_demand_mode`, else `forecast` when the row has an uploaded
-  // series and `model` when it has none. `forecast` without a series is
-  // ignored by the engine (it runs the model), so it resolves to `model` here
-  // too — the cell must never claim a forecast the run does not have.
+  // The Customer row's demand mode, as the ENGINE resolves it
+  // (`project_map._apply_row_demand_overrides`): a draft or saved override of
+  // `row_demand_mode`, else `schedule` when the row has a requested delivery
+  // schedule entered, else `forecast` when it has an uploaded series, else
+  // `model`. `forecast` without a series is ignored by the engine (it runs the
+  // model), so it resolves to `model` here too — the cell must never claim a
+  // forecast the run does not have. `schedule` is always choosable: the
+  // schedule is typed here, and an empty one is what the pre-run gate refuses.
   if (row.customer_id != null && row.product_id != null) {
     const base = args.masterRowById.outbound_logistics?.get(`${String(row.customer_id)}::${String(row.product_id)}`);
     const hasForecast = base?.demand_mode === "forecast";
     const chosen = draft?.row_demand_mode ?? args.effective?.row_demand_mode;
-    const mode = chosen === "model" ? "model" : chosen === "forecast" || hasForecast ? "forecast" : "model";
+    const schedule = draft?.row_demand_schedule !== undefined
+      ? draft.row_demand_schedule
+      : args.effective?.row_demand_schedule;
+    const hasSchedule = Array.isArray(schedule) && schedule.length > 0;
     resolved.has_forecast = hasForecast;
-    resolved.row_demand_mode = hasForecast ? mode : "model";
+    resolved.has_schedule = hasSchedule;
+    resolved.row_demand_mode =
+      chosen === "schedule" || ((chosen == null || chosen === "") && hasSchedule)
+        ? "schedule"
+        : chosen === "model"
+          ? "model"
+          : hasForecast
+            ? "forecast"
+            : "model";
   }
   return {
     fulfillmentStrategy: args.fulfillmentStrategy,

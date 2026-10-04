@@ -744,10 +744,31 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
         "family": "demand",
         "target": "CustomerLink.forecast",
         "catalog_ref": "P-C.4",
-        "transform": "empty = the engine's rule (forecast when the row has an uploaded "
+        "transform": "empty = the engine's rule (the row's requested delivery schedule "
+                     "when one is entered, else its forecast when it has an uploaded "
                      "series, else model). Enum — 'model' plans and draws on the row's mean even when a forecast "
                      "series is uploaded (the series is set aside); 'forecast' uses the "
-                     "series and is warned and ignored when the row has none",
+                     "series and is warned and ignored when the row has none; 'schedule' "
+                     "runs the row's requested delivery schedule (row_demand_schedule) "
+                     "exactly, and is warned and ignored when none is entered",
+    },
+    {
+        # The customer's REQUESTED DELIVERY SCHEDULE: quantities the customer has
+        # asked for, week by week, typed on /policies. Not a master override —
+        # nothing is uploaded for it — and not a forecast: it is firm, so the row
+        # draws nothing around it (deterministic) and is zero past its end.
+        "key": "row_demand_schedule",
+        "scopes": ("customer",),
+        "family": "demand",
+        "target": "CustomerLink.forecast",
+        "catalog_ref": "P-C.4",
+        "transform": "array of units per week, one per simulated week from week 1, each "
+                     ">= 0. Runs when row_demand_mode is 'schedule' or empty: the row's "
+                     "demand becomes exactly the schedule (deterministic, forecast = the "
+                     "schedule, mean 0 so a week past its end has no demand); the row's "
+                     "distribution, variation, bounds and any uploaded forecast are set "
+                     "aside. A non-array or a negative / non-numeric week is warned and "
+                     "the row keeps its forecast or model",
     },
     {
         "key": "row_demand_distribution",
@@ -1691,6 +1712,31 @@ def _tally_row_allocation(
             tally.value("customers.sla_fill_floor_pct", rid, None)
 
 
+def _row_schedule(raw: Any, ent: str, w: list[MappingWarning]) -> Optional[list[float]]:
+    """A Customer row's requested delivery schedule (`row_demand_schedule`):
+    units per week from week 1 — or None when there is none, or it is not one."""
+    if raw is None or raw == "" or raw == []:
+        return None
+    if not isinstance(raw, (list, tuple)):
+        w.append(MappingWarning("warn", ent, "row_demand_schedule",
+                                f"/policies delivery schedule {raw!r} is not a list of weekly "
+                                f"quantities — ignored"))
+        return None
+    out: list[float] = []
+    for i, v in enumerate(raw):
+        try:
+            n = 0.0 if v is None or v == "" else float(v)
+        except (TypeError, ValueError):
+            n = float("nan")
+        if not math.isfinite(n) or n < 0:
+            w.append(MappingWarning("warn", ent, "row_demand_schedule",
+                                    f"/policies delivery schedule week {i + 1} is {v!r}, not a "
+                                    f"quantity >= 0 — the schedule is ignored"))
+            return None
+        out.append(n)
+    return out
+
+
 def _apply_row_demand_overrides(
     row_spec: dict[tuple[str, str], dict[str, Any]], policies: dict,
     tally: "_SourceTally", w: list[MappingWarning],
@@ -1707,7 +1753,8 @@ def _apply_row_demand_overrides(
     overrides: dict[tuple[str, str], dict[str, Any]] = {}
     for key in sorted(k for k in policies if isinstance(k, str) and k.startswith("node:")):
         patch = (policies.get(key) or {}).get("demand") or {}
-        if not isinstance(patch, dict) or not any(f in patch for f in (*_ROW_OVERRIDE_FIELD, "row_demand_mode")):
+        if not isinstance(patch, dict) or not any(
+                f in patch for f in (*_ROW_OVERRIDE_FIELD, "row_demand_mode", "row_demand_schedule")):
             continue
         cid, sep, pid = key[len("node:"):].partition("::")
         if not sep or not cid or not pid:
@@ -1753,7 +1800,20 @@ def _apply_row_demand_overrides(
                 spec[field] = n
             src[field] = "override"
         mode = patch.get("row_demand_mode")
-        if mode == "model" and spec.get("forecast") is not None:
+        schedule = _row_schedule(patch.get("row_demand_schedule"), ent, w)
+        if mode == "schedule" and schedule is None:
+            w.append(MappingWarning("warn", ent, "row_demand_mode",
+                                    "/policies sets this row to a requested delivery schedule, "
+                                    "and none is entered — the row keeps its forecast or model"))
+        if schedule is not None and mode in (None, "", "schedule"):
+            # The requested delivery schedule IS the row's demand: firm, so no
+            # spread around it, and nothing past its end.
+            for f in ("demand_variation", "demand_min", "demand_max"):
+                spec.pop(f, None)
+            spec.update(demand_model="deterministic", forecast=schedule, demand_mean=0.0)
+            for f in _ROW_OVERRIDE_FIELD.values():
+                src[f] = "override"
+        elif mode == "model" and spec.get("forecast") is not None:
             spec.pop("forecast")
             if spec.get("demand_model") is None:
                 spec["demand_model"] = "deterministic"

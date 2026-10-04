@@ -338,14 +338,17 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     // chains declared to reach nothing from a Plant row (D204 b) — the FG
     // policy that replaced them resolves as master overrides.
     // FOURTEEN since the periodic type's T (`review_period_days`) is declared.
-    expect(byDeclaration.length).toBe(14);
+    // FIFTEEN since the Customer row's requested delivery schedule
+    // (`row_demand_schedule`, the third demand mode) is declared.
+    expect(byDeclaration.length).toBe(15);
     // 17 rendered fields resolve by declaration (14 until WP 14.3 added the
     // three backorder cells; rop_q_quantity, coverage_weeks
     // and holding_cost_pct resolve through their own doors on some stages, so
     // the field count trails the 16 keys project_map declares).
     // 13 fields too: with the Plant copies of `type`, `safety_stock_days`, s
     // and S gone, no declared field is rendered on two stages any more.
-    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(14);
+    // 15 since `row_demand_schedule` (one field, one stage).
+    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(15);
     for (const c of byDeclaration) {
       const detail = c.hops.find((h) => h.kind === "engine")!.detail;
       // The TARGET is what makes the chain followable; the TRANSFORM is what makes
