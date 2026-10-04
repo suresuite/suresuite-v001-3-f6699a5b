@@ -267,6 +267,6 @@ Whether the scenario was created by clicking a node on a network page (true) or 
 
 ---
 
-*Generated from data contract `16f8ea13d88e`, engine `0.7.0`,
+*Generated from data contract `ebfc2718cab2`, engine `0.8.0`,
 sidecar `supabase/contract/disruption_scenarios.contract.yaml`, table created by `20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

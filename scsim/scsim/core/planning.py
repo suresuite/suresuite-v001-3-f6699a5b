@@ -54,9 +54,108 @@ def fg_target_for(model, forecast: np.ndarray, projected: np.ndarray) -> np.ndar
     return base
 
 
+def production_lead_time_offset(model, ctx, want_mto: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """P-P.13 (PLAN.md §25 WP 15.4): this week's requirement for a product whose
+    START completes at t + L, L its PLANNING (expected) production lead time.
+
+    The work in progress (``ctx.prod_pipeline``, every unit started and not yet
+    completed) covers the demand of weeks t .. t+L−1: this week's realized demand
+    (already known — it is the current week) and the projected centres of the
+    next L−1 (``ctx.projected_demand``, never a draw). So:
+
+    * MTO — the start covers the projected demand AT t + L, plus the backlog the
+      WIP's surplus over that window does not clear;
+    * MTS — the stock the FG policy is asked about is the stock left after this
+      week's demand PLUS the WIP MINUS the projected demand of t+1 .. t+L, i.e.
+      the end-of-week stock at the week this start completes.
+
+    Returns ``(want_mto, stock)``: for a product with L = 0 both are exactly what
+    ``_mech_default_plan`` used before (D + B, and the FG stock now). Only the
+    SUM of the WIP is read, not when each unit completes — a drawn completion
+    week is not information the plan may use (gate ``plan-from-demand``).
+    """
+    t = ctx.week
+    L = model.prod_lt
+    Lmax = int(L.max(initial=0))
+    wip = ctx.prod_pipeline.sum(axis=1)
+    want = want_mto.copy()
+    stock = ctx.fg_on_hand.copy()
+    if Lmax <= 0:
+        return want, stock
+    # Projected demand for weeks t+1 .. t+Lmax, [products × Lmax].
+    proj = ctx.projected_demand(t + 1, Lmax)
+    cum = np.concatenate([np.zeros((model.n_prods, 1)), np.cumsum(proj, axis=1)], axis=1)
+    for j in np.flatnonzero(L > 0):
+        lj = int(L[j])
+        # MTO: the window t .. t+L−1 is this week's demand plus the next L−1.
+        covered = ctx.demand[j] + cum[j, lj - 1]
+        surplus = max(wip[j] - covered, 0.0)
+        want[j] = proj[j, lj - 1] + max(ctx.backlog[j] - surplus, 0.0)
+        # MTS: the stock at the end of the completion week, before this start.
+        stock[j] = ctx.fg_on_hand[j] + wip[j] - cum[j, lj]
+    return want, stock
+
+
 def plan_ahead(model, ctx, want0: np.ndarray, plan0: np.ndarray) -> None:
     """Fill ``ctx.planned_production`` / ``plan_requirement`` /
     ``plan_projected_demand`` (``[products × H]``) — column 0 is this week."""
+    _plan_ahead(model, ctx, want0, plan0)
+    if getattr(model, "has_prod_lt", False) and model.plan_horizon > 1:
+        _offset_later_columns(model, ctx, plan0)
+
+
+def _offset_later_columns(model, ctx, plan0: np.ndarray) -> None:
+    """P-P.13 — a product with a production lead time plans its later START
+    columns against the projected demand of the week each start COMPLETES
+    (t + k + L), from the stock position column 0 used. Its projected backlog in
+    those columns is the one column 0 already netted, so no shortfall is carried
+    forward for it (a declared limit, §16 · WP 15.4); a product with L = 0 keeps
+    the columns ``_plan_ahead`` gave it."""
+    t = ctx.week
+    H = model.plan_horizon
+    L = model.prod_lt
+    lt_prods = np.flatnonzero(L > 0)
+    if lt_prods.size == 0:
+        return
+    Lmax = int(L.max())
+    proj = ctx.projected_demand(t + 1, H - 1 + Lmax)
+    cap = model.capacity
+    _, stock0 = production_lead_time_offset(model, ctx, ctx.demand + ctx.backlog)
+    mts = model.mts_mask
+    for j in lt_prods:
+        lj = int(L[j])
+        stock = stock0[j] + (plan0[j] if mts[j] else 0.0)
+        for k in range(1, H):
+            d = float(proj[j, k - 1 + lj])
+            if mts[j]:
+                served = min(d, max(stock, 0.0))
+                post = stock - served
+                if model.fg_base_stock_override[j] >= 0:
+                    target = float(model.fg_base_stock_override[j])
+                elif model.fg_policy_code[j] == FG_COVER:
+                    target = float(np.nan_to_num(model.fg_cover_days[j])) / 7.0 * d
+                else:
+                    target = float(ctx.fg_target[j])
+                req = float(fg_gap(_One(model, j), np.array([target]), np.array([post]))[0])
+            else:
+                req = d
+            plan = min(req, float(cap[j]))
+            ctx.planned_production[j, k] = plan
+            ctx.plan_requirement[j, k] = req
+            ctx.plan_projected_demand[j, k] = d
+            if mts[j]:
+                stock = post + plan
+
+
+class _One:
+    """One product's FG policy fields, shaped for ``fg_gap``."""
+
+    def __init__(self, model, j: int):
+        self.fg_policy_code = model.fg_policy_code[j:j + 1]
+        self.fg_reorder_point = model.fg_reorder_point[j:j + 1]
+
+
+def _plan_ahead(model, ctx, want0: np.ndarray, plan0: np.ndarray) -> None:
     t = ctx.week
     H = model.plan_horizon
     ctx.planned_production[:, 0] = plan0

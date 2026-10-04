@@ -146,6 +146,19 @@ def _truncation_warnings(result: Any) -> list[dict]:
             ),
         }
         for t in (getattr(result, "lead_time_floor_raises", None) or [])
+    ] + [
+        # PLAN.md §25 WP 15.4 — a drawn production lead time bounded to the
+        # production pipeline (below 0 or beyond its ring).
+        {
+            "level": "warn",
+            "entity": f"product:{t['product_id']}",
+            "field": "production_lead_time",
+            "reason": (
+                f"{t['draws']} sampled production lead time(s) across {t['replications']} "
+                f"replication(s) fell outside 0 wk – the production pipeline and were bounded"
+            ),
+        }
+        for t in (getattr(result, "production_lead_time_clips", None) or [])
     ]
 
 

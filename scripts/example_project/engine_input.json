@@ -1,5 +1,5 @@
 {
- "engine_version": "0.7.0",
+ "engine_version": "0.8.0",
  "scenario": {
   "name": "scenario",
   "network": {
@@ -69,6 +69,12 @@
      "fg_reorder_point": null,
      "fg_cover_days": null,
      "fg_initial_on_hand": null,
+     "production_lead_time_weeks": 0,
+     "production_lead_time_dist": "deterministic",
+     "production_lead_time_cv": 0.0,
+     "production_lead_time_min_weeks": null,
+     "production_lead_time_mode_weeks": null,
+     "production_lead_time_max_weeks": null,
      "forecast_model": "ma",
      "forecast_window": 8,
      "forecast_bias": 0.0
@@ -92,6 +98,12 @@
      "fg_reorder_point": null,
      "fg_cover_days": 10.0,
      "fg_initial_on_hand": null,
+     "production_lead_time_weeks": 0,
+     "production_lead_time_dist": "deterministic",
+     "production_lead_time_cv": 0.0,
+     "production_lead_time_min_weeks": null,
+     "production_lead_time_mode_weeks": null,
+     "production_lead_time_max_weeks": null,
      "forecast_model": "ma",
      "forecast_window": 8,
      "forecast_bias": 0.0
@@ -431,6 +443,36 @@
     "label": "FG initial on hand",
     "unit": "units",
     "notes": "FG opening stock (engine RFC 4). None = start at the policy target."
+   },
+   "production_lead_time_weeks": {
+    "label": "Production lead time weeks",
+    "unit": "weeks",
+    "notes": "L_p: the planning production lead time. 0 = completes in the week it starts (byte-identical to an engine without it)."
+   },
+   "production_lead_time_dist": {
+    "label": "Production lead time dist",
+    "unit": "enum",
+    "notes": "Shape of the production lead time; drawn per (product, week) from the world production-time stream (CRN)."
+   },
+   "production_lead_time_cv": {
+    "label": "Production lead time CV",
+    "unit": "-",
+    "notes": "CV for normal/lognormal/gamma production lead times."
+   },
+   "production_lead_time_min_weeks": {
+    "label": "Production lead time min weeks",
+    "unit": "weeks",
+    "notes": "Lower bound (triangular, uniform)."
+   },
+   "production_lead_time_mode_weeks": {
+    "label": "Production lead time mode weeks",
+    "unit": "weeks",
+    "notes": "Most likely value (triangular)."
+   },
+   "production_lead_time_max_weeks": {
+    "label": "Production lead time max weeks",
+    "unit": "weeks",
+    "notes": "Upper bound (triangular, uniform)."
    },
    "forecast_model": {
     "label": "Forecast model",

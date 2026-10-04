@@ -120,7 +120,9 @@ class ShortTermCapacity(PolicyPlugin):
         cb = CostBreakdown()
         granted = ctx.policy_state.get(self.id, {}).get("granted")
         if granted is not None and granted.any():
-            ot_units = np.maximum(0.0, ctx.production_output - ctx.model.capacity) * granted
+            # STARTED output used the capacity (P-P.13: equal to `production_output`
+            # whenever no product has a production lead time).
+            ot_units = np.maximum(0.0, ctx.production_started - ctx.model.capacity) * granted
             premium = float((ot_units * ctx.model.unit_price).sum()) * \
                 p.overtime_premium_pct_of_price / 100.0
             if premium > 0:

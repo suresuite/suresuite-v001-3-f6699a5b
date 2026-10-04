@@ -190,7 +190,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.7.0",
+  "engine_version": "0.8.0",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -619,6 +619,19 @@
           ],
           "title": "FulfillmentMode",
           "type": "string"
+        },
+        "LeadTimeDist": {
+          "enum": [
+            "deterministic",
+            "lognormal",
+            "gamma",
+            "empirical",
+            "normal",
+            "triangular",
+            "uniform"
+          ],
+          "title": "LeadTimeDist",
+          "type": "string"
         }
       },
       "description": "Product + demand model + fulfillment mode (CODP) \u2014 \u00a73.1\u20133.3.",
@@ -850,6 +863,84 @@
           "title": "Production Capacity",
           "type": "number",
           "unit": "units/wk"
+        },
+        "production_lead_time_cv": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "notes": "CV for normal/lognormal/gamma production lead times.",
+          "scope": "P",
+          "title": "Production Lead Time Cv",
+          "type": "number",
+          "unit": "-"
+        },
+        "production_lead_time_dist": {
+          "$ref": "#/$defs/LeadTimeDist",
+          "default": "deterministic",
+          "notes": "Shape of the production lead time; drawn per (product, week) from the world production-time stream (CRN).",
+          "scope": "P",
+          "unit": "enum"
+        },
+        "production_lead_time_max_weeks": {
+          "anyOf": [
+            {
+              "maximum": 26,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Upper bound (triangular, uniform).",
+          "scope": "P",
+          "title": "Production Lead Time Max Weeks",
+          "unit": "weeks"
+        },
+        "production_lead_time_min_weeks": {
+          "anyOf": [
+            {
+              "maximum": 26,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Lower bound (triangular, uniform).",
+          "scope": "P",
+          "title": "Production Lead Time Min Weeks",
+          "unit": "weeks"
+        },
+        "production_lead_time_mode_weeks": {
+          "anyOf": [
+            {
+              "maximum": 26,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Most likely value (triangular).",
+          "scope": "P",
+          "title": "Production Lead Time Mode Weeks",
+          "unit": "weeks"
+        },
+        "production_lead_time_weeks": {
+          "default": 0,
+          "maximum": 26,
+          "minimum": 0,
+          "notes": "L_p: the planning production lead time. 0 = completes in the week it starts (byte-identical to an engine without it).",
+          "scope": "P",
+          "title": "Production Lead Time Weeks",
+          "type": "integer",
+          "unit": "weeks"
         },
         "unit_price": {
           "exclusiveMinimum": 0,

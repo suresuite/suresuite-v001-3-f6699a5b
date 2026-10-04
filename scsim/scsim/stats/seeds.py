@@ -43,6 +43,9 @@ _WORLD_LEADTIME = 1
 # under a different primary. A new key, so `_WORLD_LEADTIME` — and every
 # lognormal/gamma draw — is untouched.
 _WORLD_LEADTIME_LANE = 2
+# PLAN.md §25 WP 15.4 — a product's production lead time (P-P.13): one child
+# stream per PRODUCT, keyed by a digest of its id, for the same reason.
+_WORLD_PRODTIME = 3
 
 HAZARD_START = 0
 HAZARD_DURATION = 1
@@ -106,6 +109,16 @@ def lane_leadtime_rng(project_seed: int, model_rep: int, supplier_id: str,
     lane = policy_key(f"{supplier_id}::{material_id}")
     seq = np.random.SeedSequence(
         entropy=project_seed, spawn_key=(_REALM_WORLD, model_rep, _WORLD_LEADTIME_LANE, lane)
+    )
+    return np.random.default_rng(seq)
+
+
+def product_prodtime_rng(project_seed: int, model_rep: int, product_id: str) -> np.random.Generator:
+    """The WORLD stream of one product's production lead time (P-P.13) — keyed
+    by the product's id, independent of the product order and of every policy."""
+    seq = np.random.SeedSequence(
+        entropy=project_seed,
+        spawn_key=(_REALM_WORLD, model_rep, _WORLD_PRODTIME, policy_key(f"product::{product_id}")),
     )
     return np.random.default_rng(seq)
 

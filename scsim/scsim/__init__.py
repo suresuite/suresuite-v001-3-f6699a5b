@@ -23,7 +23,7 @@ __version__ = "0.2.0"
 # Engine semantic version. Bump per change-governance tiers (Part IX §9.5):
 #   Tier 2 (new variable, behavior-neutral default) -> patch
 #   Tier 3 (new phase / contract change)            -> minor or major + ADR
-ENGINE_VERSION = "0.7.0"  # P-S.6 widened (PLAN.md §25 WP 15.1): normal / triangular / uniform supplier lead times drawn per lane from a new world stream — minor: a new world stream (contract change); lognormal/gamma draws and every project with no new shape unchanged
+ENGINE_VERSION = "0.8.0"  # P-P.13 production lead time (PLAN.md §25 WP 15.4): starts complete at t + L through a per-product pipeline, planned on E[L], WIP traced — minor: a new world stream and a new mechanic state; L = 0 (the default) unchanged
 
 from scsim.entities.config import SimulationSettings, StatisticsReport  # noqa: E402,F401
 from scsim.entities.network import (  # noqa: E402,F401

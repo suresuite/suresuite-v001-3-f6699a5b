@@ -530,6 +530,6 @@ A triangular or uniform lane's longest lead time — a duration in the lane's `l
 
 ---
 
-*Generated from data contract `16f8ea13d88e`, engine `0.7.0`,
+*Generated from data contract `ebfc2718cab2`, engine `0.8.0`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

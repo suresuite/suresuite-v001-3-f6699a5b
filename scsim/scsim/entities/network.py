@@ -136,34 +136,41 @@ class SupplierLink(BaseModel):
 
     @model_validator(mode="after")
     def _check_lead_time_shape(self) -> "SupplierLink":
-        lane = f"supply:{self.supplier_id}->{self.material_id}"
-        lo, mo, hi = self.lead_time_min_weeks, self.lead_time_mode_weeks, self.lead_time_max_weeks
-        d = self.lead_time_dist
-        if d == LeadTimeDist.TRIANGULAR:
-            if lo is None or mo is None or hi is None:
-                raise ValueError(f"{lane}: a triangular lead time needs min, mode and max")
-            if not lo <= mo <= hi:
-                raise ValueError(f"{lane}: a triangular lead time needs min ≤ mode ≤ max, got "
-                                 f"{lo:g} / {mo:g} / {hi:g}")
-        elif d == LeadTimeDist.UNIFORM:
-            if lo is None or hi is None:
-                raise ValueError(f"{lane}: a uniform lead time needs min and max")
-            if not lo <= hi:
-                raise ValueError(f"{lane}: a uniform lead time needs min ≤ max, got "
-                                 f"{lo:g} / {hi:g}")
-            if mo is not None:
-                raise ValueError(f"{lane}: a uniform lead time has no mode")
-        elif lo is not None or mo is not None or hi is not None:
-            raise ValueError(f"{lane}: lead-time bounds apply to triangular and uniform only, "
-                             f"not {d.value}")
-        if d in (LeadTimeDist.TRIANGULAR, LeadTimeDist.UNIFORM):
-            # The planning lead time is the bounds' mean (§25.2 rule 3), so it
-            # always lies inside them; a link whose lead_time_weeks does not is a
-            # plan and a draw describing two different lanes.
-            if not (int(lo) <= self.lead_time_weeks <= max(1, int(np.ceil(hi)))):
-                raise ValueError(f"{lane}: lead_time_weeks {self.lead_time_weeks} lies outside "
-                                 f"the lead-time bounds [{lo:g}, {hi:g}]")
+        check_lead_time_shape(
+            f"supply:{self.supplier_id}->{self.material_id}", self.lead_time_dist,
+            self.lead_time_min_weeks, self.lead_time_mode_weeks, self.lead_time_max_weeks,
+            planning=self.lead_time_weeks, planning_floor=1, what="lead_time_weeks")
         return self
+
+
+def check_lead_time_shape(label: str, d: LeadTimeDist, lo: Optional[float], mo: Optional[float],
+                          hi: Optional[float], *, planning: int, planning_floor: int,
+                          what: str) -> None:
+    """One validation for every lead-time shape (PLAN.md §25 WP 15.1 / 15.4): a
+    supplier link's and a product's production lead time. A bounded shape needs
+    its bounds in order and its planning lead time inside them (the mapper
+    derives it as their mean, §25.2 rule 3); any other shape carries no bounds."""
+    if d == LeadTimeDist.TRIANGULAR:
+        if lo is None or mo is None or hi is None:
+            raise ValueError(f"{label}: a triangular lead time needs min, mode and max")
+        if not lo <= mo <= hi:
+            raise ValueError(f"{label}: a triangular lead time needs min ≤ mode ≤ max, got "
+                             f"{lo:g} / {mo:g} / {hi:g}")
+    elif d == LeadTimeDist.UNIFORM:
+        if lo is None or hi is None:
+            raise ValueError(f"{label}: a uniform lead time needs min and max")
+        if not lo <= hi:
+            raise ValueError(f"{label}: a uniform lead time needs min ≤ max, got "
+                             f"{lo:g} / {hi:g}")
+        if mo is not None:
+            raise ValueError(f"{label}: a uniform lead time has no mode")
+    elif lo is not None or mo is not None or hi is not None:
+        raise ValueError(f"{label}: lead-time bounds apply to triangular and uniform only, "
+                         f"not {d.value}")
+    if d in (LeadTimeDist.TRIANGULAR, LeadTimeDist.UNIFORM):
+        if not (int(lo) <= planning <= max(planning_floor, int(np.ceil(hi)))):
+            raise ValueError(f"{label}: {what} {planning} lies outside the lead-time bounds "
+                             f"[{lo:g}, {hi:g}]")
 
 
 def lead_time_bounds_mean(dist: LeadTimeDist, lo: float, mode: Optional[float],
@@ -327,6 +334,34 @@ class Product(BaseModel):
         None, ge=0, json_schema_extra=_meta(
             "units", "P", "FG opening stock (engine RFC 4). None = start at the policy target."),
     )
+    # P-P.13 production lead time (PLAN.md §25 WP 15.4, ADR 0003): output started
+    # in week t completes in week t + L. 0 = same-week completion, today's
+    # behaviour (W^FG = 0 by default). The same shapes as a supplier lead time,
+    # drawn per (product, week) from their own world stream; a bounded shape's
+    # planning L is its mean. Materials are consumed at the start.
+    production_lead_time_weeks: int = Field(
+        0, ge=0, le=26, json_schema_extra=_meta(
+            "weeks", "P", "L_p: the planning production lead time. 0 = completes in the week "
+                          "it starts (byte-identical to an engine without it)."),
+    )
+    production_lead_time_dist: LeadTimeDist = Field(
+        LeadTimeDist.DETERMINISTIC, json_schema_extra=_meta(
+            "enum", "P", "Shape of the production lead time; drawn per (product, week) from "
+                         "the world production-time stream (CRN)."),
+    )
+    production_lead_time_cv: float = Field(
+        0.0, ge=0.0, le=1.0, json_schema_extra=_meta(
+            "-", "P", "CV for normal/lognormal/gamma production lead times."),
+    )
+    production_lead_time_min_weeks: Optional[float] = Field(
+        None, ge=0, le=26, json_schema_extra=_meta("weeks", "P", "Lower bound (triangular, uniform)."),
+    )
+    production_lead_time_mode_weeks: Optional[float] = Field(
+        None, ge=0, le=26, json_schema_extra=_meta("weeks", "P", "Most likely value (triangular)."),
+    )
+    production_lead_time_max_weeks: Optional[float] = Field(
+        None, ge=0, le=26, json_schema_extra=_meta("weeks", "P", "Upper bound (triangular, uniform)."),
+    )
     forecast_model: ForecastModel = Field(
         ForecastModel.MA, json_schema_extra=_meta("enum", "P", "MTS plans to forecast."),
     )
@@ -362,6 +397,14 @@ class Product(BaseModel):
         if self.demand_model == DemandModel.NORMAL and self.demand_cv is None:
             raise ValueError(f"product {self.id}: normal demand requires demand_cv "
                              f"(σ = cv · demand_mode)")
+        if self.production_lead_time_dist == LeadTimeDist.EMPIRICAL:
+            raise ValueError(f"product {self.id}: an empirical production lead time is reserved "
+                             f"(observations tier), not selectable")
+        check_lead_time_shape(
+            f"product {self.id}", self.production_lead_time_dist,
+            self.production_lead_time_min_weeks, self.production_lead_time_mode_weeks,
+            self.production_lead_time_max_weeks, planning=self.production_lead_time_weeks,
+            planning_floor=0, what="production_lead_time_weeks")
         return self
 
     @classmethod

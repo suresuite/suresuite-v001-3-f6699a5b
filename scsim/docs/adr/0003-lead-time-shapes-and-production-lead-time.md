@@ -41,3 +41,4 @@ production lead time per product.
 | Engine | Package | Change |
 |---|---|---|
 | 0.7.0 | §25 WP 15.1 | The three shapes, the per-lane world stream, `lead_time_floor_raises` on the result. No phase or state key changed; the pipeline snapshot moved by its engine version only. |
+| 0.8.0 | §25 WP 15.4 | P-P.13: `Product.production_lead_time_*`; PH-50 puts starts in a per-product production pipeline (materials consumed at start) and `production_output` becomes what COMPLETES — what P-C.1 ships and FG receives; `production_started` carries the starts (P-P.5's overtime and P-P.1's shortage flag read it). PH-40 offsets the plan by the EXPECTED L, netting the work in progress (`planning.production_lead_time_offset`). A second new world spawn key (`product_prodtime_rng`). WIP traced (`trace.wip_units` / `wip_value`, `WIP`, `ScenarioResult.work_in_progress`) and charged no holding cost. No phase or state key added; L = 0 everywhere is the pre-0.8.0 path. |
