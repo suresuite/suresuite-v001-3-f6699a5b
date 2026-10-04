@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scsim"
-version = "0.2.0"
+# WP 15.1 · §4 D294 — the package version is ENGINE_VERSION, read from source.
+dynamic = ["version"]
 description = "Resilience-grade 3-echelon supply chain simulator (SCSIM)"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -19,7 +20,10 @@ dependencies = [
 
 [project.optional-dependencies]
 io = ["pyarrow>=14"]
-dev = ["pytest>=8", "pytest-cov"]
+dev = ["pytest>=8", "pytest-cov", "pyyaml>=6"]
+
+[tool.setuptools.dynamic]
+version = { attr = "scsim.ENGINE_VERSION" }
 
 [tool.setuptools.packages.find]
 include = ["scsim*"]

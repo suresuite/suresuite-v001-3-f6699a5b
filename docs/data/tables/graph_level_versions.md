@@ -32,7 +32,7 @@ partially or get corrected — the write fails.
 | Constraint | Rule | Added by |
 |---|---|---|
 | `graph_level_versions_level_check` | `CHECK (level IN ('product', 'process', 'firm', 'simulation'))` | `20261001000019_graph_level_versions.sql` |
-| `graph_level_versions_version_code_check` | `CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')` | `20261004000001_version_codes.sql` |
+| `graph_level_versions_version_code_check` | `CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')` | `20261004000002_version_codes.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -218,13 +218,13 @@ When the project's level first had this content — the first snapshot's `create
 | Type | `text` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261004000001_version_codes.sql` |
+| Added by | `20261004000002_version_codes.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ---
 
-*Generated from data contract `1fd26521a8d8`, engine `0.6.1`,
+*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
 sidecar `supabase/contract/graph_level_versions.contract.yaml`, table created by `20261001000019_graph_level_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

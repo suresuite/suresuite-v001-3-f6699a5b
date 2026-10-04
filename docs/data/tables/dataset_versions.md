@@ -53,11 +53,11 @@ Written by the `_build_dataset_snapshot` database function, never by a page — 
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:524` | yes |
+| `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:547` | yes |
 | `DeveloperApi.tsx` | rpc list_dataset_versions | `src/pages/DeveloperApi.tsx:350` | yes |
 | `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:28` | yes |
-| `ProjectPolicies.tsx` | rpc record_validated_model (Save Validated Model, WP 10.3) | `src/hooks/useModelValidation.tsx:571` | yes |
-| `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:524` | yes |
+| `ProjectPolicies.tsx` | rpc record_validated_model (Save Validated Model, WP 10.3) | `src/hooks/useModelValidation.tsx:594` | yes |
+| `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:547` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -412,6 +412,6 @@ This snapshot's SIMULATION scope version — the `graph_level_versions` row whos
 
 ---
 
-*Generated from data contract `1fd26521a8d8`, engine `0.6.1`,
+*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

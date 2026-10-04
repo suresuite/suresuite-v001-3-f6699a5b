@@ -19,7 +19,7 @@ natural_key_unique:
   - source: "partial unique index 20261001000020_simulation_scope.sql (WHERE status = 'active')"
     columns: [project_id, policy_hash, "(COALESCE(hash_simulation, graph_hash))", scenario_hash]
     name: "model_validations_active_content_uq"
-  - source: "constraint 20261004000001_version_codes.sql"
+  - source: "constraint 20261004000002_version_codes.sql"
     columns: [project_id, model_code]
     name: "model_validations_model_code_key"
 
@@ -27,12 +27,12 @@ surfaces:
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:344"
+    evidence: "src/hooks/useModelValidation.tsx:366"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:344"
+    evidence: "src/hooks/useModelValidation.tsx:366"
     confirmed: true
 
 governance:

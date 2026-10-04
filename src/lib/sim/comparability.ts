@@ -18,6 +18,9 @@
  * WP 8); the live scenario row is the fallback only for runs older than that.
  */
 
+import { engineDifference } from "./engineBuild";
+import { engineChangeSummary } from "./engineChanges";
+
 export interface ComparableSide {
   scenario: { crn: boolean; seed: number; disruption_schedule?: unknown[] | null };
   run: {
@@ -75,10 +78,12 @@ export function comparabilityFailures(a: ComparableSide, b: ComparableSide): str
     );
   }
 
-  if (a.run.code_version && b.run.code_version && a.run.code_version !== b.run.code_version) {
-    failures.push(
-      `engine versions differ (${a.run.code_version} vs ${b.run.code_version}) — re-run one side`,
-    );
+  // WP 15.1 · §4 D293 — says HOW the engines differ: version, build, or unknowable;
+  // WP 15.6 · §4 D297 — and what the change record says lies between them.
+  const engines = engineDifference(a.run.code_version, b.run.code_version);
+  if (engines) {
+    const between = engineChangeSummary(a.run.code_version, b.run.code_version);
+    failures.push(`${engines}${between ? ` — ${between}` : ""} — re-run one side`);
   }
   return failures;
 }

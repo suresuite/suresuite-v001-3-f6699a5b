@@ -114,7 +114,8 @@ describe("pages and their bodies", () => {
     { section: 9, wp: "5.2e", pages: 4 },
     { section: 10, wp: "5.2g", pages: 3 },
     { section: 11, wp: "5.2d", pages: 5 },
-    { section: 12, wp: "5.2f", pages: 3 },
+    // Four since PLAN.md §25 WP 15.6 added "Engine versions & changes".
+    { section: 12, wp: "5.2f", pages: 4 },
     { section: 13, wp: "5.2g", pages: 7 },
     { section: 14, wp: "5.2g", pages: 4 },
     { section: 15, wp: "5.2h", pages: 4 },

@@ -38,7 +38,8 @@ const COMPLETE: ReproducibilityRecordInput = {
   scenarioSeed: 42,
   scenarioSeedSource: "simulation_runs.seed (stamped at dispatch)",
   disruptionSchedule: "1 event(s) · fnv1a 0badc0de",
-  engineCodeVersion: "0.2.3",
+  // A run recorded since WP 15.1 names its build (scsim-<version>+<digest>).
+  engineCodeVersion: "scsim-0.6.1+ce3483abda4e",
   browserEngineVersion: "0.2.3",
   // WP 10.4 — the binding on the row.
   scenarioHash: "c".repeat(64),

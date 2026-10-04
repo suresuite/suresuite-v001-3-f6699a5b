@@ -202,11 +202,16 @@ export function fgBufferAppliesToRow(ctx: ColSpecCtx): boolean {
 }
 
 /** The Customer row's demand mode as the engine runs it (`rowGateCtx`):
- *  `forecast` only when the row has an uploaded series. */
-export function rowDemandMode(ctx: ColSpecCtx): "forecast" | "model" {
-  return ctx.resolved?.row_demand_mode === "forecast" ? "forecast" : "model";
+ *  `forecast` only when the row has an uploaded series; `schedule` when the row
+ *  runs its requested delivery schedule (`row_demand_schedule`). */
+export function rowDemandMode(ctx: ColSpecCtx): "forecast" | "model" | "schedule" {
+  const m = ctx.resolved?.row_demand_mode;
+  return m === "forecast" || m === "schedule" ? m : "model";
 }
-export const rowHasForecast = (ctx: ColSpecCtx): boolean => ctx.resolved?.has_forecast === true;
+export const rowHasForecast = (ctx: ColSpecCtx): boolean =>
+  ctx.resolved?.has_forecast === true && rowDemandMode(ctx) !== "schedule";
+/** The delivery-schedule cell shows only on a row that runs one. */
+export const rowRunsSchedule = (ctx: ColSpecCtx): boolean => rowDemandMode(ctx) === "schedule";
 
 /** The row's own distribution, or "" when it runs its product's (× share). */
 const rowDistribution = (ctx: ColSpecCtx): string =>
@@ -224,6 +229,8 @@ const rowDistribution = (ctx: ColSpecCtx): string =>
 const demandParamFor =
   (field: "mean" | "variation" | "bounds"): ColSpec["visibleWhen"] =>
   (ctx) => {
+    // A delivery schedule is firm demand: no distribution reads anything.
+    if (rowDemandMode(ctx) === "schedule") return false;
     const d = rowDistribution(ctx);
     if (!d) return false;
     if (field === "bounds") return d === "triangular";
@@ -535,9 +542,15 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // column to point at. Empty = the engine's rule; `model` sets an uploaded
       // series aside, and the Forecast cell beside it says whether there is one.
       col("row_demand_mode", "demand"),
+      // The customer's REQUESTED DELIVERY SCHEDULE — units per week, typed here
+      // (an override-only array: nothing is uploaded for it). Shown only on a
+      // row whose mode is `schedule`; it replaces the row's demand spec whole.
+      col("row_demand_schedule", "demand", { visibleWhen: rowRunsSchedule }),
       // The uploaded series, shown only on a row that has one.
       col("row_forecast", "demand", { readOnly: true, visibleWhen: rowHasForecast }),
       col("row_demand_distribution", "demand", {
+        // A schedule is deterministic by definition — no distribution to pick.
+        visibleWhen: (ctx) => !rowRunsSchedule(ctx),
         // Empty = the row runs its product's distribution × its volume share; the
         // select says "product's" (an enum cannot carry `nullMeans`).
         master: { table: "outbound_logistics", field: "demand_distribution", idFrom: "customer_id::product_id" },
@@ -706,7 +719,8 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   // ---- customer · fulfillment
   sourcing_firm: { sub: "serving node", w: 168, kind: "text", keep: true, align: "left" },
   // ---- customer · demand per row (WP 14.2)
-  row_demand_mode: { sub: "forecast · model", w: 92, kind: "text", keep: true, align: "left" },
+  row_demand_mode: { sub: "forecast · model · schedule", w: 156, kind: "text", keep: true, align: "left" },
+  row_demand_schedule: { sub: "units / wk · requested", w: 168, kind: "text", keep: true, filterable: false, align: "left" },
   row_forecast: { sub: "uploaded series", w: 168, kind: "text", align: "left", prio: 6 },
   row_demand_distribution: { sub: "per row", w: 112, kind: "text", keep: true, align: "left" },
   row_demand_mean: { sub: "units / wk", w: 88, kind: "num", dec: 1, keep: true },
@@ -762,6 +776,7 @@ export const SHORT_LABEL: Record<string, string> = {
   allocation_priority_weight: "Allocation wt.",
   sourcing_firm: "Sourcing firm",
   row_demand_mode: "Demand mode",
+  row_demand_schedule: "Delivery schedule",
   row_forecast: "Forecast",
   row_demand_distribution: "Distribution",
   row_demand_mean: "Mean / mode",
@@ -824,6 +839,8 @@ const POLICIES_OVERRIDE_CELLS: Record<string, { stage: StageKey; field: string }
   // Customer rows; the product value is only what an empty row inherits.
   "products.demand_mean": { stage: "customer", field: "row_demand_mean" },
   "products.demand_cv": { stage: "customer", field: "row_demand_variation" },
+  // The pre-run gate's delivery-schedule findings land on the cell that sets it.
+  "demand.row_demand_schedule": { stage: "customer", field: "row_demand_schedule" },
 };
 
 export function policiesCellFor(datasetField: string): { stage: StageKey; field: string } | null {

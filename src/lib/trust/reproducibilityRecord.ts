@@ -47,6 +47,8 @@
  * every REQUIRED binding is present, and the record says which ones are not.
  */
 import type { KnownLimit } from "./trustReport";
+import { parseCodeVersion } from "@/lib/sim/engineBuild";
+import { changeFor, engineDocHref } from "@/lib/sim/engineChanges";
 
 /** One bound fact, or the stated absence of one. */
 export interface Binding {
@@ -378,6 +380,29 @@ export function bindingsOf(input: ReproducibilityRecordInput): Binding[] {
       "required",
       "the engine that produced the figure is unrecorded, so a later engine cannot be " +
         "compared against it",
+    ),
+    // WP 15.1 / 15.6 · §4 D293, D297 — the build by content, and what its version changed.
+    bind(
+      "engine.build",
+      "Engine build",
+      parseCodeVersion(input.engineCodeVersion)?.build ?? null,
+      "simulation_runs.code_version (scsim-<version>+<build>, WP 15.1)",
+      "recommended",
+      "the run predates build identity (WP 15.1): its label names a version that several " +
+        "different builds shared, so which code computed it cannot be told from the record. " +
+        "Its version's archived builds are installable (suresuite.install_engine(version=…))",
+    ),
+    bind(
+      "engine.change_record",
+      "Engine change record",
+      (() => {
+        const e = changeFor(parseCodeVersion(input.engineCodeVersion)?.version ?? null);
+        return e ? `${e.version} — ${e.comparable}: ${e.comparability} (${engineDocHref(e.version)})` : null;
+      })(),
+      "scsim/CHANGELOG.yaml (the manual's Engine versions & changes page)",
+      "recommended",
+      "the run's engine names no version in the change record, so what that engine changed " +
+        "cannot be shown beside the figure",
     ),
     bind(
       "engine.browser_version",

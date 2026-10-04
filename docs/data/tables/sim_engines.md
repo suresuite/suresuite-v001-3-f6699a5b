@@ -226,6 +226,6 @@ When the row was seeded.
 
 ---
 
-*Generated from data contract `1fd26521a8d8`, engine `0.6.1`,
+*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
 sidecar `supabase/contract/sim_engines.contract.yaml`, table created by `20261001000009_engines_runkey.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

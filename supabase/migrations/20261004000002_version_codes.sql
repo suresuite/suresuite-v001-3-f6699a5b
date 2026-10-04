@@ -184,7 +184,7 @@ REVOKE ALL ON FUNCTION public._graph_level_versions_immutable() FROM PUBLIC, ano
 -- Each content's code is the day it first appeared; within a day, `version_no` order,
 -- which is first-appearance order — so the codes and the numbers people have already
 -- seen tell the same story. A FUNCTION, as `_graph_level_backfill` is, so
--- `rehearsal/820` runs the code this migration ran on a planted history.
+-- `rehearsal/830` runs the code this migration ran on a planted history.
 -- NOT security definer: only the migration and a rehearsal run it, each as owner. It
 -- fills a column nobody has read yet and names no actor, and no API role may call it.
 CREATE OR REPLACE FUNCTION public._version_codes_backfill(p_project_id uuid DEFAULT NULL)

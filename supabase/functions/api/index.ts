@@ -28,7 +28,9 @@ import { z } from "npm:zod@3";
 import { cleanEnv } from "../_shared/env.ts";
 import registry from "../_shared/registry.generated.json" with { type: "json" };
 import { selectTables, tablesParam, wantsGzip } from "../_shared/snapshotView.ts";
-import { ENGINE_URL_TTL_SECONDS, engineResponse, parseEngineIndex, wheelPath } from "../_shared/engineIndex.ts";
+import {
+  ENGINE_URL_TTL_SECONDS, engineResponse, parseEngineIndex, parseEngineVersions, publishedVersions, selectEngine, wheelPath,
+} from "../_shared/engineIndex.ts";
 import {
   dispatchExperimentCancel,
   dispatchExperimentRun,
@@ -1045,13 +1047,29 @@ const getPolicyVersion: Handler = async (ctx) => {
 // Every fetch is a logged request naming the key — and, for a personal key, the
 // person. The browser engine still loads the same wheels publicly (§4 D274).
 
-const getEngine: Handler = async () => {
-  const { data: blob, error } = await svc.storage.from("engine").download("index.json");
+// WP 15.3 · §4 D295 — `?version=0.4.0` (the newest build of that version) or
+// `?version=scsim-0.4.0+<digest>` (exactly that build) installs an EARLIER engine,
+// from `engine/versions.json`, so a stored result can be re-run on the engine
+// that produced it. With no version, the latest — `index.json`, as before.
+const getEngine: Handler = async (ctx) => {
+  const wanted = (ctx.url.searchParams.get("version") ?? "").trim();
+  const { data: blob, error } = await svc.storage.from("engine").download(wanted ? "versions.json" : "index.json");
   if (error || !blob) throw new ApiError(503, "engine_unpublished", "the engine has not been published to the API yet");
   let index;
   try {
-    index = parseEngineIndex(JSON.parse(await blob.text()));
-  } catch (_e) {
+    const raw = JSON.parse(await blob.text());
+    if (wanted) {
+      const versions = parseEngineVersions(raw);
+      index = selectEngine(versions, wanted);
+      if (!index) {
+        throw new ApiError(404, "engine_version_not_published",
+          `engine ${wanted} was never published; published versions: ${publishedVersions(versions).join(", ")}`);
+      }
+    } else {
+      index = parseEngineIndex(raw);
+    }
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
     throw new ApiError(503, "engine_unpublished", "the published engine index is unreadable");
   }
   const urls: Record<string, string | null> = {};

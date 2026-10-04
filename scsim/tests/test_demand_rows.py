@@ -373,3 +373,63 @@ def test_mapper_without_row_fields_builds_the_links_it_always_built():
          OutboundArc(product_id="P1", customer_id="C2", volume=0.0, time_unit="week")]))
     links = res.scenario.network.customer_links
     assert [(l.customer_id, l.share) for l in links] == [("C1", 60.0)]
+
+
+# ------------------------------------- the requested delivery schedule (P-C.4)
+
+def _schedule_pd(policies):
+    d = _pd(
+        [ProductRow(id="P1", sell_price=10.0, production_capacity=200.0, demand_mean=100.0)],
+        [OutboundArc(product_id="P1", customer_id="C1", volume=60.0, time_unit="week",
+                     demand_distribution="normal", demand_mean=50.0, demand_variation=0.3,
+                     forecast=FORECAST),
+         OutboundArc(product_id="P1", customer_id="C2", volume=40.0, time_unit="week")])
+    d.policies = policies
+    return from_project_data(d)
+
+
+SCHEDULE = [0.0, 120.0, 0.0, 80.0]
+
+
+def test_a_delivery_schedule_is_the_rows_demand_exactly():
+    """'schedule' runs the typed weekly quantities as firm demand: deterministic,
+    the distribution and the uploaded forecast set aside, nothing past its end."""
+    res = _schedule_pd({"node:C1::P1": {"demand": {"row_demand_mode": "schedule",
+                                                    "row_demand_schedule": SCHEDULE}}})
+    links = {l.customer_id: l for l in res.scenario.network.customer_links}
+    c1 = links["C1"]
+    assert c1.forecast == SCHEDULE and c1.demand_model == "deterministic"
+    assert c1.demand_mean == 0.0 and c1.demand_variation is None
+    model = compile_scenario(res.scenario).model
+    r = model.row_ids.index("C1::P1")
+    assert model.row_centre[r, :4].tolist() == SCHEDULE
+    assert not model.row_centre[r, 4:].any()       # zero past its end, no warning tail
+    assert not model.row_forecast_short or all(
+        f["tail"] == 0.0 for f in model.row_forecast_short)
+
+
+def test_a_saved_schedule_runs_when_the_mode_is_empty_and_not_under_model():
+    empty = _schedule_pd({"node:C1::P1": {"demand": {"row_demand_schedule": SCHEDULE}}})
+    (c1,) = [l for l in empty.scenario.network.customer_links if l.customer_id == "C1"]
+    assert c1.forecast == SCHEDULE
+    model = _schedule_pd({"node:C1::P1": {"demand": {"row_demand_mode": "model",
+                                                      "row_demand_schedule": SCHEDULE}}})
+    (c1,) = [l for l in model.scenario.network.customer_links if l.customer_id == "C1"]
+    assert c1.forecast is None and c1.demand_model == "normal"
+
+
+@pytest.mark.parametrize("bad", [[10, -1], [10, "x"], "10,20"])
+def test_an_invalid_schedule_is_warned_and_the_row_keeps_its_data(bad):
+    res = _schedule_pd({"node:C1::P1": {"demand": {"row_demand_mode": "schedule",
+                                                    "row_demand_schedule": bad}}})
+    (c1,) = [l for l in res.scenario.network.customer_links if l.customer_id == "C1"]
+    assert c1.forecast == FORECAST and c1.demand_model == "normal"
+    fields = {w.field for w in res.warnings if w.entity == "customer_row:C1::P1"}
+    assert {"row_demand_schedule", "row_demand_mode"} <= fields
+
+
+def test_a_schedule_on_a_row_with_no_uploaded_spec_gives_it_one():
+    res = _schedule_pd({"node:C2::P1": {"demand": {"row_demand_mode": "schedule",
+                                                    "row_demand_schedule": [5, 5]}}})
+    (c2,) = [l for l in res.scenario.network.customer_links if l.customer_id == "C2"]
+    assert c2.forecast == [5.0, 5.0] and c2.demand_model == "deterministic"

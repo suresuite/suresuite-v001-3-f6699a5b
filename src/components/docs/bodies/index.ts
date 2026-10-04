@@ -76,6 +76,7 @@ import NetworkSummary from "./NetworkSummary";
 import DatasetVersions from "./DatasetVersions";
 import VerifiableExports from "./VerifiableExports";
 import ReproducibilityRecord from "./ReproducibilityRecord";
+import EngineVersions from "./EngineVersions";
 import ExportingAndDeleting from "./ExportingAndDeleting";
 
 // 7 · Experiments & scenarios, 11 · Results & statistics (WP 5.2d)
@@ -199,6 +200,7 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   // 12 · Exports & reproducibility
   "verifiable-exports": VerifiableExports,
   "reproducibility-record": ReproducibilityRecord,
+  "engine-versions": EngineVersions,
   "exporting-and-deleting": ExportingAndDeleting,
 
   // 13 · Access & administration

@@ -3,7 +3,7 @@
 //
 //     2026Q3 - Data 20260915 - Policy 20261004
 //
-// The codes are STORED by the database (`20261004000001_version_codes.sql`):
+// The codes are STORED by the database (`20261004000002_version_codes.sql`):
 //   · `model_validations.model_code` — the planning period the modeller chose, `-n`
 //     for the n-th model of that period;
 //   · `graph_level_versions.version_code` (simulation level) — the UTC day the

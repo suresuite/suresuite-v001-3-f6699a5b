@@ -33,8 +33,8 @@ partially or get corrected — the write fails.
 | `model_validations_basis_check` | `CHECK (basis IN ('statistical', 'face'))` | `20260710000001_model_validations.sql` |
 | `model_validations_status_check` | `CHECK (status IN ('active', 'superseded', 'revoked'))` | `20260710000001_model_validations.sql` |
 | `model_validations_protocol_check` | `CHECK (protocol IS NULL OR cardinality(public.validated_model_protocol_problems(protocol)) = 0)` | `20261001000008_validated_model.sql` |
-| `model_validations_planning_period_check` | `CHECK (planning_period IS NULL OR planning_period ~ '^[0-9]{4}Q[1-4]$')` | `20261004000001_version_codes.sql` |
-| `model_validations_model_code_check` | `CHECK ((planning_period IS NULL) = (model_code IS NULL) AND (model_code IS NULL OR model_code ~ ('^' \|\| planning_period \|\| '(-[0-9]+)?$')))` | `20261004000001_version_codes.sql` |
+| `model_validations_planning_period_check` | `CHECK (planning_period IS NULL OR planning_period ~ '^[0-9]{4}Q[1-4]$')` | `20261004000002_version_codes.sql` |
+| `model_validations_model_code_check` | `CHECK ((planning_period IS NULL) = (model_code IS NULL) AND (model_code IS NULL OR model_code ~ ('^' \|\| planning_period \|\| '(-[0-9]+)?$')))` | `20261004000002_version_codes.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -77,8 +77,8 @@ Tier 4 — a DECISION. Readable by every API role (`model_validations_read_all`,
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `SimulationLab.tsx` | table read | `src/hooks/useModelValidation.tsx:344` | yes |
-| `ProjectPolicies.tsx` | table read | `src/hooks/useModelValidation.tsx:344` | yes |
+| `SimulationLab.tsx` | table read | `src/hooks/useModelValidation.tsx:366` | yes |
+| `ProjectPolicies.tsx` | table read | `src/hooks/useModelValidation.tsx:366` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -653,7 +653,7 @@ The planning period the model is FOR (`2026Q3`), chosen by the modeller when the
 | Type | `text` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261004000001_version_codes.sql` |
+| Added by | `20261004000002_version_codes.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -667,7 +667,7 @@ The planning period the model is FOR (`2026Q3`), chosen by the modeller when the
 | Type | `text` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261004000001_version_codes.sql` |
+| Added by | `20261004000002_version_codes.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -681,6 +681,6 @@ The planning period the model is FOR (`2026Q3`), chosen by the modeller when the
 
 ---
 
-*Generated from data contract `1fd26521a8d8`, engine `0.6.1`,
+*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
 sidecar `supabase/contract/model_validations.contract.yaml`, table created by `20260710000001_model_validations.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

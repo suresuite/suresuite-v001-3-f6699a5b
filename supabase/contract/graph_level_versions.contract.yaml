@@ -21,7 +21,7 @@ natural_key_unique:
   - source: "constraint 20261001000019_graph_level_versions.sql"
     columns: [project_id, level, version_no]
     name: "graph_level_versions_number_key"
-  - source: "constraint 20261004000001_version_codes.sql"
+  - source: "constraint 20261004000002_version_codes.sql"
     columns: [project_id, level, version_code]
     name: "graph_level_versions_code_key"
 

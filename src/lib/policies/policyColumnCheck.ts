@@ -420,9 +420,15 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   },
   // PLAN.md §24 WP 14.2 — demand per customer × product row.
   "customer:row_demand_mode": {
-    shows: "your override, else empty — the engine's rule: the row's forecast when one is uploaded, else its model",
+    shows: "your override, else empty — the engine's rule: the row's delivery schedule when one is entered, else its forecast when one is uploaded, else its model",
     savedTo: "override demand.row_demand_mode (Customer row)",
-    engine: "'model' sets an uploaded forecast aside; 'forecast' without one is warned and ignored",
+    engine: "'model' sets an uploaded forecast aside; 'forecast' without one is warned and ignored; 'schedule' runs the row's requested delivery schedule exactly",
+    verdict: "works",
+  },
+  "customer:row_demand_schedule": {
+    shows: "the row's requested delivery schedule — units per week from week 1, typed here",
+    savedTo: "override demand.row_demand_schedule (Customer row, an array)",
+    engine: "CustomerLink.forecast with a deterministic draw and mean 0: the row's demand is exactly the schedule, and nothing past its end; its distribution and any uploaded forecast are set aside",
     verdict: "works",
   },
   "customer:row_forecast": {

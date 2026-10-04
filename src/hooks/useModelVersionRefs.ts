@@ -33,7 +33,7 @@ async function readRefs(card: CardRefs): Promise<VersionRefs> {
       : Promise.resolve({ data: null }),
     sb.from("policy_versions").select("version_no,version_code").eq("id", card.policy_version_id).maybeSingle()
       .then(async (r: { data: unknown; error: unknown }) =>
-        // Before `20261004000001` there is no code column: the number alone.
+        // Before `20261004000002` there is no code column: the number alone.
         r.error ? sb.from("policy_versions").select("version_no").eq("id", card.policy_version_id).maybeSingle() : r),
   ])) as Array<{ data: unknown }>;
   const t = tupleNumbers(ds.data);
