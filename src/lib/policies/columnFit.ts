@@ -175,6 +175,8 @@ export function fitColumns({
       if (c.key === "type") return { ...c, sub: "active ▾", w: 74, compact: true };
       if (c.key === "params" || c.key === "__inv_params")
         return { ...c, sub: "levels", w: 148, paramW: 42 };
+      // The Plant row's FG levels (WP 15.6) hold at most s and S.
+      if (c.key === "__fg_inv_params") return { ...c, sub: "levels", w: 118, paramW: 42 };
       if (c.kind === "chip" && !c.foldedFamily) {
         return { ...c, sub: "sizing", w: 84, shortChip: true };
       }

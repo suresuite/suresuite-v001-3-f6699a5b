@@ -665,7 +665,7 @@ export const FIELD_LABELS: Record<string, string> = {
   row_demand_min: "Demand min (units/wk, triangular)",
   row_demand_max: "Demand max (units/wk, triangular)",
   // plant · FG policy per product (PLAN.md §24 WP 14.4) — MTS only.
-  fulfillment_mode: "Holds FG stock (mts) or builds to order (mto)",
+  fulfillment_mode: "Holds FG inventory (mts) or builds to order (mto)",
   fg_policy: "FG policy (base-stock / min-max / days of cover)",
   fg_base_stock: "FG target S (units)",
   fg_reorder_point: "FG reorder point s (units, min-max)",

@@ -698,8 +698,16 @@ export function ReplenishmentCell({
   showBasis,
   paramW,
   basisNotSimulated,
+  paramSpec,
+  emptyNote,
 }: {
   policyType: string;
+  /** The parameters to show, in order, with their symbols — the FG twin of
+   *  `POLICY_PARAMS` for the Plant row (PLAN.md §25 WP 15.6). Defaults to the
+   *  Supplier stage's `POLICY_PARAMS[policyType]`. */
+  paramSpec?: Array<{ field: string; symbol: string }>;
+  /** What an empty parameter list says (default: MRP's "from the plan"). */
+  emptyNote?: { label: string; title: string };
   params: Array<{
     field: string;
     value: number | undefined;
@@ -714,6 +722,11 @@ export function ReplenishmentCell({
     placeholderNote?: string;
     /** §23 WP 13.4 — the engine does not read this parameter on this stage. */
     notSimulated?: string;
+    /** Where the value came from, for a master-backed parameter (the FG levels
+     *  over `products`, WP 15.6) — the same dot every other grid cell carries. */
+    source?: Provenance;
+    /** The source dot's hover. */
+    sourceTitle?: string;
   }>;
   labelFor: (field: string) => string;
   basis: "days_of_supply" | "forward_visible";
@@ -726,7 +739,7 @@ export function ReplenishmentCell({
   paramW?: number;
 }) {
   const hasValue = (f: string) => params.find((x) => x.field === f)?.value !== undefined;
-  const spec = (POLICY_PARAMS[policyType] ?? POLICY_PARAMS.min_max).filter(
+  const spec = paramSpec ?? (POLICY_PARAMS[policyType] ?? POLICY_PARAMS.min_max).filter(
     ({ field }) => field !== "coverage_weeks" || kappaIsRead(policyType, hasValue),
   );
   const visibleBasis = showBasis || basis !== "days_of_supply";
@@ -737,6 +750,11 @@ export function ReplenishmentCell({
         const p = params.find((x) => x.field === field);
         return (
           <div key={field} className="flex shrink-0 items-center gap-[3px]">
+            {p?.source && (
+              <span title={p.sourceTitle}>
+                <ProvenanceDot p={p.source} />
+              </span>
+            )}
             <span title={labelFor(field)} className="cursor-help font-mono text-[10px] font-medium text-muted-foreground">
               {symbol}
             </span>
@@ -778,8 +796,11 @@ export function ReplenishmentCell({
         );
       })}
       {spec.length === 0 && (
-        <span className="font-mono text-[10px] text-muted-foreground" title="MRP orders the plan's need over the lead time, net of stock and the pipeline — no level, lot or κ">
-          from the plan
+        <span
+          className="font-mono text-[10px] text-muted-foreground"
+          title={emptyNote?.title ?? "MRP orders the plan's need over the lead time, net of stock and the pipeline — no level, lot or κ"}
+        >
+          {emptyNote?.label ?? "from the plan"}
         </span>
       )}
       {visibleBasis && spec.length > 0 && (

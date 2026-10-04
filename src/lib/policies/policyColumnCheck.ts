@@ -425,10 +425,17 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     verdict: "conditional",
     note: "Shown only on a triangular or uniform row.",
   },
+  "plant:__fg_inv_params": {
+    shows: "the FG Replenishment cell: only the levels the row's FG policy reads — S (base-stock), s and S (min-max), D (days of cover) — each with its source dot; an empty S shows what it means (≈ 1 wk demand)",
+    savedTo: "the individual fields below (Plant-row overrides of products)",
+    engine: "see the individual fields",
+    verdict: "info",
+    note: "PLAN.md §25 WP 15.6 — laid out like the Supplier stage's inventory band (§4 D293).",
+  },
   "plant:fulfillment_mode": {
     shows: "your override → products.fulfillment_mode → projects.supply_chain_model → MTO",
     savedTo: "override production.fulfillment_mode (Plant row — /policies never writes the master)",
-    engine: "Product.fulfillment_mode: MTS holds FG stock and reads the FG policy below; MTO reads none of it",
+    engine: "Product.fulfillment_mode: MTS holds FG inventory and reads the FG policy below; MTO reads none of it",
     verdict: "works",
     note: "The FG columns appear only on an MTS row, so every FG cell shown is one the run reads.",
     refs: ["D197"],
@@ -600,7 +607,7 @@ export function stageColumnChecks(stage: GridStage) {
   return STAGE_TABLE_SPEC[stage].cols.map((c) => ({
     field: c.field,
     family: c.family,
-    inVector: c.vectorGroup === "invParams",
+    inVector: c.vectorGroup === "invParams" || c.vectorGroup === "fgInvParams",
     ...headerFor(stage, c.field),
     check: COLUMN_CHECK[`${stage}:${c.field}`],
   }));
