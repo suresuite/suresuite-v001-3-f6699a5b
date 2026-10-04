@@ -47,29 +47,6 @@ jobs:
       - name: The index the wheels produce
         run: node scripts/publish_engine_wheels.mjs --dry-run
 
-      # PLAN.md §25 · WP 15.3 · §4 D295 — every version gets a tag at the commit that
-      # set it, read from scsim/CHANGELOG.yaml. A tag that already exists is NEVER
-      # moved: if it points elsewhere, say so and leave it (a moved tag would make
-      # "engine 0.4.0" mean two things).
-      - name: The change record's reader (PyYAML) for the tag step
-        run: python3 -m pip install --quiet pyyaml
-
-      - name: Tag every engine version (engine-v<version>, never moved)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          new=0
-          while read -r tag sha; do
-            if have=$(git rev-parse -q --verify "refs/tags/$tag^{commit}"); then
-              [ "$have" = "$sha" ] || echo "::warning::$tag points at ${have:0:12}, the change record says ${sha:0:12} — not moved"
-              continue
-            fi
-            git tag -a "$tag" "$sha" -m "scsim engine ${tag#engine-v} (scsim/CHANGELOG.yaml)"
-            new=$((new + 1))
-          done < <(python3 scsim/scripts/engine_changelog.py tags)
-          if [ "$new" -gt 0 ]; then git push origin --tags; fi
-          echo "$new new engine tag(s)"
-
       - name: Resolve the service-role key (masked)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -88,3 +65,40 @@ jobs:
         # (content-addressed, a file already there is skipped), so versions.json
         # lists every build ever shipped — WP 15.3.
         run: node scripts/publish_engine_wheels.mjs --backfill
+
+      # PLAN.md §25 · WP 15.3 · §4 D295 — every version gets a tag at the commit that
+      # set it, read from scsim/CHANGELOG.yaml. A tag that already exists is NEVER
+      # moved: if it points elsewhere, say so and leave it (a moved tag would make
+      # "engine 0.4.0" mean two things).
+      #
+      # §4 D299 — this step runs AFTER the publish and never fails it. On the Phase 15
+      # merge it ran first, and GitHub refused nine of the eighteen tags: GITHUB_TOKEN
+      # cannot push a ref to a commit whose workflow files differ, and no `permissions:`
+      # key grants that. `git push --tags` pushed the rest but exited non-zero, so the
+      # job stopped before the publish and the archive was never written. Each tag
+      # is now pushed alone; a refused one is a named warning and is left for a person
+      # with the `workflow` scope to push (the command is in the warning).
+      - name: The change record's reader (PyYAML) for the tag step
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: Tag every engine version (engine-v<version>, never moved)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          new=0; refused=0
+          while read -r tag sha; do
+            if have=$(git rev-parse -q --verify "refs/tags/$tag^{commit}"); then
+              [ "$have" = "$sha" ] || echo "::warning::$tag points at ${have:0:12}, the change record says ${sha:0:12} — not moved"
+              continue
+            fi
+            git tag -a "$tag" "$sha" -m "scsim engine ${tag#engine-v} (scsim/CHANGELOG.yaml)"
+            if err=$(git push origin "refs/tags/$tag" 2>&1); then
+              new=$((new + 1))
+            else
+              git tag -d "$tag" >/dev/null
+              refused=$((refused + 1))
+              why=$(printf '%s\n' "$err" | grep -m1 'remote rejected' | sed 's/.*(\(.*\))$/\1/')
+              echo "::warning::$tag (${sha:0:12}) not created: ${why:-push refused}. With the workflow scope: git tag -a $tag $sha -m 'scsim engine ${tag#engine-v} (scsim/CHANGELOG.yaml)' && git push origin $tag"
+            fi
+          done < <(python3 scsim/scripts/engine_changelog.py tags)
+          echo "$new new engine tag(s), $refused refused (see the warnings)"
