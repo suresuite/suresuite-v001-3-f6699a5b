@@ -3149,7 +3149,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc record_model_validation",
-        "evidence": "src/hooks/useModelValidation.tsx:513"
+        "evidence": "src/hooks/useModelValidation.tsx:536"
       },
       {
         "page": "DeveloperApi.tsx",
@@ -3164,12 +3164,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc record_validated_model (Save Validated Model, WP 10.3)",
-        "evidence": "src/hooks/useModelValidation.tsx:541"
+        "evidence": "src/hooks/useModelValidation.tsx:564"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc record_model_validation",
-        "evidence": "src/hooks/useModelValidation.tsx:513"
+        "evidence": "src/hooks/useModelValidation.tsx:536"
       }
     ],
     "governance": {
@@ -10854,12 +10854,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useModelValidation.tsx:333"
+        "evidence": "src/hooks/useModelValidation.tsx:355"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useModelValidation.tsx:333"
+        "evidence": "src/hooks/useModelValidation.tsx:355"
       }
     ],
     "governance": {

@@ -331,6 +331,7 @@ export const DOC_GROUPS: DocGroup[] = [
     pages: [
       { ...live, slug: "verifiable-exports", title: "Verifiable exports", summary: "The workbooks, and what makes each one checkable.", keywords: "exports workbooks verifiable xlsx download provenance" },
       { ...live, slug: "reproducibility-record", title: "Reproducibility record", summary: "The stamp that lets someone else rerun what you ran.", keywords: "reproducibility record versions dataset policy scenario engine stamp" },
+      { ...live, slug: "engine-versions", title: "Engine versions & changes", summary: "Every engine version, what it changed, who it affects, and how to re-run a result on its own engine.", keywords: "engine version build changelog changes release comparable withdrawn archive install reproduce scsim", related: ["reproducibility-record", "model-validation", "experiments-and-comparison"] },
       { ...live, slug: "exporting-and-deleting", title: "Exporting and deleting your data", summary: "Getting everything out, and getting it removed.", keywords: "export delete data removal gdpr portability account" },
     ],
   },

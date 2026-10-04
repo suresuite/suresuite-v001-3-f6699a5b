@@ -24,12 +24,12 @@ surfaces:
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:333"
+    evidence: "src/hooks/useModelValidation.tsx:355"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:333"
+    evidence: "src/hooks/useModelValidation.tsx:355"
     confirmed: true
 
 governance:

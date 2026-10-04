@@ -5046,7 +5046,7 @@
           "page": "DataManager.tsx",
           "via": "rpc record_model_validation",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:513",
+          "evidence": "src/hooks/useModelValidation.tsx:536",
           "confirmed": true
         },
         {
@@ -5067,14 +5067,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc record_validated_model (Save Validated Model, WP 10.3)",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:541",
+          "evidence": "src/hooks/useModelValidation.tsx:564",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc record_model_validation",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:513",
+          "evidence": "src/hooks/useModelValidation.tsx:536",
           "confirmed": true
         }
       ],
@@ -16760,14 +16760,14 @@
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:333",
+          "evidence": "src/hooks/useModelValidation.tsx:355",
           "confirmed": true
         },
         {
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:333",
+          "evidence": "src/hooks/useModelValidation.tsx:355",
           "confirmed": true
         }
       ],
@@ -44359,5 +44359,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "9313436a6d19"
+  "contract_version": "9980b7ae3762"
 }

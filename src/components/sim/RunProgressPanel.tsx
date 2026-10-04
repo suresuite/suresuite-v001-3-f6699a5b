@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { engineDocHref } from "@/lib/sim/engineChanges";
+import { engineLabelText } from "@/lib/sim/engineBuild";
 import { replicationLabel } from "@/lib/sim/replicationLabel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,8 +27,9 @@ interface Props {
  *  the Run-queue console (6.E) so both label the engine identically. */
 export function engineLabel(codeVersion: string | null | undefined): { label: string; cls: string } {
   const cv = codeVersion ?? "";
+  // WP 15.1 — `scsim-0.6.1+<build>` reads "scsim engine 0.6.1 (build …)".
   if (cv.startsWith("scsim-"))
-    return { label: `scsim engine ${cv.slice("scsim-".length)}`, cls: "border-green-500 text-green-700" };
+    return { label: `scsim engine ${engineLabelText(cv)}`, cls: "border-green-500 text-green-700" };
   if (cv.startsWith("worker")) return { label: "worker engine", cls: "border-green-500 text-green-700" };
   return { label: "preliminary (stub)", cls: "border-yellow-400 text-yellow-700" };
 }
@@ -85,9 +89,12 @@ export function RunProgressPanel({ run, reps, versionLabel, credibility, onCance
                   {versionLabel}
                 </Badge>
               )}
-              <Badge variant="outline" className={`text-[10px] ${engine.cls}`}>
-                {engine.label}
-              </Badge>
+              {/* WP 15.6 · §4 D296 — the badge opens what this engine version changed. */}
+              <Link to={engineDocHref(run.code_version)} title="What this engine version changed">
+                <Badge variant="outline" className={`text-[10px] ${engine.cls}`}>
+                  {engine.label}
+                </Badge>
+              </Link>
               {credibility && <CredibilityBadge credibility={credibility} />}
             </CardTitle>
             <div className="flex shrink-0 gap-2">
