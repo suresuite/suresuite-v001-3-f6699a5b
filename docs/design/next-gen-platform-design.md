@@ -666,6 +666,16 @@ flowchart TD
 > `inputs` domain has been exactly the tables the worker reads since WP 4.1, so the scope is
 > NAMED (its hash is `hash_inputs`) and gated against the worker's read list (D264). No stored
 > hash and no `schema_version` moves.
+>
+> **Version codes (WP 10.5 follow-up): a version is named by a code a person can say.** Four
+> counters printed as a bare `vN` (model, simulation inputs, policy, snapshot) and could not be
+> told apart; the per-table numbers stay — exports, the RunKey and the API keep them — but what a
+> person reads is a STORED code: a level version and a policy version are named by the UTC day
+> their content first appeared, `YYYYMMDD`, with `-n` for the n-th content first seen that day
+> ("Data 20260915" is the `simulation` level; "Policy 20261004"). Rows of one policy content share
+> one code, as they share one number. A code is assigned once, by the numbering trigger, and never
+> re-issued: the suffix is one past the highest ever stored that day, so deleting an older
+> version never renames a surviving one.
 
 ---
 
@@ -889,6 +899,17 @@ This subsection is numbered inside §9 but **logically precedes §9.1**: experim
 > validated result). A changed scenario world or engine still requires re-validation, because a
 > replay cannot hold those; a model recorded before models named their dataset version cannot be
 > replayed on moved data and offers only the exploratory run.
+>
+> **WP 10.5 follow-up: a model is named by its planning period.** The modeller picks the period a
+> model is FOR when saving it (`2026Q3` — never derived from the date it was validated); the
+> database stores `model_code` (`2026Q3`, then `2026Q3-2` for the next model of that period), and
+> the model reads as one sentence: **`2026Q3 - Data 20260915 - Policy 20261004`**, its name after
+> it. The period names the model and is not part of `model_hash`. A model saved before periods
+> existed reads "v1 · no period" until it is given one, once — no code is guessed for it (T1).
+> The same pass fixed the vocabulary around it: a model's state is *valid* / *superseded* /
+> *revoked* / *stale → re-validate*, and a policy version whose content is the live policies is
+> *live* — the two no longer share "in force"; "in use" says what it means ("used by 3 runs ·
+> 1 model").
 
 #### 9.5.1 The Run & Validate surface: trust before persistence *(closes G14a)*
 

@@ -46,15 +46,30 @@ const text = (h: string) =>
   h.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
 
 describe("Model → Engine, with the protocol locked", () => {
-  it("offers the model by name, number and protocol, and says it is in force", () => {
+  it("offers the model by its code and name, says it is valid, and states the protocol once", () => {
     const t = text(html(base()));
-    expect(t).toContain("Q4 baseline v2 · 30 seeds · steady from wk 12 · 52 wks");
-    expect(t).toContain("in force");
+    // WP 10.5 follow-up — a model saved before periods existed says so, never a guessed code.
+    expect(t).toContain("v2 · no period · Q4 baseline");
+    expect(text(html(base({ chosen: model({ model_code: "2026Q3" }), models: [model({ model_code: "2026Q3" })] }))))
+      .toContain("2026Q3 · Q4 baseline");
+    expect(t).toContain("valid");
+    expect(t).not.toContain("in force");
+    expect(t).toContain("30 replications · 52 weeks · results from wk 12");
   });
-  it("names the engine with its version and the build the worker reported", () => {
-    expect(text(html(base()))).toContain("scsim — the strategic engine · 0.2.8 · scsim-0.2.8");
+  it("names the engine with its version, and the build only when it is not the version", () => {
+    const h = html(base());
+    expect(text(h)).toContain("scsim 0.2.8");
+    expect(text(h)).not.toContain("scsim-0.2.8 ");
+    expect(h).toContain('title="the strategic engine · build scsim-0.2.8"');
     expect(text(html(base({ engines: [{ ...base().engines[0], code_version: null }] })))).toContain(
       "build ?",
+    );
+  });
+  it("offers a model with no period its period, once, only where it may be set", () => {
+    expect(html(base({ onSetPeriod: async () => {} }))).toContain('data-testid="model-set-period"');
+    expect(html(base())).not.toContain('data-testid="model-set-period"');
+    expect(html(base({ onSetPeriod: async () => {}, chosen: model({ model_code: "2026Q3" }) }))).not.toContain(
+      'data-testid="model-set-period"',
     );
   });
   it("shows the protocol LOCKED, and lists nothing when nothing deviates", () => {
@@ -108,9 +123,9 @@ describe("staleness and the run-the-model action", () => {
     expect(h).toContain("Run current data as exploratory");
     expect(text(h)).toContain("Your project's data changed since this model was validated.");
   });
-  it("a deep-tier change is a note beside 'in force', never 're-validate' (WP 11.3)", () => {
+  it("a deep-tier change is a note beside 'valid', never 're-validate' (WP 11.3)", () => {
     const t = text(html(base({ credibility: { state: "validated", card: model(), notes: ["network"] } })));
-    expect(t).toContain("in force");
+    expect(t).toContain("valid");
     expect(t).toContain("the deep tier changed — not read by the simulation");
     expect(t).not.toContain("re-validate");
   });

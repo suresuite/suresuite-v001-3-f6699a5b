@@ -17,6 +17,7 @@ import { DIALOG_AS_SHEET } from "@/components/shared";
 import { KX_TIGHT, MonoChip, SURFACE } from "@/components/intelligence/piUi";
 import type { PolicyVersion } from "@/hooks/usePolicies";
 import { useConfirm } from "@/components/shared/confirm/useConfirm";
+import { policyRef, stripLegacyDate, usageText } from "@/lib/versions/versionLabels";
 
 export function formatVersionWhen(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -27,10 +28,16 @@ export function formatVersionWhen(iso: string) {
   });
 }
 
+/** The version's own words: its label, without the date old auto-labels baked in. */
+export function versionName(v: PolicyVersion) {
+  const name = v.label ? stripLegacyDate(v.label) : "";
+  return name || (policyRef(v) ? "" : `Version ${v.id.slice(0, 8)}`);
+}
+
 export function versionDisplayName(v: PolicyVersion) {
-  const name = v.label || `Version ${v.id.slice(0, 8)}`;
-  // "v4 · name" — the per-project content number (WP 10.2), when the row carries it.
-  return typeof v.version_no === "number" ? `v${v.version_no} · ${name}` : name;
+  // "Policy 20261004 · name" — the stored code (WP 10.5 follow-up), else the
+  // per-project content number (WP 10.2), when the row carries either.
+  return [policyRef(v), versionName(v)].filter(Boolean).join(" · ");
 }
 
 /** Save a snapshot of the current bundle — opened from row A's black button. */
@@ -174,8 +181,14 @@ export function PolicyHistorySheet({
     });
     if (deleted.length === n) setSelecting(false);
   };
-  const parentLabel = (id: string | null) =>
-    versions.find((v) => v.id === id)?.label || (id ? id.slice(0, 8) : "—");
+  const parentLabel = (id: string | null) => {
+    if (!id) return null;
+    const parent = versions.find((v) => v.id === id);
+    return parent ? policyRef(parent) ?? versionName(parent) : id.slice(0, 8);
+  };
+  // Rows saved before deduplication can share one content, and so one code (§4 D241).
+  const sharing = (v: PolicyVersion) =>
+    v.version_no == null ? [] : versions.filter((o) => o.id !== v.id && o.version_no === v.version_no);
 
   // v2 §4C. The sheet is mounted by both platforms and already branches on
   // `isMobile` for its side and its radius, so the skin rides that branch
@@ -302,6 +315,15 @@ export function PolicyHistorySheet({
             const refCount = (v.run_count ?? 0) + (v.card_count ?? 0);
             const referenced = refCount > 0;
             const editing = editingNotesId === v.id;
+            const usage = usageText(v.run_count, v.card_count);
+            const parent = parentLabel(v.parent_version_id);
+            const twins = sharing(v);
+            const title = (
+              <span className="flex min-w-0 items-center gap-1.5">
+                {policyRef(v) && <MonoChip>{policyRef(v)}</MonoChip>}
+                <span className={label}>{versionName(v)}</span>
+              </span>
+            );
             return (
               <div
                 key={v.id}
@@ -325,28 +347,33 @@ export function PolicyHistorySheet({
                             : undefined
                         }
                       />
-                      <span className={label}>{versionDisplayName(v)}</span>
+                      {title}
                     </label>
                   ) : (
-                    <span className={label}>{versionDisplayName(v)}</span>
+                    title
                   )}
                   <div className="flex shrink-0 items-center gap-1">
-                    {referenced && (
-                      <MonoChip>
-                        <span
-                          title={`Referenced by ${v.run_count ?? 0} run(s) and ${v.card_count ?? 0} model card(s)`}
-                        >
-                          in use
-                        </span>
+                    {isSelected && (
+                      <MonoChip color="#111111">
+                        <span title="These are the policies you are editing now">live</span>
                       </MonoChip>
                     )}
-                    {isSelected && <MonoChip color="#111111">in force</MonoChip>}
                   </div>
                 </div>
                 <span className={meta}>
                   {formatVersionWhen(v.created_at)} · {v.author_name || v.author_email || "unknown"}
+                  {parent ? ` · from ${parent}` : ""}
                 </span>
-                <span className={meta}>parent {parentLabel(v.parent_version_id)}</span>
+                {usage && (
+                  <span className={meta} title="A version a run or a model was made from cannot be deleted">
+                    {usage}
+                  </span>
+                )}
+                {twins.length > 0 && (
+                  <span className={meta}>
+                    same policies saved {twins.length + 1}× — also “{twins.map(versionName).join("”, “")}”
+                  </span>
+                )}
 
                 {editing ? (
                   <div className="mt-1 flex flex-col gap-1.5">

@@ -71,9 +71,9 @@ partially or get corrected — the write fails.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `ProjectIntelligence.tsx` | table read | `src/hooks/usePolicies.tsx:181` | yes |
-| `ProjectPolicies.tsx` | table read | `src/hooks/usePolicies.tsx:181` | yes |
-| `SimulationLab.tsx` | table read | `src/hooks/usePolicies.tsx:181` | yes |
+| `ProjectIntelligence.tsx` | table read | `src/hooks/usePolicies.tsx:185` | yes |
+| `ProjectPolicies.tsx` | table read | `src/hooks/usePolicies.tsx:185` | yes |
+| `SimulationLab.tsx` | table read | `src/hooks/usePolicies.tsx:185` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -343,6 +343,6 @@ When the preset was last applied.
 
 ---
 
-*Generated from data contract `9980b7ae3762`, engine `0.6.1`,
+*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
 sidecar `supabase/contract/policy_defaults.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

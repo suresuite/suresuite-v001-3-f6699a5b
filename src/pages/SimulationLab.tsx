@@ -411,7 +411,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const handleSaveVersionAndRun = async () => {
     if (!projectId || !selected) return;
     const versionId = await savePolicySnapshot(
-      `Run: ${selected.name} — ${new Date().toLocaleString()}`,
+      // The card dates the version from `created_at`; the label names what it was for.
+      `Run: ${selected.name}`,
     );
     if (!versionId) return;
     await dispatchRun(versionId);
@@ -587,7 +588,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     ? `Validated Model ${modelOptionLabel(chosenModel)}`
     : (!currentPolicyVersion
         ? "Exploratory · unsaved edits"
-        : `Exploratory · policy ${versionDisplayName(currentPolicyVersion)}`);
+        : `Exploratory · ${versionDisplayName(currentPolicyVersion)}`);
 
   // WP 10.5 — the run's size before it is dispatched: replication-weeks (what
   // WP 10.7 will meter) and the storage its replications take, with the basis.
@@ -664,6 +665,18 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       onRunCurrent={
         baselineSelected && usingModel && canExplore && modelOffer?.kind === "moved"
           ? () => void runChosenModel("current")
+          : undefined
+      }
+      onSetPeriod={
+        canRunSimulations
+          ? async (id, period) => {
+              try {
+                await cred.setPlanningPeriod(id, period);
+                toast.success(`Model is now ${period}`);
+              } catch (e) {
+                toast.error(`Could not set the period: ${(e as Error).message}`);
+              }
+            }
           : undefined
       }
     />

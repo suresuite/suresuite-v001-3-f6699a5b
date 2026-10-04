@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { policyRef } from "@/lib/versions/versionLabels";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectRights } from "@/hooks/useProjectRights";
@@ -30,6 +31,9 @@ export interface PolicyVersion {
   /** "Policy v4" — one number per content per project (WP 10.2). Absent until the
    *  migration lands and on the direct-select fallback. */
   version_no?: number | null;
+  /** "Policy 20261004" — the UTC day this content was first saved, `-n` for the
+   *  n-th that day; stored, shared by rows of one content (WP 10.5 follow-up). */
+  version_code?: string | null;
   /** How many simulation runs / model cards reference this version — a
    *  version with either is delete-guarded (6.D). Absent on the RLS fallback. */
   run_count?: number;
@@ -92,7 +96,7 @@ interface UsePoliciesResult {
  * signature than the deployed schema (a migration hasn't been applied). Lets
  * callers retry an older signature instead of hard-failing on deploy ordering.
  */
-function isMissingRpcSignature(error: { code?: string; message?: string } | null): boolean {
+export function isMissingRpcSignature(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
   if (error.code === "PGRST202") return true;
   const msg = (error.message ?? "").toLowerCase();
@@ -557,8 +561,8 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       if (!opts?.quiet) {
         if (existing) {
           toast.message(
-            existing.version_no != null
-              ? `These policies are already saved as policy v${existing.version_no} — no new version.`
+            policyRef(existing)
+              ? `These policies are already saved as ${policyRef(existing)} — no new version.`
               : "These policies are already saved — no new version.",
           );
         } else {

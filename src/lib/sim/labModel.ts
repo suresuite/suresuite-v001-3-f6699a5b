@@ -15,7 +15,8 @@
 //     exploratory run as the baseline side.
 import type { ModelValidationCard } from "@/hooks/useModelValidation";
 import { REPLICATION_SERIES_FACTS } from "@/components/docs/generated/policy.generated";
-import { driftReasons, protocolLine, type ValidatedModelProtocol } from "./validatedModel";
+import { driftReasons, type ValidatedModelProtocol } from "./validatedModel";
+import { modelCodeLine } from "@/lib/versions/versionLabels";
 
 // ── the model choice ─────────────────────────────────────────────────────────
 
@@ -41,13 +42,14 @@ export function defaultModel(
   return modelChoices(allCards)[0] ?? null;
 }
 
-/** One line per model in the picker: name and number, then its protocol. */
-export function modelOptionLabel(c: ModelValidationCard): string {
-  const head = `${c.name ?? "Validated model"}${c.version_no != null ? ` v${c.version_no}` : ""}`;
-  const p = c.protocol;
-  return p
-    ? `${head} · ${protocolLine({ replications: p.replications, warmup_week: p.warmup_week, horizon_weeks: p.horizon_weeks })}`
-    : `${head} · no protocol recorded`;
+/** One line per model in the picker: its code, its data and policy codes when
+ *  loaded, and its name — "2026Q3 - Data 20260915 - Policy 20261004 · Q4 baseline".
+ *  The protocol is the line under the picker, not part of the name. */
+export function modelOptionLabel(
+  c: ModelValidationCard,
+  refs?: { data?: string | null; policy?: string | null } | null,
+): string {
+  return modelCodeLine(c, refs);
 }
 
 // ── deviations from the protocol ─────────────────────────────────────────────

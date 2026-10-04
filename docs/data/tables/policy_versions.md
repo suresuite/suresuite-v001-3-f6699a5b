@@ -17,6 +17,15 @@
 |---|---|---|
 | `id` | column PRIMARY KEY | `policy_versions_pkey` |
 
+## Constraints
+
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `policy_versions_version_code_check` | `CHECK (version_code IS NULL OR version_code ~ '^[0-9]{8}(-[0-9]+)?$')` | `20261004000002_version_codes.sql` |
+
 ## Governance
 
 | | |
@@ -57,7 +66,7 @@ Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the d
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `ProjectPolicies.tsx` | table read | `src/hooks/usePolicies.tsx:510` | yes |
+| `ProjectPolicies.tsx` | table read | `src/hooks/usePolicies.tsx:514` | yes |
 | `SimulationLab.tsx` | table read | `src/hooks/useVerifiableExports.tsx:243` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -87,6 +96,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `policy_hash` | — | `text` | — | — | The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id. SINCE WP 10.2 IT IS THE VERSION'S IDENTITY: `snapshot_policy` returns the existing row when the project already has this hash (§4 D241), and a model card is matched by it, never by `id` (D242). |
 | `notes` | — | `text` | — | — | Free text a person wrote about why. The only column here that carries a REASON rather than a state, and nothing reads it today. |
 | `version_no` | — | `integer` | — | — | "Policy v4" — one number per CONTENT per project, in order of first appearance, assigned by a BEFORE INSERT trigger (so a direct insert numbers too). Rows saved before WP 10.2 that share a `policy_hash` share the number, because they are one model saved twice (§4 D241). |
+| `version_code` | — | `text` | — | — | "Policy 20261004" — the code a person says. The UTC day this CONTENT was first saved (`YYYYMMDD`), and `-n` for the n-th distinct content first saved that day. Rows of one content share it, as they share `version_no`. Assigned by the numbering trigger and STORED, so deleting an older same-day version never moves a surviving code; the suffix is one past the highest ever stored that day (WP 10.5 follow-up, `20261004000002`). |
 
 ## Each column in full
 
@@ -288,6 +298,20 @@ Free text a person wrote about why. The only column here that carries a REASON r
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `version_code`
+
+"Policy 20261004" — the code a person says. The UTC day this CONTENT was first saved (`YYYYMMDD`), and `-n` for the n-th distinct content first saved that day. Rows of one content share it, as they share `version_no`. Assigned by the numbering trigger and STORED, so deleting an older same-day version never moves a surviving code; the suffix is one past the highest ever stored that day (WP 10.5 follow-up, `20261004000002`).
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261004000002_version_codes.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -297,6 +321,6 @@ Free text a person wrote about why. The only column here that carries a REASON r
 
 ---
 
-*Generated from data contract `9980b7ae3762`, engine `0.6.1`,
+*Generated from data contract `fc91bab0c1e3`, engine `0.6.1`,
 sidecar `supabase/contract/policy_versions.contract.yaml`, table created by `20260609000002_policy_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

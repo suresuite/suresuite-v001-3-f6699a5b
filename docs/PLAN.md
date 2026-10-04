@@ -487,6 +487,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D295** | **No engine build can be retrieved by version.** WP 12.4's bucket keeps each wheel at a content-addressed path it never overwrites (correct, and kept), but its only index, `engine/index.json`, is upserted to the LATEST build. `public/engine/` is overwritten at every build, the repository has no tags, and the Fly image a worker run used is recorded nowhere: the deploy workflow ships `main`. So "install engine 0.4.0 and re-run this result" has no answer except git archaeology, and the archived wheels cannot be found without already knowing their hash | `scripts/publish_engine_wheels.mjs:76` (`index.json`, upsert); `scripts/build_engine_wheels.sh` (rewrites `public/engine/`); `.github/workflows/deploy-sim-worker.yml` (no image or commit recorded) | **✅ CLOSED by WP 15.3 (2026-10-04)** — `engine/versions.json` lists every build ever published (append-only), the backfill publishes every committed wheel set in history, `GET /v1/engine?version=` and `suresuite.install_engine(version=…)` install any of them, every version is tagged `engine-v<version>` from the change record, and the worker's commit and image reach the ledger. `verify_engine_archive.sh` proves an archived build reproduces its own frozen results byte for byte |
 | **D296** | **The engine's change history is a code comment, and each version bump overwrites it.** Each version's rationale is the trailing comment on the `ENGINE_VERSION` line, replaced by the next bump. The rest is scattered over ADR 0002's *Changes* (which covers its own scope only), §16 (the data-layer drift log), and commit messages. The golden-digest gate tells the author to "bump ENGINE_VERSION, record it in ADR 0002 and PLAN.md §16", and nothing checks that the record exists, that it names the scenarios that moved, or that the bump's tier (Part IX §9.5: patch vs minor/major + ADR) matches what changed | `scsim/scsim/__init__.py:23-26`; `scsim/tests/test_golden_digests.py:216-218`; `sim-worker/tests/test_golden_runs.py:106` | **✅ CLOSED by WP 15.4 (2026-10-03)** — `scsim/CHANGELOG.yaml` is the one source: all 18 versions, each with tier, ADR, comparability and the reference runs it moved. `scripts/engine_changelog.py` gates it in `scsim-tests.yml` (rules 1–4, 6, 7, each mutation-tested in `test_changelog.py`) and generates `scsim/docs/changelog.md` and the /docs module. `ENGINE_VERSION` carries the version alone, and both golden tests point at the record. Unbumped changes are amendments; the backfill publishes the 44 engine commits no record describes as a count |
 | **D297** | **No user can see what an engine version changed, so the warnings an engine change triggers cannot be acted on.** /docs has no engine-version page. A comparison across two builds says only "engine versions differ (a vs b) — re-run one side". A Validated Model goes stale with "the engine changed" after any engine change, including one that touches no policy the model uses. Both messages are correct and neither can say WHAT changed, whether it affects this model's policies or KPIs, or where the old build can be obtained (T1, T3) | `src/lib/sim/comparability.ts:78-80`; `src/lib/sim/validatedModel.ts:248` (`driftReasons`); the docs registry `src/components/docs/registry.ts` (no such page) | **✅ CLOSED by WP 15.6 (2026-10-04)** — /docs "Engine versions & changes" is generated from the change record and the release reports, with the ledger read live. A run's engine badge links to its version's entry, comparability names the versions between two engines and what they change, a stale Validated Model names the engine change, and the Reproducibility Record binds the build and the version's entry |
+| **D298** | **A version could not be named aloud: four counters printed as one bare `vN`.** The Lab showed a model as "Validated model v1 · 1 seeds · steady from wk 5 · 53 wks" with chips "inputs v2  policy v5  in force", and the History sheet two cards both titled "v3". The four numbers are four sequences with four rules — `model_validations.version_no` per insert, `graph_level_versions.version_no` per content per level, `policy_versions.version_no` per content, `dataset_versions.version_no` per content — and nothing on screen said which was which; the two "v3" cards are legacy rows of one content (D241), which share the number by design. Around them: "in force" meant two things (a policy version equal to the live policies; a model active and undrifted), "in use" did not say it meant "referenced by a run or a model, so not deletable", auto-saved labels baked the saving browser's locale date into the stored label, and "1 seeds". | `src/lib/sim/labModel.ts` (`modelOptionLabel`), `src/components/sim/LabModelStep.tsx` (`ChosenFacts`, the engine option), `src/components/policies/PolicyVersionSheets.tsx` (`versionDisplayName`, the badges), `src/pages/SimulationLab.tsx` and `src/components/policies/RunValidateStage.tsx` (the auto-labels) | **✅ CLOSED (2026-10-04, `20261004000002`)** — STORED codes a person can say: `policy_versions.version_code` and `graph_level_versions.version_code` are the UTC day the content first appeared plus `-n`, assigned by the numbering triggers and never re-issued (the suffix is one past the highest ever stored that day); `model_validations.planning_period` is chosen by the modeller and `model_code` is the period plus `-n`, not part of `model_hash`, fill-once for older models through `set_model_planning_period`. A model reads "2026Q3 - Data 20260915 - Policy 20261004"; one module, `src/lib/versions/versionLabels.ts`, formats every code; a model's state is valid / superseded / revoked / stale and a policy version equal to the live policies is "live". `rehearsal/830`, mutation-tested. |
 
 ### 4.1 Code map — the data layer
 
@@ -23710,6 +23711,51 @@ its runs sets a schedule.
 record holds and its views are current. scsim 518, sim-worker 184, vitest 1749, `suresuite` 9 and
 notebooks 22 passed. Typecheck holds 15 of 15, `audit:ui` is clean, and the wheels, demo, notebooks
 and release report `--check`s are clean.
+
+### WP 10.5 follow-up — version codes a person can say · 2026-10-04 · `20261004000002`
+
+**What the previous package promised.** WP 10.5 promised a Model step whose list says "name,
+graph vN, policy vM, protocol line", and WP 10.2 / 11.1 promised numbers per content and per
+level. Each number was true. Read together on one screen they were not: four counters, one
+spelling (§4 D298).
+
+**What this found.** The owner, from two screenshots: the way versions are coded is hard to read
+and to communicate. The numbers could not be fixed by relabelling alone — "inputs v2" and
+"policy v5" are counters with different rules, and a reader who says "v3" names nothing. The
+owner chose the vocabulary: a model is named by the **planning period it is for**, chosen by the
+modeller (`2026Q3`); data and policy versions by the **day their content first appeared**
+(`Data 20260915`, `Policy 20261004`), `-2` for a second content the same day. A code computed on
+read would move when an older same-day version is deleted, so the codes are STORED.
+
+**What it did.**
+- **Migration `20261004000002`.** `_next_version_code` (the one suffix rule) and
+  `_version_day_code` (UTC) feed the existing numbering triggers on `policy_versions` and
+  `graph_level_versions`; rows of one policy content share one code. A backfill in
+  `version_no` order (a function, so `rehearsal/830` runs the code the migration ran);
+  `graph_level_versions` codes are unique per project and level and fill-once under its
+  immutability trigger. `model_validations.planning_period` (CHECK `YYYYQ1..4`) and
+  `model_code` (unique per project); `record_validated_model` takes `p_planning_period`
+  (trailing, defaulted, so every existing caller is unchanged); `_validated_model_immutable`
+  gains a third fill-once completion, which `set_model_planning_period` uses for a model saved
+  before periods existed. `list_policy_versions` and `dataset_version_tuple` return the codes.
+- **Client.** `src/lib/versions/versionLabels.ts` formats every code and falls back to the
+  per-table `vN` — never a computed code — where a row predates the column. The Lab offers
+  "2026Q3 - Data 20260915 - Policy 20261004 · name", states the protocol once ("1 replication ·
+  53 weeks · results from wk 5"), names the engine "scsim 0.6.1" (the build only when it is not
+  `<slug>-<version>`), and offers "Set period" on a model without one. Run & Validate's save
+  asks for the period. The History card carries a `Policy …` badge, "live" for the version
+  equal to the live policies, "used by N runs · M models", "from Policy …" only when a parent
+  exists, and says when the same policies were saved more than once. New auto-labels carry no
+  date; old ones have it hidden at display.
+
+**Gap check.** `rehearsal/830` proves the UTC day, the `-2`, a shared code for one content, no
+re-issue after a deletion (mutation: counting instead of taking the max fails it), the backfill,
+level-code immutability, the model's `-2` and fill-once, a refused `2026Q5` and an unattributed
+call, and that the period does not move `model_hash`. **Named limits:** the Lab's
+"Run this model" scenario is still found by its old name (`<name> vN — run`) — renaming it would
+mint one new scenario per existing model; the snapshot (`dataset_versions`) keeps `vN`, shown
+only on hover; a deleted code can be re-issued once EVERY code of its day is gone; and production
+has not seen the migration — the after-reading belongs to the push after the merge (D153).
 
 ## 17. Sequencing
 
