@@ -927,7 +927,6 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
         <div className="p-3.5">
           <ExperimentLibraryBox count={stressCount} open={stressOpen} onToggle={onToggleStress} />
           {stressOpen ? <StressTestDrawer onLaunch={onLaunchStress} /> : null}
-          <SurrogateCard training={trainingSet} />
           <ScenarioList
             scenarios={scenarios}
             selectedId={selectedId}
@@ -945,6 +944,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
             onDuplicate={onDuplicateScenario}
             onDelete={onDeleteScenario}
           />
+          <SurrogateCard training={trainingSet} />
         </div>
       </MobileSheet>
 
