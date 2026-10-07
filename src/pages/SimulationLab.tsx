@@ -900,6 +900,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     onToggle={() => setStressOpen((v) => !v)}
                   />
                   {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
+                  <SurrogateCard training={trainingSet} />
                 </div>
                 <ScenarioList
                   scenarios={scenarios}
@@ -913,11 +914,6 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   onDelete={deleteScenario}
                   fill
                 />
-                {/* Not built yet, so it sits below the live surfaces rather
-                    than between the stress-test launcher and its scenarios. */}
-                <div className="md:shrink-0">
-                  <SurrogateCard training={trainingSet} />
-                </div>
               </aside>
 
               <div className="flex-1 min-w-0 flex flex-col gap-3">
