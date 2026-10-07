@@ -887,10 +887,11 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
             <div className="flex flex-col gap-4 md:flex-row md:items-start">
               <aside
-                // Only the scenario list scrolls (it shrinks to what is left);
-                // the cards above it keep their height — their detail opens
-                // in a sheet on the right, never inside this column.
-                className="w-full min-w-0 md:sticky md:flex md:w-64 md:shrink-0 md:flex-col md:self-start md:overflow-y-auto md:overscroll-contain"
+                // The two cards NEVER move: this column does not scroll (it
+                // clips), the cards keep their height, and only the scenario
+                // list scrolls, shrinking to whatever height is left. The
+                // cards' detail opens in a sheet on the right, never in here.
+                className="w-full min-w-0 md:sticky md:flex md:w-64 md:shrink-0 md:flex-col md:self-start md:overflow-hidden"
                 style={{ top: asideTop, maxHeight: `calc(100dvh - ${asideTop}px - 16px)` }}
               >
                 <div className="md:shrink-0">

@@ -89,8 +89,9 @@ export function ScenarioList({
   /** Opens the saved-experiment library (scenario templates). */
   onBrowseSaved: () => void;
   /**
-   * Desktop rail: the list shrinks to the height its column leaves it and
-   * scrolls inside itself, so the cards above it stay put. Off on mobile,
+   * Desktop rail: the list shrinks to the height its column leaves it (no
+   * floor — a floor would make the column overflow and scroll the cards
+   * above it away) and scrolls inside itself, so those cards stay put. Off on mobile,
    * where the page scrolls.
    */
   fill?: boolean;
@@ -100,7 +101,7 @@ export function ScenarioList({
     <aside
       className={cn(
         "overflow-hidden rounded-sm border border-[--hair-rule] bg-white",
-        fill && "md:flex md:min-h-[180px] md:shrink md:flex-col",
+        fill && "md:flex md:min-h-0 md:shrink md:flex-col",
       )}
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[--hair-rule] px-[14px] py-[11px]">
