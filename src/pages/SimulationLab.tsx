@@ -25,11 +25,7 @@ import { RunProgressPanel } from "@/components/sim/RunProgressPanel";
 import { ResultsDashboard } from "@/components/sim/ResultsDashboard";
 import { CompareScenariosPanel } from "@/components/sim/CompareScenariosPanel";
 import { DisruptionRecoveryPane, mergeRecovery } from "@/components/sim/DisruptionRecoveryPane";
-import {
-  StressTestDrawer,
-  STRESS_TESTS,
-  type StressTestPreset,
-} from "@/components/sim/StressTestCard";
+import { STRESS_TESTS, type StressTestPreset } from "@/components/sim/StressTestCard";
 import { RESOLVABLE_PLACEHOLDER, resolveStressSchedule } from "@/lib/sim/stressTargets";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,6 +33,7 @@ import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
 import { CapacityReadinessPanel } from "@/components/sim/CapacityReadiness";
 import { RunCard } from "@/components/sim/RunCard";
 import { SurrogateCard } from "@/components/sim/SurrogateCard";
+import { StressTestSheet, SurrogateSheet } from "@/components/sim/LabDetailSheets";
 import { ReadOnlyFrame } from "@/components/sim/ReadOnlyFrame";
 import {
   NewScenarioDialog,
@@ -107,6 +104,9 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const [pane, setPane] = useState<Pane>("setup");
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [stressOpen, setStressOpen] = useState(false);
+  // Desktop: the surrogate card opens its detail on the right, as the
+  // stress-test card does; the left rail never grows.
+  const [surrogateOpen, setSurrogateOpen] = useState(false);
 
   // If navigated from a network page with ?scenario_id=XYZ, auto-select that scenario
   // and jump to the recovery pane so the user sees the pre-filled disruption.
@@ -888,19 +888,25 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
             <div className="flex flex-col gap-4 md:flex-row md:items-start">
               <aside
                 // Only the scenario list scrolls (it shrinks to what is left);
-                // the aside itself scrolls only when the open stress-test
-                // drawer alone outgrows the viewport.
+                // the cards above it keep their height — their detail opens
+                // in a sheet on the right, never inside this column.
                 className="w-full min-w-0 md:sticky md:flex md:w-64 md:shrink-0 md:flex-col md:self-start md:overflow-y-auto md:overscroll-contain"
                 style={{ top: asideTop, maxHeight: `calc(100dvh - ${asideTop}px - 16px)` }}
               >
                 <div className="md:shrink-0">
+                  {/* Both cards open their detail on the RIGHT (a sheet, as
+                      /policies' model version history does), so neither they
+                      nor the scenario list below them ever move. */}
                   <ExperimentLibraryBox
                     count={STRESS_TESTS.length}
                     open={stressOpen}
                     onToggle={() => setStressOpen((v) => !v)}
                   />
-                  {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
-                  <SurrogateCard training={trainingSet} />
+                  <SurrogateCard
+                    training={trainingSet}
+                    open={surrogateOpen}
+                    onOpen={() => setSurrogateOpen(true)}
+                  />
                 </div>
                 <ScenarioList
                   scenarios={scenarios}
@@ -915,6 +921,13 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   fill
                 />
               </aside>
+              <StressTestSheet
+                open={stressOpen}
+                onOpenChange={setStressOpen}
+                count={STRESS_TESTS.length}
+                onLaunch={launchStress}
+              />
+              <SurrogateSheet open={surrogateOpen} onOpenChange={setSurrogateOpen} training={trainingSet} />
 
               <div className="flex-1 min-w-0 flex flex-col gap-3">
                 {modelStep}

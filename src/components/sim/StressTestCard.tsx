@@ -147,9 +147,11 @@ interface Props {
 }
 
 /**
- * The drawer behind ExperimentLibraryBox. The library is a SOURCE of
- * scenarios, not a scenario — separate surface, teal accent, sitting above
- * the scenario list and never looking like a row in it.
+ * The preset list behind ExperimentLibraryBox. The library is a SOURCE of
+ * scenarios, not a scenario — separate surface, teal accent, never looking
+ * like a row in the scenario list. Desktop shows it in a sheet on the right
+ * (`StressTestSheet`), so the left rail never moves; the phone's Scenarios
+ * sheet shows it inline under the card.
  */
 export function StressTestDrawer({ onLaunch }: Props) {
   return (

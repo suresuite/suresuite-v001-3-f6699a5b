@@ -20,6 +20,16 @@ describe("SurrogateCard", () => {
     expect(html).not.toMatch(/<button|<a |onclick/i);
     expect(html.replace(/<[^>]+>/g, "")).not.toMatch(/\d/);
   });
+  // Desktop: the card opens its detail on the right, as the stress-test card
+  // does. Still no figure on the card, and nothing on it but that one button.
+  it("with onOpen it is one button that opens the detail, still with no figure", () => {
+    const btn = renderToStaticMarkup(createElement(SurrogateCard, { onOpen: () => {} }));
+    expect(btn.match(/<button/g)).toHaveLength(1);
+    expect(btn).toContain('aria-expanded="false"');
+    expect(btn).toContain("coming soon");
+    expect(btn).not.toMatch(/<a /i);
+    expect(btn.replace(/<[^>]+>/g, "")).not.toMatch(/\d/);
+  });
 });
 
 // WP 10.8 · §4 D249 — one figure, and it is a count of what exists.
