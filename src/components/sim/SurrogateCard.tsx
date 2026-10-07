@@ -30,7 +30,7 @@ export function SurrogateCard({ training = null }: { training?: TrainingTotals |
     <section
       aria-label="Surrogate model: nexus node detection, coming soon"
       title={detail}
-      className="mb-3 flex w-full items-center gap-[7px] rounded-sm border border-dashed border-[#BF2330] bg-[rgba(191,35,48,0.06)] px-[14px] py-[9px]"
+      className="mt-3 flex w-full items-center gap-[7px] rounded-sm border border-dashed border-[#BF2330] bg-[rgba(191,35,48,0.06)] px-[14px] py-[9px]"
       data-testid="surrogate-card"
     >
       <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#BF2330]" />
