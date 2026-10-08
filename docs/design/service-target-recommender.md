@@ -155,7 +155,41 @@ hand-written (blueprint §6.2). A field without a `tune` block is not a lever.
 
 Later levers (§7): P-S.2 sourcing shares, P-P.5 overtime factor, P-T.2 expedite trigger, and
 activating a policy that is not in the bundle. Each of these changes behaviour structurally,
-not just in quantity, and needs its own validation.
+not just in quantity, and needs its own validation. Every other implemented policy and every
+input field still has a declared role. §2.9 lists them all, and a gate keeps that list complete.
+
+**Which levers are live depends on the configuration.** The table above lists the fields that
+*can* be levers. Whether one is live for a given project depends on the fields that select a
+mode:
+
+- **P-P.1 `policy_type`.** `min_max` and `base_stock` tune the coverage strip. `rop_q` tunes
+  `reorder_point` and `rop_q_quantity`. `periodic` tunes `periodic_review_weeks` and
+  `order_up_to`. Under `mrp`, the plan nets requirements and has no coverage lever, so its
+  buffer is P-P.3's safety stock.
+- **P-P.3 `classification`.** `z_matrix` is live only under `abc_xyz`, `uniform_service_level`
+  only under `uniform`, and the `fixed_days_*` fields only under `fixed_days`.
+- **P-P.4 `sizing` and the product's `fg_policy`.** These choose which FG fields are live.
+- **`fulfillment_mode`.** FG levers exist only for MTS products. An MTO product's service comes
+  from material availability, capacity and production lead time. The recommender can raise its
+  materials' buffers, but it has no FG lever for that product.
+
+v1 never changes a mode-selecting field (`policy_type`, `classification`, `sizing`,
+`fg_policy`, `fulfillment_mode`). Switching a material from reorder point to MRP is a policy
+redesign, not a tuning step (§7). Every candidate is validated through the policy's own
+`Params` model before it is simulated, including cross-field validators such as
+`forward_visible` requiring a whole-number κ. A candidate that fails validation is snapped to
+the nearest valid value, or else rejected, and is never sent to the engine.
+
+**Levers that buffer the same stock move as one.** P-P.1's cover and P-P.3's safety stock both
+size the same material's target stock. If θ raises both independently, the material is buffered
+twice. The phase pipeline already declares which state key each policy writes (A1, and §7 of
+the blueprint). Levers whose policies write the same state key for the same entity form **one
+composite lever**. θ moves the composite along one path, and the record names which levers were
+coupled.
+
+**Per-entity overrides are respected.** A material with its own `material_overrides` entry
+does not follow a global lever. θ moves that override in step, as a separate path, so a global
+change never silently skips the items a user tuned by hand.
 
 **Levers live in policy-snapshot space.** A candidate is the project's policy snapshot with
 some values changed: the same object /policies saves. It reaches the engine through the
@@ -172,6 +206,19 @@ the two routes give byte-identical results for every lever.
 | `fill_rate_units` (network) | WP 18.1 | Same formula, unweighted units. A low-value product counts the same as a high-value one |
 | `fill_rate_by_product` | WP 18.1 | Unit fill rate per product over the window. Supports targets like "every product ≥ 92 %" |
 | `cycle_service_level_by_product` | WP 18.1 | Share of window weeks in which the product had no shortage (α, per period) |
+| `fill_rate_by_row` (customer × product) | WP 18.1 | Unit fill rate per demand row. Demand and fulfillment have been per row since WP 14.1 and 14.3, and P-C.2 already allocates by row, so a customer's service is a real, measurable quantity |
+
+**What fill rate means depends on P-C.1.** Under `lost_sales`, unmet demand is gone. Under
+`backorder`, it is served later, within `backorder_horizon`. Under `partial_backorder`, part of
+it is. The same stock therefore produces a different fill rate under each rule. The recommender
+never changes P-C.1. It records the rule, and decision R1 settles whether late fulfillment
+counts. A target set under one rule is not comparable with a result under another.
+
+**Targets the data already contains.** `Customer.sla_fill_floor_pct`, P-C.2's `sla_tiers` and
+its `row_floor_pct` are per-customer and per-row service floors the user has already entered.
+`target=sim.target("row_floors")` makes "every row meets its own floor" a target, read from the
+same resolution order P-C.2 uses (row → customer → segment tier). The user does not type the
+floors twice.
 
 The per-product metrics need an **always-on per-product accumulator**, a length-P vector of
 window demand and served units, like the existing capacity-binding accumulator. Today the
@@ -193,15 +240,27 @@ meets it" holds jointly at the stated confidence. The report states the correcti
 4  confirm            fresh, independent seeds at full protocol   → the reported result
 ```
 
-**Step 1: analytic seed (no simulation).** For each item, classic single-echelon formulas give a
-starting point. Each item's demand mean and CV (per row, WP 14.1), lead-time mean and CV (P-S.6,
-WP 16.1) and review period feed:
+**Step 1: analytic seed (no simulation).** For each item, single-echelon inventory theory gives a
+starting point. It reads the demand **model** of each row (WP 14.1: deterministic, normal,
+triangular, triangular_av or poisson), the lead-time **distribution** of each supplier link
+(P-S.6, WP 16.1: deterministic, lognormal, gamma and the others the enum names), the production
+lead time (P-P.13) for MTS products, and the review period. From these it computes the
+distribution of demand over the replenishment interval:
 
-- for a β (fill-rate) target, the normal loss function, G(z) = (1 − β)·μ_R / σ_{L+R};
-- for an α target, z = Φ⁻¹(α).
+- in closed form when demand is normal and lead time is fixed: β through the normal loss
+  function, G(z) = (1 − β)·μ_R / σ_{L+R}, and α through z = Φ⁻¹(α);
+- otherwise by sampling the engine's own demand and lead-time distribution functions (a few
+  thousand draws, no simulation). The seed therefore never assumes normality the data does not
+  have.
+
+A material's demand is the sum of the BOM-weighted demand of the products that use it. MOQ is
+applied to the resulting order quantity. The seed is **skipped** for items it cannot describe
+honestly: MRP-planned materials (the plan's requirements, not a stationary distribution, drive
+them), products with a forecast model or forecast bias, and items with no measured demand. The
+record says which items were seeded and which started from their current values.
 
 The result is mapped into each lever's units (z → service-level %, safety stock + cycle stock →
-cover weeks). The seed ignores capacity, shared materials, BOM coupling and disruptions, so it
+cover weeks). The seed ignores capacity, shared suppliers, BOM coupling and disruptions, so it
 is only a starting point. The report shows the gap between the analytic prediction and the
 simulated result, because that gap measures how much the network interactions matter (T3).
 
@@ -217,6 +276,13 @@ implements. The search stops when the bracket's service width falls below an ind
 *Monotonicity check:* at each probe, the CRN-paired difference SL(θ_hi) − SL(θ_lo) must not be
 significantly negative. If it is (for example, with lumpy MRP lots or an `rop_q` lot size), the
 search falls back to a coarse grid on θ, and the report says so.
+
+*Plateaus:* MOQ, `rop_q_quantity`, discrete review cadences and whole-week lead times make
+service a step function of some levers. A raised buffer may change nothing until the next order
+crosses an MOQ. When two probes give a CRN-paired difference of exactly zero, the search treats
+the interval as flat. It steps to the lever's next effective value instead of bisecting inside
+the plateau, and never reports a cost saving that comes from a value change the engine did not
+act on.
 
 **Step 3: marginal descent (WP 18.7, multi-lever).** Moving all levers together is safe, but it
 over-stocks items that did not need it. Starting from θ*, a greedy marginal-analysis loop runs
@@ -266,8 +332,21 @@ If every lever is at its upper bound and the UCB is still below the target, the 
   stress scenario. "Meet 95 % in normal operation **and** 85 % under a six-week outage of S2"
   is a robust target (WP 18.10).
 - **Required data.** The recommender refuses to run on a project where the required-data gate
-  reports blocking substitutions, and warns about non-blocking ones. Tuning a model built on
-  substituted defaults gives a precise answer to the wrong question.
+  reports blocking substitutions. Tuning a model built on substituted defaults gives a precise
+  answer to the wrong question. A non-blocking substitution is not harmless either, because
+  some defaults bias a recommendation in a known direction. The recommender therefore checks
+  the fields its own answer depends on (§2.9) and acts on each:
+  - **Capacity defaulted** (supplier capacity is infinite unless set, and the plant has a
+    default; blueprint G4): every capacity-bound diagnosis is impossible, and "met" may be
+    optimistic. The record carries a *capacity not measured* warning on every capacity it
+    did not read from data.
+  - **Cost or price defaulted:** inventory value, the objective, and the value weights in
+    `fill_rate` are invented. The recommender refuses `minimize="avg_inventory_value"` and
+    value-weighted targets for those items, and offers units instead (`avg_inventory_units`,
+    `fill_rate_units`).
+  - **Demand or lead-time variability missing** (no CV, a deterministic default): the
+    simulated chain has less noise than the real one, so the recommended buffers are too small.
+    The record says which items it affects.
 
 ### 2.7 Compute and reuse
 
@@ -300,6 +379,63 @@ A `Recommendation` is a reproducible record (T4):
 
 Same inputs and same root seed give a byte-identical recommendation. A golden test pins this.
 
+### 2.9 Coverage: every policy and every input has a declared role
+
+"Considers all policies and data" must be checked, not claimed. Every implemented policy and
+every input field the engine reads gets exactly one **recommender role**. A gate
+(`recommender-coverage`, §3) fails when a new policy or field arrives without one, so an
+unconsidered input cannot exist silently.
+
+| Role | Meaning |
+|---|---|
+| **lever** | The recommender may change it, within its registry bounds (§2.2) |
+| **mode** | Selects which levers are live. Fixed in v1 |
+| **metric** | Defines what the target measures. Fixed, and stated in the record |
+| **target** | Data the user already entered that can serve as a target (§2.3) |
+| **constraint** | Limits what any lever can reach. Read by `why_not` (§2.5) |
+| **seed input** | Feeds the analytic seed (§2.4 step 1) |
+| **objective** | Prices the result |
+| **context** | Simulated exactly as configured. Not tuned in v1, and named in the record |
+| **event-only** | Acts only during a disruption, so it is inert in a no-event target scenario. It is active at its configured values in a stressed target (WP 18.10) |
+| **planned** | A planned policy raises when selected (A3), so it cannot be in a bundle or be a lever |
+
+**Policies: all 12 implemented, plus the planned ones.**
+
+| Policy | Role in v1 | Note |
+|---|---|---|
+| P-P.1 inventory control | lever (mode: `policy_type`, `basis`) | Live fields by type (§2.2). Alert and crisis strip values become levers in a stressed target |
+| P-P.3 material safety stock | lever (mode: `classification`) | Coupled with P-P.1 as one composite where both buffer the same material |
+| P-P.4 FG safety stock | lever (mode: `sizing`) | MTS products only |
+| FG replenishment (product `fg_*` fields, as row overrides) | lever (mode: `fg_policy`) | MTS products only. Written as overrides, never to the master (`page-equals-run`) |
+| P-C.1 unmet demand | metric | Changes what fill rate means (§2.3) |
+| P-C.2 customer allocation | target · context | Row floors become targets. Allocation weights are simulated as set |
+| P-C.6 forward visibility | context | Required by P-P.1 `basis = forward_visible` |
+| P-S.2 proactive multi-sourcing | context | Shares become a lever later (§7) |
+| P-S.1 backup supplier · P-S.4 early warning · P-T.2 expediting · P-P.5 short-term capacity · P-P.9 material allocation | event-only | In a stressed target they act first. The recommender buffers only what they leave uncovered, and the record says so |
+| P-P.2, P-P.6, P-P.7, P-P.8, P-P.10, P-S.3, P-T.1, P-T.3, P-T.4, P-C.3, P-X.1 | planned | Gain a role when they ship. The gate makes that a requirement of shipping them |
+
+**Input data: the fields the engine reads.**
+
+| Entity · fields | Role | How the recommender uses it |
+|---|---|---|
+| Customer link (row) · `demand_model`, `demand_mean`, `demand_variation`, `demand_min`/`max`, `share`, `forecast` | seed input | Demand distribution per row. Missing variability is flagged (§2.6) |
+| Product · `demand_*`, `negbin_dispersion`, `demand_history`, `demand_floor_factor`, `forecast_model`, `forecast_window`, `forecast_bias` | seed input | A forecast-driven product is not seeded (§2.4). Bias is simulated, never corrected for |
+| Supplier link · `lead_time_weeks`, `lead_time_dist`, `lead_time_cv`, `lead_time_min/mode/max_weeks` | seed input | The lead-time distribution, drawn from the engine's own functions |
+| Product · `production_lead_time_*` | seed input | For MTS FG buffers (P-P.13) |
+| Supplier link · `moq` · `rop_q_quantity` (policy) | constraint | Order floor. Causes plateaus (§2.4) |
+| Supplier · `capacity_per_week` · Product · `production_capacity` · Lane · `capacity_per_week` | constraint | `why_not` reads the binding share. A default is flagged (§2.6) |
+| Material · `cost`, `holding_cost_rate` · Product and row · `unit_price` · Supplier link · `cost` · Lane · `cost_per_unit` | objective | Prices inventory and weights fill rate. A default disables value-based objectives for that item (§2.6) |
+| Material · `initial_on_hand` · Product · `fg_initial_on_hand` | context | Opening stock. Covered by the warm-up check (§2.6) |
+| Product · `fulfillment_mode` | mode | MTS or MTO decides which levers exist for the product (§2.2) |
+| BOM · `rate` | seed input · context | Material demand from product demand. Multi-level BOMs arrive flattened (G20), so sub-assembly stock cannot be a lever |
+| Supplier link · `primary` · Network · `multi_sourcing_threshold_pct` · Supplier · `reliability_score`, `tier` | context | Sourcing structure, simulated as configured |
+| Customer · `priority_weight`, `segment`, `sla_fill_floor_pct` | target · context | Floors become targets. Priorities steer P-C.2 |
+| Lane · `mode`, `lead_time_weeks` | context | Simulated as the mapper passes them today |
+
+These tables are a snapshot of 2026-10-08. The **authority** is the role declared on each
+field (WP 18.2). The tables are then generated from those roles, so they cannot fall behind the
+engine.
+
 ---
 
 ## 3. Rules that keep it honest, as named gates
@@ -310,6 +446,7 @@ Same inputs and same root seed give a byte-identical recommendation. A golden te
 | `recommendation-equals-run` | A recommendation's confirmation KPIs equal those of an ordinary run of the recommended policy snapshot with the same seeds, byte for byte. The recommender evaluates what a saved version runs | `test_recommendation_equals_run.py` on the bundled example (WP 18.4), and on the platform path (WP 18.8) |
 | `no-silent-shortfall` | `status = "met"` only when the confirmation LCB ≥ target. Every other outcome names the highest service level reached and what binds | unit tests over the status function plus a not-reachable golden case (WP 18.4) |
 | `recommendation-is-a-proposal` | Nothing the recommender produces writes a policy version, a master or a run. A recommendation reaches the platform only as a candidate the user saves through the normal path | platform tests (WP 18.8, 18.9), consistent with blueprint §12's guardrail |
+| `recommender-coverage` | Every implemented policy's `Params` field and every engine-read entity field declares one recommender role (§2.9). A new policy or field without one fails CI, and §2.9's tables are generated from the roles | registry test plus a generated-table check (WP 18.2) |
 | `engine-ledger` *(existing)* | The recommender is engine code, so every change to it follows the ritual | existing CI |
 
 The gates follow the repository's single-source rule (`single-source`, I1). The service metric
@@ -325,7 +462,7 @@ tables and UI are generated from.
 |---|---|---|---|---|---|
 | 18.0 | Wire the plan in, record the decisions | S | — | 👤 decisions R1–R5 (§5) | ⬜ |
 | 18.1 | Per-product service KPIs in the engine | M | 17.1 | — | ⬜ |
-| 18.2 | Lever catalog: `tune` blocks and their export | M | 17.1 | — | ⬜ |
+| 18.2 | Lever catalog, roles for every policy and input, coverage gate | L | 17.1 | — | ⬜ |
 | 18.3 | Target spec, evaluator and the statistics | M | 18.1, 18.2 | — | ⬜ |
 | 18.4 | Search v1: seed · bracket/bisect · confirm · why-not | L | 18.3 | — | ⬜ |
 | 18.5 | `sim.recommend` in the front door; tutorial | M | 18.4, 17.4 | — | ⬜ |
@@ -354,6 +491,7 @@ Sizes: **S** ≈ 30–40 % of a session, **M** ≈ 50–65 %, **L** ≈ 70–80 
 | R5 | Where it lives | **Open.** Recommended: in SuReSuite Sim, free, because the methods stay open (`python-library-plan.md` §1, Horizon Europe open science). The platform adds hosted compute, the Lab UI, the record store and agents |
 | R6 | Default lever granularity | Recommended: one scalar θ (v1). Then ABC×XYZ groups (18.7). Single items only as an opt-in for networks with at most 50 items |
 | R7 | Starting point on the platform | Recommended: a Validated Model is required (its protocol fixes warm-up and replications). Exploratory models may run a study, but the result is labeled exploratory, as runs are (WP 10.5) |
+| R8 | Mode-selecting fields | Recommended: never changed in v1 (`policy_type`, `classification`, `sizing`, `fg_policy`, `fulfillment_mode`). Policy redesign, for example reorder point → MRP, is a separate experiment that compares two configurations at their own tuned optimum (§7) |
 
 ---
 
@@ -381,8 +519,9 @@ two §16 entries.
 **Do.**
 1. An always-on per-product accumulator over the analysis window (demand units, served units,
    and shortage weeks), with no `full_debug` dependency.
-2. KPIs `fill_rate_units` (network), plus `fill_rate_by_product` and
-   `cycle_service_level_by_product`. These are a per-entity block on `ScenarioResult`, beside the
+2. KPIs `fill_rate_units` (network), plus `fill_rate_by_product`,
+   `cycle_service_level_by_product` and `fill_rate_by_row` (customer × product, built on WP
+   14.3's per-row fulfillment). These are a per-entity block on `ScenarioResult`, beside the
    capacity-binding block, not flat replication keys.
 3. KPI dictionary entries per R1, and the generated docs.
 4. Ritual: version bump. The new KPIs are additive, so check whether any frozen digest moved. If
@@ -392,22 +531,29 @@ two §16 entries.
 checks that per-product fill rates weighted by value reproduce the network `fill_rate`. A
 performance guard shows less than 3 % slowdown per replication.
 
-### WP 18.2: Lever catalog: `tune` blocks and their export · M
+### WP 18.2: Lever catalog, roles and the coverage gate · L
 
-**Read first.** `policies/base.py` (`PolicyParams`), the four policies in §2.2's table,
-`io/registry_export.py`.
+**Read first.** `policies/base.py` (`PolicyParams`), every implemented policy's `Params`,
+`entities/network.py`, `io/registry_export.py`, `core/phases.py` (owned state keys).
 
 **Do.**
 1. A `tune` schema (direction, cost, step, space, discrete values), validated when the registry
    loads.
-2. `tune` blocks on the v1 levers.
+2. `tune` blocks on the v1 levers, and a recommender **role** (§2.9) on every other field of
+   every implemented policy and on every entity field the engine reads. Live-lever rules per
+   mode field (§2.2). Composite levers derived from the phase pipeline's owned state keys.
 3. `registry_export` emits them, and the app's generated registry module carries them.
 4. `sim.levers(project)` lists the levers usable *for this project* (active policies only,
    with each lever's current value and bounds).
 5. A path helper reads and writes a lever's value in **policy-snapshot space**.
 
 **Exit.** Registry snapshot test. The generated-module check. The `levers-from-registry` test,
-which fails on a lever name that is not declared on a field. Ritual: metadata only, entry
+which fails on a lever name that is not declared on a field. The `recommender-coverage` test,
+which fails on any policy or entity field without a role. §2.9's tables are regenerated from
+the roles.
+
+**Split point.** Levers and their export first. Roles for the remaining fields, plus the
+coverage gate, as a follow-up WP 18.2b. Ritual: metadata only, entry
 `identical`.
 
 ### WP 18.3: Target spec, evaluator and the statistics · M
@@ -420,14 +566,19 @@ which fails on a lever name that is not declared on a field. Ritual: metadata on
 3. Feasibility decision (LCB/UCB), the Bonferroni correction for per-product targets, and the
    CRN-paired difference test (reusing the engine's `stats` package).
 4. The compile-once fast path behind a parity test.
+5. Candidate validation through each policy's `Params` (snap or reject, §2.2), and the
+   data-trust check (§2.6): blocking substitutions refuse, while defaulted capacity, cost and
+   variability produce the named warnings and disable value-based objectives where needed.
 
 **Exit.** Unit tests with a fake evaluator (a known monotone function plus noise), so the
 statistics are tested in milliseconds. The parity test on the bundled example.
 
 ### WP 18.4: Search v1: seed, bracket/bisect, confirm, why-not · L
 
-**Do.** Steps 1, 2 and 4 of §2.4, plus §2.5. The analytic seed (normal loss function, α and β
-forms) mapped into lever units. Bracketing and bisection on θ with the monotonicity check and
+**Do.** Steps 1, 2 and 4 of §2.4, plus §2.5. The analytic seed: closed form for normal demand
+with a fixed lead time, sampling from the engine's own distribution functions otherwise, and
+skip rules for MRP-planned and forecast-driven items. It is mapped into lever units. Plateau
+handling for MOQ and discrete levers. Bracketing and bisection on θ with the monotonicity check and
 the grid fallback. Independent-seed confirmation with one step-up retry. Status assignment and
 `why_not` built from the capacity-binding KPIs.
 
@@ -438,6 +589,10 @@ the grid fallback. Independent-seed confirmation with one step-up retry. Status 
   the recommendation lands within δ of the analytic β answer.
 - **Golden B:** on a network whose plant capacity binds, the status is `not_reachable` with the
   correct binding reason.
+- **Golden C:** a lognormal lead time and Poisson demand, where the seed comes from sampling
+  rather than a normal approximation, and the confirmed result still meets the target.
+- **Golden D:** an MOQ-dominated material, where the search reports no saving from a buffer
+  change the engine did not act on.
 - **Determinism:** the same inputs and seed give a byte-identical record.
 - The `recommendation-equals-run` and `no-silent-shortfall` tests pass.
 
@@ -521,6 +676,9 @@ tool `propose_service_target_study`, which produces a proposal card through the 
   produces a proposed *dataset* change through the ingestion path. It never edits a master from
   the recommender.
 - **Multi-stage** service targets once WP 14.7 lifts the single production stage.
+- **Policy redesign comparison:** tune configuration A (for example reorder point) and
+  configuration B (MRP) each to the same target, then compare their confirmed costs,
+  CRN-paired. This is the fair version of the question "which policy should I use?" (R8).
 
 ---
 
@@ -536,4 +694,17 @@ tool `propose_service_target_study`, which produces a proposal card through the 
 | Compute cost and quota | Cost preview, in-study and RunKey reuse, process and worker parallelism, a budget cap that is a hard stop |
 | Warm-up changes under the new policies | A warm-up check at confirmation, with a warning (§2.6) |
 | Users read a recommendation as certain truth | Every figure carries its CI and seed set. The status vocabulary has no "approximately met". The result is a proposal, confirmed by an ordinary run |
+| An input or policy is silently ignored | `recommender-coverage` (§2.9): every policy and engine-read field has a declared role, checked in CI |
+| Levers double-buffer the same stock (P-P.1 + P-P.3) | Composite levers from the pipeline's owned state keys (§2.2) |
+| Defaults make the answer optimistic (infinite capacity, no variability) | Data-trust check (§2.6), with named warnings and value-based objectives refused where costs are invented |
+| Event-driven policies mask or duplicate buffers under stress | They are simulated active at their configured values in a stressed target, and the record reports what they covered (§2.9) |
 | Engine churn makes old recommendations stale | The record binds the engine build. On the platform a recommendation on a withdrawn or superseded build is labeled, the same as a run |
+
+---
+
+## 9. Change log of this plan
+
+| Date | Change |
+|---|---|
+| 2026-10-08 | Written |
+| 2026-10-08 | Coverage review against the 12 implemented policies and the engine's entity fields. Added §2.9 (a role for every policy and input), gate `recommender-coverage`, live-lever rules per mode field, composite levers for P-P.1 + P-P.3, per-row targets and the data's own SLA floors, P-C.1's effect on fill rate, distribution-faithful seeding with skip rules, MOQ plateaus, the data-trust check, decision R8, goldens C–D |
