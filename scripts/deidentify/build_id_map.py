@@ -42,12 +42,15 @@ the inbound lanes and the node list, and every join still holds:
   product_id, material_id,
   higher_level_component_id                    -> ONE item namespace, named
         ROLE-FAMILY.BASE[TAIL], which keeps what a part number means:
-            E539.15280.000.00      -> ASM-F1.010.000.00
-            E539.15280.000.10-SA   -> ASM-F1.010.000.10-SA   (same part, -SA state)
-            53C112316 / 53C112318  -> ASM-F2.004 / ASM-F2.005 (neighbours stay so)
-            DB366 (S14A)           -> PRD-F7.001 (V1)
+            E539.15280.000.00      -> ASM-E1.010.000.00
+            E539.15280.000.10-SA   -> ASM-E1.010.000.10-SA   (same part, -SA state)
+            53C112316 / 53C112318  -> ASM-1C.004 / ASM-1C.005 (neighbours stay so)
+            DSC641 · WP1           -> ASM-DSC.002 · ASM-WP.001
+            DB366 (S14A)           -> PRD-DB.001 (V1)
         ROLE   PRD product · ASM sub-assembly (a BOM parent) · MAT material
-        FAMILY F1, F2 ... one per real family (E539, 53C, DSC ...), F1 largest
+        FAMILY the family's own letters, its digits renumbered: E539 -> E1,
+               E532 -> E2, 53C -> 1C; DSC, DB, WP unchanged
+               (--hide-family-letters: F1, F2 ... instead)
         BASE   001, 002 ... per family, in the originals' natural order
         TAIL   digits and short suffixes (-SA) kept; longer codes and a code
                in brackets become V1, V2 ... (--plain-tails replaces all)
@@ -317,14 +320,17 @@ class IdMap:
 # E539.15280.000.10-SA are one part in two states. A flat ASM-001 hides all of
 # it; a structured alias keeps it and replaces only the real codes:
 #
-#     E539.15280.000.10-SA  ->  ASM-F1.012.000.10-SA
-#     E539.15280.000.00     ->  ASM-F1.012.000.00      (same base: 012)
-#     53C112316             ->  ASM-F2.004
-#     53C112212-1           ->  ASM-F2.002-1
-#     DB366 (S14A)          ->  PRD-F5.001 (V1)
+#     E539.15280.000.10-SA  ->  ASM-E1.010.000.10-SA
+#     E539.15280.000.00     ->  ASM-E1.010.000.00      (same base: 010)
+#     53C112316             ->  ASM-1C.004
+#     53C112212-1           ->  ASM-1C.003-1
+#     DSC641                ->  ASM-DSC.002
+#     DB366 (S14A)          ->  PRD-DB.001 (V1)
 #
 # ROLE   PRD / ASM / MAT, from the BOM (as before).
-# FAMILY F1, F2, ... one per real family, F1 the largest.
+# FAMILY the family's own LETTERS are kept and only its digits renumbered
+#        (E539 -> E1, E532 -> E2, 53C -> 1C, DSC / DB / WP unchanged); the
+#        largest family of a letter pattern gets 1 (--hide-family-letters: F1, F2).
 # BASE   001, 002, ... per family, in the originals' natural order, so a run of
 #        neighbouring design numbers stays neighbouring. One base, one code.
 # TAIL   digits and short letter suffixes (-SA) are kept: they say "variant /
@@ -355,29 +361,43 @@ def _keep_token(tok: str, plain: bool) -> bool:
     return not plain and (tok.isdigit() or (tok.isalpha() and len(tok) <= 3))
 
 
-def assign_items(idmap: "IdMap", kinds: dict[str, str], plain_tails: bool):
+def assign_items(idmap: "IdMap", kinds: dict[str, str], plain_tails: bool, keep_letters: bool = True):
     """Structured aliases for every item not already named by --existing-map."""
     parsed = {v: parse_part(v) for v in kinds}
     fam_members = defaultdict(set)
     for v, p in parsed.items():
         fam_members[p[0] if p else "~unstructured"].add(v)
 
-    # family codes: an existing map's first, then the largest family first
+    # family codes: an existing map's first; then, largest family first, either
+    # the family's own letters with its digits renumbered (E539 -> E1, 53C -> 1C,
+    # DSC stays DSC) or, with keep_letters off, a plain F1, F2 ...
     fam_code, base_code, var_code = {}, defaultdict(dict), {}
     for (ns, orig), alias in idmap.alias.items():
         p = parse_part(orig) if ns == "item" else None
-        m = re.match(r"^[A-Z]+-(F\d+)\.(\d+)", alias)
+        m = re.match(r"^[A-Z]+-([^.\s]+)\.(\d+)", alias)
         if p and m:
             fam_code.setdefault(p[0], m[1])
             base_code[p[0]].setdefault(p[1], m[2])
-    taken = {int(c[1:]) for c in fam_code.values()}
-    nxt = 1
+    taken = set(fam_code.values())
     for fam in sorted(fam_members, key=lambda f: (-len(fam_members[f]), _natural(f))):
-        if fam not in fam_code:
-            while nxt in taken:
-                nxt += 1
-            fam_code[fam] = f"F{nxt}"
-            taken.add(nxt)
+        if fam in fam_code:
+            continue
+        if fam == "~unstructured":
+            skeleton = "X#"
+        elif not keep_letters:
+            skeleton = "F#"
+        else:
+            skeleton = re.sub(r"\d+", "#", fam)
+        if "#" not in skeleton and skeleton not in taken:
+            code = skeleton                                  # letters only: kept as is
+        else:
+            skeleton = skeleton if "#" in skeleton else skeleton + "#"
+            i = 1
+            while skeleton.replace("#", str(i)) in taken:
+                i += 1
+            code = skeleton.replace("#", str(i))
+        fam_code[fam] = code
+        taken.add(code)
 
     for fam, members in fam_members.items():
         bases = sorted({parsed[v][1] if parsed[v] else v for v in members}, key=_natural)
@@ -407,12 +427,13 @@ def assign_items(idmap: "IdMap", kinds: dict[str, str], plain_tails: bool):
         idmap.prefix_of[key] = ROLE_OF_KIND[kinds[v]]
 
     # what the leak check must also look for: the real family codes and bases
-    idmap.extra_terms |= {f for f in fam_members if f != "~unstructured"}
+    idmap.extra_terms |= {f for f in fam_members if f != "~unstructured" and fam_code[f] != f}
     idmap.extra_terms |= {p[1] for p in parsed.values() if p}
     idmap.extra_terms |= set(var_code)
 
 
-def build_map(tables: list[Table], idmap: IdMap, naming: str = "structured", plain_tails: bool = False):
+def build_map(tables: list[Table], idmap: IdMap, naming: str = "structured", plain_tails: bool = False,
+              keep_letters: bool = True):
     """Pass 1: every original ID, its namespace and (for items) its kind."""
     ids = defaultdict(set)
     products, parents = set(), set()
@@ -441,7 +462,7 @@ def build_map(tables: list[Table], idmap: IdMap, naming: str = "structured", pla
     kinds = {v: "product" if v in products else "assembly" if v in parents else "material"
              for v in ids["item"]}
     if naming == "structured":
-        assign_items(idmap, kinds, plain_tails)
+        assign_items(idmap, kinds, plain_tails, keep_letters)
     else:
         for v, kind in kinds.items():
             if ("item", v) not in idmap.prefix_of:       # an earlier run already named it
@@ -695,6 +716,8 @@ def main(argv=None) -> int:
                     help="extra text the output must not contain, e.g. a project or company name (repeatable)")
     ap.add_argument("--naming", choices=["structured", "simple"], default="structured",
                     help="item aliases: structured ROLE-FAMILY.BASE[TAIL] (default) or simple ASM-001")
+    ap.add_argument("--hide-family-letters", action="store_true",
+                    help="family codes F1, F2 ... instead of the family's own letters (DSC, E1, 1C)")
     ap.add_argument("--plain-tails", action="store_true",
                     help="replace every variant/revision tail token too, not only the long ones")
     ap.add_argument("--include-network", action="store_true",
@@ -725,7 +748,7 @@ def main(argv=None) -> int:
     if args.existing_map:
         idmap.load_existing(Path(args.existing_map))
 
-    build_map(tables, idmap, args.naming, args.plain_tails)
+    build_map(tables, idmap, args.naming, args.plain_tails, not args.hide_family_letters)
     ambiguous = {v for v, n in Counter(k[1] for k in idmap.alias).items() if n > 1}
     actions = defaultdict(dict)
     rewrite(tables, idmap, args.keep_coordinates, args.keep_firm_size, actions)

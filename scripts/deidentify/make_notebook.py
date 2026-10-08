@@ -30,7 +30,7 @@ Generated from `build_id_map.py` by `make_notebook.py` (same code, split into ce
 
 **How to use:** put this notebook in the folder with the CSVs (or point `INPUTS` at it), check the settings cell, then *Run All*. The run cell prints every check and stops if any fails.
 
-**Item names keep their meaning** — `E539.15280.000.10-SA` → `ASM-F1.010.000.10-SA`: role (PRD / ASM / MAT), family (`E539` → `F1`), base number (`15280` → `010`, shared by every variant of that part) and the variant tail. The node list and the deep-tier files are skipped (out of scope).
+**Item names keep their meaning** — `E539.15280.000.10-SA` → `ASM-E1.010.000.10-SA`, `DSC641` → `ASM-DSC.002`, `DB366 (S14A)` → `PRD-DB.001 (V1)`: role (PRD / ASM / MAT), family (its letters kept, its digits renumbered: `E539` → `E1`, `53C` → `1C`; `DSC`, `DB`, `WP` unchanged), base number (`15280` → `010`, shared by every variant of that part) and the variant tail. The node list and the deep-tier files are skipped (out of scope).
 
 **Input** — the CSVs the project data viewer's *Download CSV* writes (`bom_data.csv`, `inbound_data.csv`, `outbound_data.csv`; `node list_data.csv` and the `deep …` files are skipped), the CSVs you upload on /project-manager, an `.xlsx` with one table per sheet, or a dataset version saved as JSON. Tables are recognised by their **headers**, not their file names.
 
@@ -47,6 +47,7 @@ OUT = "./aa_ver3_deid"              # NOT inside a git repo (the private map mus
 SECRET = None                       # None = generate one and save it to private/secret.txt
 EXISTING_MAP = None                 # e.g. "./aa_ver2_deid/private/id_map.csv" to keep its aliases
 NAMING = "structured"               # "structured": ASM-F1.010.000.10-SA · "simple": ASM-001
+HIDE_FAMILY_LETTERS = False         # True: families become F1, F2 ... instead of DSC, DB, WP, E1, 1C
 PLAIN_TAILS = False                 # True also replaces short tails like .000.10 / -SA with V1, V2 ...
 INCLUDE_NETWORK = False             # False skips the node list and the deep-tier files (out of scope)
 KEEP_COORDINATES = False            # True keeps latitude / longitude (only with INCLUDE_NETWORK)
@@ -65,6 +66,7 @@ cells += [
 if SECRET: args += ["--secret", SECRET]
 if EXISTING_MAP: args += ["--existing-map", EXISTING_MAP]
 args += ["--naming", NAMING]
+if HIDE_FAMILY_LETTERS: args.append("--hide-family-letters")
 if PLAIN_TAILS: args.append("--plain-tails")
 if INCLUDE_NETWORK: args.append("--include-network")
 if KEEP_COORDINATES: args.append("--keep-coordinates")
