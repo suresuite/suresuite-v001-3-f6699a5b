@@ -48,6 +48,8 @@ import { ErpConnectionsPanelForEditors } from '@/components/erp/ErpConnectionsPa
 import { confirmProjectDeletion } from '@/lib/projects/projectDeletion';
 import { useConfirm } from '@/components/shared/confirm/useConfirm';
 import { planRefusal } from '@/lib/auth/organizationPlan';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import { projectCreationNote } from '@/lib/auth/projectCreation';
 
 interface Project {
   id: string;
@@ -184,6 +186,13 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   // toast is imported from sonner
   const { user } = useAuth();
   const { role, canModify } = useUserRole();
+  // §4 D303 — creating a project is the database's answer (`project_creation_right`): the
+  // account role, OR the Admin/Owner role in the organization being worked in. Everything
+  // else on this page that `canModify` gates still reads the account role.
+  const { capabilities } = useCapabilities();
+  const projectCreation = capabilities?.project_creation ?? null;
+  const canCreate = projectCreation ? projectCreation.allowed : canModify;
+  const creationNote = projectCreationNote(projectCreation);
 
   const isDuplicateName = projects.some(
     (project) => project.name.toLowerCase() === newProjectName.trim().toLowerCase()
@@ -1072,6 +1081,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   const projectList = projects.map(renderProjectBlock);
   const createForm = (
     <>
+            {creationNote && <p className="text-sm text-muted-foreground">{creationNote}</p>}
             <div>
               <Label htmlFor="projectName">Project Name</Label>
               <Input
@@ -1197,7 +1207,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   );
   // Not a tab-bar root (isMobileRootRoute) — reached from More, so T2 hides
   // the tab bar here and the header's own back target is the only way out.
-  const newProjectAction = canModify && (
+  const newProjectAction = canCreate && (
     <Button
       onClick={handleOpenCreateForm}
       disabled={isCreating}
@@ -1271,7 +1281,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                 dropping it here is a removal, not a move. */}
 
             {/* Create New Project Form */}
-        {isCreating && canModify && (
+        {isCreating && canCreate && (
           isMobile ? (
             // The dashed card is a second container style, which the skin does
             // not have (§12) — the form is the panel, with the touch floor on
@@ -1303,7 +1313,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                 <span className="text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
                   No projects yet — create your first one to get started.
                 </span>
-                {canModify && (
+                {canCreate && (
                   <MobileButton weight="secondary" onClick={handleOpenCreateForm}>
                     New project
                   </MobileButton>

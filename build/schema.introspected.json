@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 404,
-  "migrations_applied": 396,
+  "migrations_found": 405,
+  "migrations_applied": 397,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261004000004_production_lead_time.sql",
+  "last_migration": "20261008000001_org_admin_creates_projects.sql",
   "counts": {
     "tables": 94,
     "views": 8,
     "enums": 4,
-    "functions": 420,
+    "functions": 421,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -27202,7 +27202,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260905000001_grant_ga_agent_capabilities.sql"
+      "defined_by": "20261008000001_org_admin_creates_projects.sql"
     },
     {
       "name": "capture_graph_version",
@@ -29294,6 +29294,18 @@
       "volatility": "STABLE",
       "comment": "D215, D217, D230 — who is on a project and what each may do there: every account that owns it, ",
       "defined_by": "20261001000003_project_rights_one_answer.sql"
+    },
+    {
+      "name": "project_creation_right",
+      "signature": "project_creation_right(uuid)",
+      "args": [
+        "_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "D303 — who may create a project, authored once: super admin; a modeler or admin account; ",
+      "defined_by": "20261008000001_org_admin_creates_projects.sql"
     },
     {
       "name": "project_freshness",
