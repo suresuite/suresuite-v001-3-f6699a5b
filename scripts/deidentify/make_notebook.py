@@ -30,7 +30,9 @@ Generated from `build_id_map.py` by `make_notebook.py` (same code, split into ce
 
 **How to use:** put this notebook in the folder with the CSVs (or point `INPUTS` at it), check the settings cell, then *Run All*. The run cell prints every check and stops if any fails.
 
-**Input** — the CSVs the project data viewer's *Download CSV* writes (`bom_data.csv`, `inbound_data.csv`, `outbound_data.csv`, `node list_data.csv`, `deep nodes_data.csv`, `deep edges_data.csv`), the CSVs you upload on /project-manager, an `.xlsx` with one table per sheet, or a dataset version saved as JSON. Tables are recognised by their **headers**, not their file names.
+**Item names keep their meaning** — `E539.15280.000.10-SA` → `ASM-F1.010.000.10-SA`: role (PRD / ASM / MAT), family (`E539` → `F1`), base number (`15280` → `010`, shared by every variant of that part) and the variant tail. The node list and the deep-tier files are skipped (out of scope).
+
+**Input** — the CSVs the project data viewer's *Download CSV* writes (`bom_data.csv`, `inbound_data.csv`, `outbound_data.csv`; `node list_data.csv` and the `deep …` files are skipped), the CSVs you upload on /project-manager, an `.xlsx` with one table per sheet, or a dataset version saved as JSON. Tables are recognised by their **headers**, not their file names.
 
 **Output** (`OUT` folder):
 - `private/id_map.csv` — original → alias (+ original name, where seen). **Keep private: it reverses the de-identification.**
@@ -44,8 +46,11 @@ INPUTS = ["."]                      # files and/or folders (.csv / .json / .xlsx
 OUT = "./aa_ver3_deid"              # NOT inside a git repo (the private map must never be committed)
 SECRET = None                       # None = generate one and save it to private/secret.txt
 EXISTING_MAP = None                 # e.g. "./aa_ver2_deid/private/id_map.csv" to keep its aliases
-KEEP_COORDINATES = False            # True keeps latitude / longitude
-KEEP_FIRM_SIZE = False              # True keeps a deep-tier firm's revenue and number_of_employees
+NAMING = "structured"               # "structured": ASM-F1.010.000.10-SA · "simple": ASM-001
+PLAIN_TAILS = False                 # True also replaces short tails like .000.10 / -SA with V1, V2 ...
+INCLUDE_NETWORK = False             # False skips the node list and the deep-tier files (out of scope)
+KEEP_COORDINATES = False            # True keeps latitude / longitude (only with INCLUDE_NETWORK)
+KEEP_FIRM_SIZE = False              # True keeps a deep-tier firm's revenue / headcount (only with INCLUDE_NETWORK)
 ALSO_HIDE = ["Project AA"]          # extra text the output must not contain (project / company names)
 ALLOW_IN_GIT = False
 '''),
@@ -59,6 +64,9 @@ cells += [
     code('''args = [*INPUTS, "--out", OUT]
 if SECRET: args += ["--secret", SECRET]
 if EXISTING_MAP: args += ["--existing-map", EXISTING_MAP]
+args += ["--naming", NAMING]
+if PLAIN_TAILS: args.append("--plain-tails")
+if INCLUDE_NETWORK: args.append("--include-network")
 if KEEP_COORDINATES: args.append("--keep-coordinates")
 if KEEP_FIRM_SIZE: args.append("--keep-firm-size")
 for term in ALSO_HIDE: args += ["--also-hide", term]

@@ -40,17 +40,29 @@ the inbound lanes and the node list, and every join still holds:
   customer_id                                  -> CUS-001 ...
   plant_name                                   -> PLANT-01 ...
   product_id, material_id,
-  higher_level_component_id                    -> ONE item namespace:
-        PRD-001  a product (product master, product_id, outbound)
-        ASM-001  a sub-assembly (a BOM parent that is not a product)
-        MAT-001  a purchased material (everything else)
+  higher_level_component_id                    -> ONE item namespace, named
+        ROLE-FAMILY.BASE[TAIL], which keeps what a part number means:
+            E539.15280.000.00      -> ASM-F1.010.000.00
+            E539.15280.000.10-SA   -> ASM-F1.010.000.10-SA   (same part, -SA state)
+            53C112316 / 53C112318  -> ASM-F2.004 / ASM-F2.005 (neighbours stay so)
+            DB366 (S14A)           -> PRD-F7.001 (V1)
+        ROLE   PRD product · ASM sub-assembly (a BOM parent) · MAT material
+        FAMILY F1, F2 ... one per real family (E539, 53C, DSC ...), F1 largest
+        BASE   001, 002 ... per family, in the originals' natural order
+        TAIL   digits and short suffixes (-SA) kept; longer codes and a code
+               in brackets become V1, V2 ... (--plain-tails replaces all)
+        (--naming simple gives the flat PRD-001 / ASM-001 / MAT-001 instead)
   node_id, from_firm_id, to_firm_id,
   uid, src_uid, dst_uid (deep tier)            -> whichever of the above the
                                                   ID already is; else FIRM-001
 
-Alias numbers are NOT in the originals' sort order, which would leak adjacent
-part numbers. They are ordered by HMAC-SHA256(secret, namespace|id), so the
-order is reproducible with the secret and meaningless without it.
+SCOPE. The node list and the deep-tier files are skipped by default — read
+only to report that they were skipped, never written (--include-network).
+
+Supplier, customer and plant numbers are NOT in the originals' sort order:
+they are ordered by HMAC-SHA256(secret, namespace|id), reproducible with the
+secret and meaningless without it. Item BASE codes deliberately keep the
+order inside a family (a rank, never the number itself).
 --existing-map keeps every alias an earlier run gave and numbers only new IDs,
 so ver1/ver2/ver3 of a project can share one map.
 
@@ -122,6 +134,11 @@ DROP_COLUMNS = {"id", "project_id", "ingest_run_id", "source_row_id", "created_a
 PREFIX = {"supplier": "SUP", "customer": "CUS", "plant": "PLANT", "firm": "FIRM",
           "product": "PRD", "assembly": "ASM", "material": "MAT"}
 MIN_WIDTH = {"PLANT": 2}
+SIMPLE_ALIAS = re.compile(r"^(?P<pre>[A-Z]+)-(?P<num>\d+)$")
+
+# Out of scope by default: the node list and the deep-tier network. Their files
+# are read only to say they were skipped; nothing from them reaches the output.
+OUT_OF_SCOPE = {"node_list", "deep_nodes", "deep_edges"}
 
 
 def detect_kind(headers: set[str]) -> str:
@@ -258,13 +275,14 @@ class IdMap:
         self.names: dict[tuple[str, str], str] = {}
         self.seen: dict[tuple[str, str], Counter] = defaultdict(Counter)
         self.kept: set[tuple[str, str]] = set()
+        self.extra_terms: set[str] = set()
 
     def load_existing(self, path: Path):
         with path.open(newline="", encoding="utf-8") as f:
             for r in csv.DictReader(f):
                 key = (r["namespace"], r["original_id"])
                 self.alias[key] = r["alias"]
-                self.prefix_of[key] = r["alias"].rsplit("-", 1)[0]
+                self.prefix_of[key] = r["alias"].split("-", 1)[0]
                 if r.get("original_name"):
                     self.names[key] = r["original_name"]
                 self.kept.add(key)
@@ -272,8 +290,9 @@ class IdMap:
     def assign(self, keys_by_prefix: dict[str, set[tuple[str, str]]]):
         used = Counter()
         for key, a in self.alias.items():
-            pre, num = a.rsplit("-", 1)
-            used[pre] = max(used[pre], int(num))
+            m = SIMPLE_ALIAS.match(a)
+            if m:
+                used[m["pre"]] = max(used[m["pre"]], int(m["num"]))
         for pre, keys in keys_by_prefix.items():
             new = [k for k in keys if k not in self.alias]
             order = sorted(new, key=lambda k: hmac.new(self.secret, f"{k[0]}|{k[1]}".encode(),
@@ -291,7 +310,109 @@ class IdMap:
         return "firm", value
 
 
-def build_map(tables: list[Table], idmap: IdMap):
+# ── structured item names ───────────────────────────────────────────────────
+#
+# Part numbers carry meaning: a FAMILY (E539, 53C, DSC), a BASE number inside it
+# (15280), and a VARIANT tail (.000.10-SA, -1). E539.15280.000.00 and
+# E539.15280.000.10-SA are one part in two states. A flat ASM-001 hides all of
+# it; a structured alias keeps it and replaces only the real codes:
+#
+#     E539.15280.000.10-SA  ->  ASM-F1.012.000.10-SA
+#     E539.15280.000.00     ->  ASM-F1.012.000.00      (same base: 012)
+#     53C112316             ->  ASM-F2.004
+#     53C112212-1           ->  ASM-F2.002-1
+#     DB366 (S14A)          ->  PRD-F5.001 (V1)
+#
+# ROLE   PRD / ASM / MAT, from the BOM (as before).
+# FAMILY F1, F2, ... one per real family, F1 the largest.
+# BASE   001, 002, ... per family, in the originals' natural order, so a run of
+#        neighbouring design numbers stays neighbouring. One base, one code.
+# TAIL   digits and short letter suffixes (-SA) are kept: they say "variant /
+#        revision / sub-assembly", not who made it. Anything longer, and a code
+#        in brackets, becomes V1, V2, ... (--plain-tails replaces all of it).
+
+DOTTED = re.compile(r"^(?P<family>[^.\s]+)\.(?P<base>[^.\s-]+)(?P<tail>(?:[.-][^.\s-]+)*)(?P<note>\s*\(.*\))?$")
+COMPACT = re.compile(r"^(?P<family>\d*[A-Za-z]+)(?P<base>\d[0-9A-Za-z]*?)(?P<tail>(?:-[0-9A-Za-z]+)*)"
+                     r"(?P<note>\s*\(.*\))?$")
+ROLE_OF_KIND = {"product": "PRD", "assembly": "ASM", "material": "MAT"}
+
+
+def parse_part(v: str):
+    """(family, base, tail tokens [(sep, token)], note) — or None if no structure."""
+    m = DOTTED.match(v) or COMPACT.match(v)
+    if not m:
+        return None
+    tail = re.findall(r"([.-])([^.\s-]+)", m["tail"] or "")
+    note = (m["note"] or "").strip()
+    return m["family"], m["base"], tail, note[1:-1].strip() if note else ""
+
+
+def _natural(s: str):
+    return [(0, int(t), "") if t.isdigit() else (1, 0, t) for t in re.findall(r"\d+|\D+", s)]
+
+
+def _keep_token(tok: str, plain: bool) -> bool:
+    return not plain and (tok.isdigit() or (tok.isalpha() and len(tok) <= 3))
+
+
+def assign_items(idmap: "IdMap", kinds: dict[str, str], plain_tails: bool):
+    """Structured aliases for every item not already named by --existing-map."""
+    parsed = {v: parse_part(v) for v in kinds}
+    fam_members = defaultdict(set)
+    for v, p in parsed.items():
+        fam_members[p[0] if p else "~unstructured"].add(v)
+
+    # family codes: an existing map's first, then the largest family first
+    fam_code, base_code, var_code = {}, defaultdict(dict), {}
+    for (ns, orig), alias in idmap.alias.items():
+        p = parse_part(orig) if ns == "item" else None
+        m = re.match(r"^[A-Z]+-(F\d+)\.(\d+)", alias)
+        if p and m:
+            fam_code.setdefault(p[0], m[1])
+            base_code[p[0]].setdefault(p[1], m[2])
+    taken = {int(c[1:]) for c in fam_code.values()}
+    nxt = 1
+    for fam in sorted(fam_members, key=lambda f: (-len(fam_members[f]), _natural(f))):
+        if fam not in fam_code:
+            while nxt in taken:
+                nxt += 1
+            fam_code[fam] = f"F{nxt}"
+            taken.add(nxt)
+
+    for fam, members in fam_members.items():
+        bases = sorted({parsed[v][1] if parsed[v] else v for v in members}, key=_natural)
+        have = base_code[fam]
+        start = max((int(c) for c in have.values()), default=0)
+        width = max(3, len(str(start + len(bases))))
+        for b in bases:
+            if b not in have:
+                start += 1
+                have[b] = f"{start:0{width}d}"
+
+    for v in sorted(kinds, key=_natural):
+        key = ("item", v)
+        if key in idmap.alias:
+            continue
+        p = parsed[v]
+        fam = p[0] if p else "~unstructured"
+        alias = f"{ROLE_OF_KIND[kinds[v]]}-{fam_code[fam]}.{base_code[fam][p[1] if p else v]}"
+        if p:
+            for sep, tok in p[2]:
+                if not _keep_token(tok, plain_tails):
+                    tok = var_code.setdefault(tok, f"V{len(var_code) + 1}")
+                alias += sep + tok
+            if p[3]:
+                alias += f" ({var_code.setdefault(p[3], f'V{len(var_code) + 1}')})"
+        idmap.alias[key] = alias
+        idmap.prefix_of[key] = ROLE_OF_KIND[kinds[v]]
+
+    # what the leak check must also look for: the real family codes and bases
+    idmap.extra_terms |= {f for f in fam_members if f != "~unstructured"}
+    idmap.extra_terms |= {p[1] for p in parsed.values() if p}
+    idmap.extra_terms |= set(var_code)
+
+
+def build_map(tables: list[Table], idmap: IdMap, naming: str = "structured", plain_tails: bool = False):
     """Pass 1: every original ID, its namespace and (for items) its kind."""
     ids = defaultdict(set)
     products, parents = set(), set()
@@ -317,12 +438,14 @@ def build_map(tables: list[Table], idmap: IdMap):
     for role in ("supplier", "customer", "plant"):
         for v in ids[role]:
             by_prefix[PREFIX[role]].add((role, v))
-    for v in ids["item"]:
-        key = ("item", v)
-        if key in idmap.prefix_of:                   # an earlier run already named it
-            continue
-        kind = "product" if v in products else "assembly" if v in parents else "material"
-        by_prefix[PREFIX[kind]].add(key)
+    kinds = {v: "product" if v in products else "assembly" if v in parents else "material"
+             for v in ids["item"]}
+    if naming == "structured":
+        assign_items(idmap, kinds, plain_tails)
+    else:
+        for v, kind in kinds.items():
+            if ("item", v) not in idmap.prefix_of:       # an earlier run already named it
+                by_prefix[PREFIX[kind]].add(("item", v))
     idmap.assign(by_prefix)
 
     # node_id / firm ids: whatever they already are, else a firm of their own.
@@ -434,7 +557,7 @@ def run_checks(tables: list[Table], idmap: IdMap, extra_leak_terms: list[str]):
 
     # 4 · no original survives as text
     aliases = set(idmap.alias.values())
-    terms = {k[1] for k in idmap.alias} | set(idmap.names.values()) | set(extra_leak_terms)
+    terms = {k[1] for k in idmap.alias} | set(idmap.names.values()) | set(extra_leak_terms) | idmap.extra_terms
     terms = sorted({t for t in terms if t and len(t) >= 3 and not _is_number(t)}, key=len, reverse=True)
     leaks = []
     if terms:
@@ -450,6 +573,11 @@ def run_checks(tables: list[Table], idmap: IdMap, extra_leak_terms: list[str]):
                         leaks.append((t.kind, i + 1, c, m.group(0)))
     results.append(("no original ID or name left in the output text", not leaks,
                     f"{len(leaks)} cells (see report)" if leaks else f"{len(terms)} originals searched for"))
+    # a real numeric base (15280) must not survive as a segment of any alias
+    bases = {t for t in idmap.extra_terms if t.isdigit() and len(t) >= 4}
+    kept_bases = sorted({seg for a in aliases for seg in re.split(r"[.\-\s()]+", a) if seg in bases})
+    results.append(("no real base number inside an alias", not kept_bases,
+                    ", ".join(kept_bases) if kept_bases else f"{len(bases)} bases of 4+ digits checked"))
     numeric_ids = sorted({k[1] for k in idmap.alias if _is_number(k[1])})
     return results, leaks, numeric_ids
 
@@ -466,7 +594,7 @@ def _inside_git_repo(p: Path) -> bool:
 
 
 def write_outputs(out: Path, tables, docs, idmap: IdMap, secret_generated: bool, actions,
-                  results, leaks, numeric_ids, ambiguous):
+                  results, leaks, numeric_ids, ambiguous, skipped=()):
     priv, share = out / "private", out / "shareable"
     priv.mkdir(parents=True, exist_ok=True)
     share.mkdir(parents=True, exist_ok=True)
@@ -479,7 +607,7 @@ def write_outputs(out: Path, tables, docs, idmap: IdMap, secret_generated: bool,
                      "original_name": idmap.names.get(key, ""),
                      "seen_in": "; ".join(f"{w}×{n}" for w, n in sorted(idmap.seen[key].items())),
                      "from_existing_map": "yes" if key in idmap.kept else ""})
-    rows.sort(key=lambda r: (r["alias"].rsplit("-", 1)[0], int(r["alias"].rsplit("-", 1)[1])))
+    rows.sort(key=lambda r: _natural(r["alias"]))
     with (priv / "id_map.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else ["namespace", "alias", "original_id"])
         w.writeheader()
@@ -515,7 +643,7 @@ def write_outputs(out: Path, tables, docs, idmap: IdMap, secret_generated: bool,
             written[t.source] = f"{fname} → {'/'.join(map(str, t.json_path))}"
 
     # the report
-    counts = Counter(a.rsplit("-", 1)[0] for a in idmap.alias.values())
+    counts = Counter(idmap.prefix_of.get(k) or a.split("-", 1)[0] for k, a in idmap.alias.items())
     L = ["# De-identification report", "",
          "PRIVATE — this file names the input files, which may identify the project.", "",
          "## Checks", "", "| Check | Result | Detail |", "|---|---|---|"]
@@ -531,6 +659,9 @@ def write_outputs(out: Path, tables, docs, idmap: IdMap, secret_generated: bool,
     if numeric_ids:
         L += ["", f"{len(numeric_ids)} original IDs are purely numeric, so the leak scan cannot tell them from "
               "quantities and skips them; they are still mapped in every ID column."]
+    if skipped:
+        L += ["", "## Skipped — out of scope (nothing from these files is in the output)", ""]
+        L += [f"- {t.source} (`{t.kind}`, {len(t.rows)} rows)" for t in skipped]
     L += ["", "## Files", ""]
     for t in tables:
         kept = [c for c, a in actions[t.source].items() if a == "kept as is"]
@@ -562,6 +693,12 @@ def main(argv=None) -> int:
                     help="keep a deep-tier firm's revenue and number_of_employees")
     ap.add_argument("--also-hide", action="append", default=[],
                     help="extra text the output must not contain, e.g. a project or company name (repeatable)")
+    ap.add_argument("--naming", choices=["structured", "simple"], default="structured",
+                    help="item aliases: structured ROLE-FAMILY.BASE[TAIL] (default) or simple ASM-001")
+    ap.add_argument("--plain-tails", action="store_true",
+                    help="replace every variant/revision tail token too, not only the long ones")
+    ap.add_argument("--include-network", action="store_true",
+                    help="also de-identify the node list and the deep-tier files (skipped by default)")
     ap.add_argument("--allow-in-git", action="store_true", help="allow --out inside a git working tree")
     args = ap.parse_args(argv)
 
@@ -574,6 +711,11 @@ def main(argv=None) -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     tables, docs = collect_inputs(args.inputs)
+    skipped = [t for t in tables if t.kind in OUT_OF_SCOPE and not args.include_network]
+    tables = [t for t in tables if t not in skipped]
+    docs = [(f, d, [t for t in jt if t not in skipped]) for f, d, jt in docs]
+    for t in skipped:
+        print(f"skipped (out of scope: {t.kind}): {t.source}")
     if not any(t.rows for t in tables):
         print("no rows with a recognised ID or name column were found", file=sys.stderr)
         return 2
@@ -583,13 +725,13 @@ def main(argv=None) -> int:
     if args.existing_map:
         idmap.load_existing(Path(args.existing_map))
 
-    build_map(tables, idmap)
+    build_map(tables, idmap, args.naming, args.plain_tails)
     ambiguous = {v for v, n in Counter(k[1] for k in idmap.alias).items() if n > 1}
     actions = defaultdict(dict)
     rewrite(tables, idmap, args.keep_coordinates, args.keep_firm_size, actions)
     results, leaks, numeric_ids = run_checks(tables, idmap, args.also_hide)
     counts = write_outputs(out, tables, docs, idmap, secret_generated, actions, results, leaks,
-                           numeric_ids, ambiguous)
+                           numeric_ids, ambiguous, skipped)
 
     print(f"read {len(tables)} tables, {sum(len(t.rows) for t in tables)} rows")
     print("map: " + ", ".join(f"{p} {n}" for p, n in sorted(counts.items())))
