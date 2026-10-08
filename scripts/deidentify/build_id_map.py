@@ -12,8 +12,11 @@ INPUT is any mix of files or folders (a folder means every .csv / .json /
 
   * the CSVs uploaded on /project-manager (suppliers, materials, products,
     customers, inbound, outbound, BOM single- or multi-level, demand
-    forecasts, tier-2 / tier-3 suppliers, multi-tier, node list) — tables are
-    recognised by their HEADERS, not their file names;
+    forecasts, tier-2 / tier-3 suppliers, multi-tier, node list), or the ones
+    the project data viewer's "Download CSV" writes (bom_data.csv,
+    inbound_data.csv, outbound_data.csv, "node list_data.csv",
+    "deep nodes_data.csv", "deep edges_data.csv") — tables are recognised by
+    their HEADERS, not their file names;
   * a dataset version as JSON (`GET /v1/projects/{id}/dataset-versions/latest`,
     or `ss.dataset(api, pid).snapshot` dumped with json.dump).
 
@@ -41,7 +44,8 @@ the inbound lanes and the node list, and every join still holds:
         PRD-001  a product (product master, product_id, outbound)
         ASM-001  a sub-assembly (a BOM parent that is not a product)
         MAT-001  a purchased material (everything else)
-  node_id, from_firm_id, to_firm_id            -> whichever of the above the
+  node_id, from_firm_id, to_firm_id,
+  uid, src_uid, dst_uid (deep tier)            -> whichever of the above the
                                                   ID already is; else FIRM-001
 
 Alias numbers are NOT in the originals' sort order, which would leak adjacent
@@ -50,8 +54,10 @@ order is reproducible with the secret and meaningless without it.
 --existing-map keeps every alias an earlier run gave and numbers only new IDs,
 so ver1/ver2/ver3 of a project can share one map.
 
-ALSO REMOVED: names become the row's alias; description / location text and
-coordinates are blanked (--keep-coordinates keeps lat/lon); database
+ALSO REMOVED: names become the row's alias; description / location text,
+website, ticker and coordinates are blanked (--keep-coordinates keeps them); a
+deep-tier firm's revenue and number_of_employees are blanked, because with its
+country and industry they can name the company (--keep-firm-size); database
 provenance (project_id, ingest_run_id, source_row_id, surrogate id,
 timestamps, hashes, organisation, modeler) is dropped.
 
@@ -94,14 +100,20 @@ ID_COLUMNS = {
     "node_id": "any",
     "from_firm_id": "any",
     "to_firm_id": "any",
+    "uid": "any",            # deep-tier nodes (Deep Nodes export)
+    "src_uid": "any",        # deep-tier edges (Deep Edges export)
+    "dst_uid": "any",
 }
+ANY_COLUMNS = [c for c, role in ID_COLUMNS.items() if role == "any"]
 
 # A row's own ID, in the order a master names it; its `name` becomes this alias.
-PRIMARY_ID = ("supplier_id", "customer_id", "product_id", "material_id", "node_id")
+PRIMARY_ID = ("supplier_id", "customer_id", "product_id", "material_id", "node_id", "uid")
 NAME_COLUMNS = {"name", "supplier_name", "customer_name", "product_name", "material_name", "node_name"}
 BLANK_COLUMNS = {"description_text", "description", "location_text", "notes", "comment", "comments",
-                 "address", "city", "country", "source_external_id", "plant_location_text"}
-COORD_COLUMNS = {"latitude", "longitude", "lat", "lon", "lng", "plant_latitude", "plant_longitude"}
+                 "address", "city", "source_external_id", "plant_location_text", "website", "traded_as"}
+# A deep-tier firm's size: with its country and industry it can name the company.
+FIRM_SIZE_COLUMNS = {"revenue", "number_of_employees"}
+COORD_COLUMNS = {"latitude", "longitude", "lat", "lon", "long", "lng", "plant_latitude", "plant_longitude"}
 DROP_COLUMNS = {"id", "project_id", "ingest_run_id", "source_row_id", "created_at", "updated_at",
                 "computed_from_hash", "computed_at", "organization", "organization_id",
                 "modeler_id", "modeler_name", "project_name", "uploaded_by", "graph_hash",
@@ -121,6 +133,10 @@ def detect_kind(headers: set[str]) -> str:
         return "bom_single_level"
     if "upstream_supplier_id" in h:
         return "tier_suppliers"
+    if {"src_uid", "dst_uid"} & h:
+        return "deep_edges"
+    if "uid" in h:
+        return "deep_nodes"
     if {"from_firm_id", "to_firm_id"} & h:
         return "multi_tier_supply_chain"
     if "node_id" in h:
@@ -318,7 +334,7 @@ def build_map(tables: list[Table], idmap: IdMap):
     idmap.assign({PREFIX["firm"]: firms})
     for t in tables:
         for r in t.rows:
-            for col in ("node_id", "from_firm_id", "to_firm_id"):
+            for col in ANY_COLUMNS:
                 v = _clean(r.get(col))
                 if v not in (None, ""):
                     idmap.seen[idmap.resolve_any(str(v))][f"{t.kind}.{col}"] += 1
@@ -335,7 +351,7 @@ def map_value(idmap: IdMap, col: str, v):
     return idmap.alias[key]
 
 
-def rewrite(tables: list[Table], idmap: IdMap, keep_coords: bool, actions: dict):
+def rewrite(tables: list[Table], idmap: IdMap, keep_coords: bool, keep_firm_size: bool, actions: dict):
     for t in tables:
         out_cols = [c for c in t.columns if c not in DROP_COLUMNS]
         for c in t.columns:
@@ -345,7 +361,7 @@ def rewrite(tables: list[Table], idmap: IdMap, keep_coords: bool, actions: dict)
                 actions[t.source][c] = f"ID -> {ID_COLUMNS[c]} map"
             elif c in NAME_COLUMNS:
                 actions[t.source][c] = "name -> the row's alias"
-            elif c in BLANK_COLUMNS or (c in COORD_COLUMNS and not keep_coords):
+            elif _blank(c, keep_coords, keep_firm_size):
                 actions[t.source][c] = "blanked"
             else:
                 actions[t.source][c] = "kept as is"
@@ -366,11 +382,16 @@ def rewrite(tables: list[Table], idmap: IdMap, keep_coords: bool, actions: dict)
                         o[c] = idmap.alias[key]
                     else:
                         o[c] = "" if isinstance(v, str) or v is None else None
-                elif c in BLANK_COLUMNS or (c in COORD_COLUMNS and not keep_coords):
+                elif _blank(c, keep_coords, keep_firm_size):
                     o[c] = "" if not isinstance(v, (int, float)) else None
                 else:
                     o[c] = v
             t.out_rows.append(o)
+
+
+def _blank(col: str, keep_coords: bool, keep_firm_size: bool) -> bool:
+    return (col in BLANK_COLUMNS or (col in COORD_COLUMNS and not keep_coords)
+            or (col in FIRM_SIZE_COLUMNS and not keep_firm_size))
 
 
 # ── checks ──────────────────────────────────────────────────────────────────
@@ -537,6 +558,8 @@ def main(argv=None) -> int:
     ap.add_argument("--secret", help="key that fixes the alias order (default: generate one and save it)")
     ap.add_argument("--existing-map", help="an earlier private/id_map.csv whose aliases are kept")
     ap.add_argument("--keep-coordinates", action="store_true", help="keep latitude / longitude")
+    ap.add_argument("--keep-firm-size", action="store_true",
+                    help="keep a deep-tier firm's revenue and number_of_employees")
     ap.add_argument("--also-hide", action="append", default=[],
                     help="extra text the output must not contain, e.g. a project or company name (repeatable)")
     ap.add_argument("--allow-in-git", action="store_true", help="allow --out inside a git working tree")
@@ -563,7 +586,7 @@ def main(argv=None) -> int:
     build_map(tables, idmap)
     ambiguous = {v for v, n in Counter(k[1] for k in idmap.alias).items() if n > 1}
     actions = defaultdict(dict)
-    rewrite(tables, idmap, args.keep_coordinates, actions)
+    rewrite(tables, idmap, args.keep_coordinates, args.keep_firm_size, actions)
     results, leaks, numeric_ids = run_checks(tables, idmap, args.also_hide)
     counts = write_outputs(out, tables, docs, idmap, secret_generated, actions, results, leaks,
                            numeric_ids, ambiguous)
