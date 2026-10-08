@@ -550,11 +550,10 @@ performance guard shows less than 3 % slowdown per replication.
 **Exit.** Registry snapshot test. The generated-module check. The `levers-from-registry` test,
 which fails on a lever name that is not declared on a field. The `recommender-coverage` test,
 which fails on any policy or entity field without a role. §2.9's tables are regenerated from
-the roles.
+the roles. Ritual: metadata only, entry `identical`.
 
 **Split point.** Levers and their export first. Roles for the remaining fields, plus the
-coverage gate, as a follow-up WP 18.2b. Ritual: metadata only, entry
-`identical`.
+coverage gate, as a follow-up WP 18.2b.
 
 ### WP 18.3: Target spec, evaluator and the statistics · M
 
