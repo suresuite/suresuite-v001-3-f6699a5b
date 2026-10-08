@@ -6,6 +6,11 @@
 > statements live in [`/COPYRIGHT.md`](../../COPYRIGHT.md) and
 > [`/scsim/NOTICE.md`](../../scsim/NOTICE.md); this document is the plan for getting
 > the open-access part public.
+>
+> **2026-10-08:** the steps are now planned session by session in
+> [`python-library-plan.md`](python-library-plan.md) (Phase 17), which also records L1–L4 as
+> decided and a new open point: the name `scsim` is taken on PyPI. WP 17.0 folds this
+> document's §4 and §5 into agreement with it.
 
 ## 1. What is being released, and why
 
