@@ -9,8 +9,9 @@
 >
 > **2026-10-08:** the steps are now planned session by session in
 > [`python-library-plan.md`](python-library-plan.md) (Phase 17), which also records L1–L4 as
-> decided and a new open point: the name `scsim` is taken on PyPI. WP 17.0 folds this
-> document's §4 and §5 into agreement with it.
+> decided. The public name is **SuReSuite Sim** (`pip install suresuite-sim`), because
+> `scsim` is taken on PyPI; the model keeps the name SCSIM. WP 17.0 folds this document's §4
+> and §5 into agreement with it.
 
 ## 1. What is being released, and why
 
