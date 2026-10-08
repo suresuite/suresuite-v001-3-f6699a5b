@@ -681,6 +681,6 @@ The planning period the model is FOR (`2026Q3`), chosen by the modeller when the
 
 ---
 
-*Generated from data contract `c7c7da69c86d`, engine `0.8.0`,
+*Generated from data contract `5ec67443cac9`, engine `0.8.0`,
 sidecar `supabase/contract/model_validations.contract.yaml`, table created by `20260710000001_model_validations.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

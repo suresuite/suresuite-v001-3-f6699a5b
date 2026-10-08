@@ -493,6 +493,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D300** | **Production has no lead time: what the plant starts in a week is finished stock that same week.** `_mech_production_execute` adds MTS output to `fg_on_hand` in the week it is built and P-C.1 ships MTO output against demand in the same week (`W^FG = 0`), which the blueprint recorded as a deliberate fidelity boundary. A product that takes two weeks to make cannot be modelled: its finished stock, its service and the timing of its material requirements are all two weeks optimistic, and nothing on the page says so. Reported by the owner (production lead time per product, Production group) | `scsim/scsim/core/engine.py` (`_mech_production_execute`, "same-week completion, W^FG = 0 in v1"); `scsim/scsim/policies/builtin/p_c1_unmet_demand.py` (`Q = ctx.production_output`); blueprint §2.4 | **✅ CLOSED by §26 WP 16.4 + WP 16.5 (2026-10-04, migration `20261004000004`, engine 0.8.0)** — output started in week t completes in t + L through a per-product pipeline (materials consumed at the start, WIP traced and charged nothing), the plan starts each batch on the expected L net of the WIP, and the honesty test scrambles demand and production-time draws; `products` carries the lead time and its shape (days → weeks at promotion), the mapper resolves the Plant row → the master → 0, and the Plant stage's Production group shows the lead time, its shape and only the parameters the shape reads (`leadTimeParamFor`). `test_production_lead_time.py`, `test_project_map.py` (four), `rehearsal/850`, `laneLeadTimeShape.test.ts`, `page-equals-run` (mutation-tested) |
 | **D301** | **The Plant stage's finished-goods band reads differently from the Supplier stage's inventory band for the same idea.** The band and its switch are labelled "FG stock", and the FG policy's levels are separate columns (`fg_reorder_point`, `fg_base_stock`, `fg_cover_days`), where the Supplier stage puts the policy type first and every level the type reads into one "Replenishment parameters" cell. Two layouts for one concept, side by side on one page. Reported by the owner | `src/lib/policies/columnSpecs.ts` (`FG_BAND`, the `fulfillment_mode` label, the three FG level columns); `src/components/policies/StagePolicyTable.tsx` (the MTO empty state) | **✅ CLOSED by §26 WP 16.6 (2026-10-04, no migration)** — the band and switch read "FG inventory"; the FG policy is the policy type and ONE "Replenishment parameters" cell (`__fg_inv_params`, `vectorGroup: "fgInvParams"`) holds only the levels it reads (`FG_POLICY_PARAMS`, held equal to the levels' own `fgPolicyIn` gates), each with its source dot, then the opening stock; no safety-stock or holding cell (the engine reads neither per product). `fgInventoryLayout.test.ts`, `page-equals-run` unchanged |
 | **D302** | **A material's lead-time CV above 1 fails the whole run.** The `materials` sidecar accepts any `lead_time_cv` ≥ 0 at ingestion and in the Item Master editor, while `SupplierLink.lead_time_cv` is bounded `le=1.0`; the mapper passes the master value straight through, so one CV of 1.5 raises a validation error while the network is built — the run fails instead of warning. LATENT: found by reading (§26.1), no §15 measurement of a CV above 1 yet | `supabase/contract/materials.contract.yaml` (`lead_time_cv.ingest.rule`: `min: 0`, no max); `scsim/scsim/entities/network.py` (`lead_time_cv … le=1.0`); `scsim/scsim/io/project_map.py` (the arc loop) | **✅ CLOSED by §26 WP 16.2 (2026-10-04)** — the mapper clamps a material CV above 1 to the engine's bound and warns ("§4 D302"), declared as a substitution on the `materials` sidecar; the upload rule now refuses a CV above 1 at the door; the lane's own `lead_time_cv` is CHECK-bounded 0–1. `test_a_material_cv_above_one_is_clamped_not_a_failed_run`, `rehearsal/840` §3 |
+| **D303** | **An Admin of an organization could not create a project in it.** Who may create a project was authored only in the browser, and only from the ACCOUNT role: /project-manager opens by the account role's page default (`user` → off, `20260711000002`) and the New Project button by `useUserRole().canModify` (`modeler`/`admin`/`super_admin`). The organization role (`organization_members.org_role`) was read by neither, so an account that is "Admin · User account" on /profile — the owner's report: `phu.nguyen@hwr-berlin.de`, Admin of ACCURATE-AA, default organization HWR — saw no page and no button. `create_project` itself checks nothing. Asked for by the owner: "role admin in one organization could generate a new project" | `supabase/migrations/20260905000001_grant_ga_agent_capabilities.sql` (`capabilities_for_user(uuid)`: pages person → organization → account role); `src/hooks/useUserRole.tsx` (`canModify`); `src/pages/DataManager.tsx` (`newProjectAction`); `supabase/migrations/20261001000016_project_settings_one_writer.sql` (`create_project`: no check) | **✅ CLOSED (`20261008000001`).** ONE rule, `project_creation_right(user)`: super admin → yes; a Modeler or Admin account → yes; otherwise an Owner or Admin membership of the ACTIVE organization (D210 — where `set_project_defaults` stamps the new project) → yes; it returns what decided and that organization. `capabilities_for_user(uuid)` grants `/project-manager` to a caller it admits by organization role — below the person and organization overrides, above the account-role default — and returns it as `project_creation`; the button reads that (`projectCreation.ts`), the form names the organization the project lands in, and the fallback is the old account-role gate. `rehearsal/860` §1–§5 (admin working in its member organization refused, switched in admitted; owner admitted; member refused; modeler unchanged; the page through `get_my_capabilities`; both overrides still decide; `create_project` lands in the admin's organization with the creator as `owner`; the grant), mutation red at §2 with the grant removed; `projectCreation.test.ts`. NOT changed, stated: the rule is the ACTIVE organization's — an admin of ACCURATE-AA who signs in to HWR (D216) switches first; `create_project` still does not ENFORCE the rule (doing so would refuse callers that work today — `rehearsal/420`, `520` create as `user` accounts — a tightening for the owner to decide); editing and deleting a project on /project-manager still read the account role |
 
 ### 4.1 Code map — the data layer
 
@@ -24135,6 +24136,52 @@ contract, `docs/data/tables/*`, `engine_input.json` and `page_equals_run`.
 **Gap check.** Golden digests and golden runs are unchanged on both sides of the merge. The
 `engine-ledger` gate and `release_report.py --check` hold. **The §15 reading is still owed**, in the
 push AFTER the merge (D153), for both phases: §25's WP 15.7 and §26's boundary.
+
+### D303 — an organization admin creates projects in that organization · 2026-10-08 · `20261008000001`
+
+**Owner-reported.** "Phu … is the admin of ACCURATE-AA but he could not add a new project in
+ACCURATE-AA", then "role admin in one organization could generate a new project".
+
+**What the previous record promised against what this found.** D210 made the active organization
+what a new project is stamped with, D216 made the default the one an account signs in to, and
+D278 linked the account role to the organization role in ONE direction (an account `admin` becomes
+an organization `admin`). Nothing linked it the other way: an organization `admin` with a `user`
+account held no right the organization role named, because outside the API-key verbs nothing read
+`org_role`. And the rule for creating a project had no author in the database at all — the page
+default and the button's `canModify` were the whole of it; `create_project` checks nothing.
+
+**What changed.** See §4 D303. Migration `20261008000001`: `project_creation_right` (the rule, not
+executable by PUBLIC, `anon` or `authenticated`); `capabilities_for_user(uuid)` re-created from
+`20260905000001` with the lines marked D303. App: `projectCreation.ts` (the answer's type, the
+fallback, the form's sentence), `capabilities.ts` (carries `project_creation`), `DataManager.tsx`
+(the button, the form and the mobile empty state read it; the form says where the project lands),
+`roleGloss.ts` and the manual's Roles and capabilities page say it. The sidecars' `DataManager.tsx`
+citations moved by the nine lines this added, and the generated pages with them.
+
+**Also found: a helper that reads one overload per name.** `live-sql.mjs`'s `functions` map keeps
+the LAST-created body per name (D100), so re-creating the one-argument `capabilities_for_user`
+hid the two-argument resolver from `projectMembership.test.ts`, whose order and GUC assertions are
+about that one — two of them went red reading the wrong function. `liveDefinitions` now also
+returns the `overloads` map it already built, and the suite names `(uuid, uuid)`.
+
+**Gate results.** `contract:rehearse --since origin/main` against a local PostgreSQL 16 green both
+ways (fresh and `--fixtures`), `860` new; the mutation that removes the organization-role grant
+turns `860` §2 red. `contract:check` holds (its two warnings, R10 and R13, are `main`'s).
+`npm test`: 1 721 passed, 6 failed — all six in `manualExample.test.ts` ("retains its reviewed
+content" for files this change does not touch), and red identically on `main` at `1ad63b2`.
+`typecheck` 15 of 15 held; `audit:ui`, `check:docs` clean; eslint 294 errors / 111 warnings, the
+`DataManager.tsx` count identical to `main`'s and none in the new files.
+
+**Gap check.** (1) The rule is the ACTIVE organization's, by design: the project lands there.
+An organization admin whose default is elsewhere switches first; the form names the organization
+so nobody creates in the wrong one unawares. (2) `create_project` does not enforce the rule. It did
+not enforce the old one either; enforcing now refuses `user` accounts that `rehearsal/420` and
+`520` create with, so it is a decision for the owner, not a side effect of this one. (3) The
+organization role grants creation and the page only — editing or deleting a project's settings on
+/project-manager still reads the account role; the creator is the project's `owner` (D61), so the
+four project rights on it are theirs (D279). (4) Who gains the page on deploy is every account
+that is an organization Owner or Admin with a `user` account; that is a §15 reading after the
+merge, not one a branch can take (D153).
 
 ## 17. Sequencing
 

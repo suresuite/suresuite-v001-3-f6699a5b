@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 404,
-      "migrations_applied": 396,
-      "last_migration": "20261004000004_production_lead_time.sql"
+      "migrations_found": 405,
+      "migrations_applied": 397,
+      "last_migration": "20261008000001_org_admin_creates_projects.sql"
     },
     "sidecars": 77,
     "registry": {
@@ -3124,7 +3124,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:421",
+          "evidence": "src/pages/DataManager.tsx:430",
           "confirmed": true
         },
         {
@@ -3753,7 +3753,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:421",
+          "evidence": "src/pages/DataManager.tsx:430",
           "confirmed": true
         },
         {
@@ -11093,7 +11093,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:421",
+          "evidence": "src/pages/DataManager.tsx:430",
           "confirmed": true
         },
         {
@@ -18536,7 +18536,7 @@
           "page": "DataManager.tsx",
           "via": "rpc delete_project_dataset",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:711",
+          "evidence": "src/pages/DataManager.tsx:720",
           "confirmed": true
         },
         {
@@ -18960,7 +18960,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:421",
+          "evidence": "src/pages/DataManager.tsx:430",
           "confirmed": true
         },
         {
@@ -19564,7 +19564,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:421",
+          "evidence": "src/pages/DataManager.tsx:430",
           "confirmed": true
         },
         {
@@ -21222,7 +21222,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_node_list",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:433",
+          "evidence": "src/pages/DataManager.tsx:442",
           "confirmed": true
         },
         {
@@ -22573,7 +22573,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The member's standing in the organization — `owner`, `admin` or `member`, CHECK-constrained. This is an ORG vocabulary and it is not the project vocabulary: `min_project_role` throughout this contract speaks of viewer / analyst / editor / owner, which WP 2.2 creates on `project_members`. The two share the word \"owner\" and mean different things by it.",
+          "meaning": "The member's standing in the organization — `owner`, `admin` or `member`, CHECK-constrained. This is an ORG vocabulary and it is not the project vocabulary: `min_project_role` throughout this contract speaks of viewer / analyst / editor / owner, which WP 2.2 creates on `project_members`. The two share the word \"owner\" and mean different things by it. Since D303 an `owner` or `admin` row of the account's ACTIVE organization lets a `user` account create projects there (`project_creation_right`, read by `capabilities_for_user`).",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -23447,7 +23447,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:421",
+          "evidence": "src/pages/DataManager.tsx:430",
           "confirmed": true
         },
         {
@@ -30401,7 +30401,7 @@
           "page": "DataManager.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:201",
+          "evidence": "src/pages/DataManager.tsx:210",
           "confirmed": true
         },
         {
@@ -41512,7 +41512,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:648",
+          "evidence": "src/pages/DataManager.tsx:657",
           "confirmed": true
         },
         {
@@ -42469,7 +42469,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:648",
+          "evidence": "src/pages/DataManager.tsx:657",
           "confirmed": true
         },
         {
@@ -45094,5 +45094,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "c7c7da69c86d"
+  "contract_version": "5ec67443cac9"
 }

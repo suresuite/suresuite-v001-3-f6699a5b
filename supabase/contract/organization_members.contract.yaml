@@ -97,7 +97,9 @@ fields:
       vocabulary: `min_project_role` throughout this contract speaks of
       viewer / analyst / editor / owner, which WP 2.2 creates on
       `project_members`. The two share the word "owner" and mean different
-      things by it.
+      things by it. Since D303 an `owner` or `admin` row of the account's ACTIVE
+      organization lets a `user` account create projects there
+      (`project_creation_right`, read by `capabilities_for_user`).
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions:

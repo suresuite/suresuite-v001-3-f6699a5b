@@ -25,7 +25,7 @@ export const ACCOUNT_ROLE_GLOSS: Record<UserRole, string> = {
   modeler:
     "The builder's role. The same default surface as admin — the two differ by what older row rules name and by convention, not by their default grants.",
   user:
-    'Read and analyse. Every workspace opens, but creating projects, editing data and running simulations are off by default.',
+    'Read and analyse. Every workspace opens, but creating projects, editing data and running simulations are off by default. An Admin or Owner of an organization may still create projects in it, while working in that organization.',
 };
 
 /** One line per role for the picker on /admin/users, where the gloss would not fit. */
@@ -33,7 +33,7 @@ export const ACCOUNT_ROLE_PICKER_LINE: Record<UserRole, string> = {
   super_admin: 'Opens the administration area; every check is skipped.',
   admin: 'Every workspace and feature by default. Does NOT open the administration area.',
   modeler: 'Every workspace and feature by default; builds projects.',
-  user: 'Read and analyse; editing data and running simulations off by default.',
+  user: "Read and analyse; editing data and running simulations off by default. Creates projects only as an organization's Admin or Owner.",
 };
 
 /**

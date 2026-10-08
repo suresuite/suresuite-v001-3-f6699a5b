@@ -64,6 +64,7 @@ function argTypesOf(tail) {
  *
  * @returns {{policies: Map<string, {table:string, name:string, migration:string, sql:string}>,
  *            functions: Map<string, {name:string, migration:string, sql:string}>,
+ *            overloads: Map<string, Map<string, {name:string, migration:string, sql:string}>>,
  *            triggers: Map<string, {table:string, name:string, migration:string, sql:string}>,
  *            textualCallSites: number}}
  */
@@ -165,7 +166,10 @@ export function liveDefinitions() {
       }
     }
   }
-  return { policies, functions, triggers, textualCallSites };
+  // `overloads` is returned so a rule about ONE overload can name its argument types
+  // ("uuid,uuid") instead of reading whichever was created last (§4 D303: re-creating the
+  // one-argument `capabilities_for_user` hid the two-argument one from `functions`).
+  return { policies, functions, overloads, triggers, textualCallSites };
 }
 
 /**

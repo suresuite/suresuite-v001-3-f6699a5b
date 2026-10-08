@@ -1,5 +1,6 @@
 import type { UserRole } from '@/hooks/useUserRole';
 import { canAccessRoute } from '@/lib/permissions';
+import { normalizeProjectCreation, projectCreationFromRole, type ProjectCreationRight } from '@/lib/auth/projectCreation';
 
 /**
  * Canonical capability catalog.
@@ -81,6 +82,12 @@ export interface EffectiveCapabilities {
   features: Record<string, boolean>;
   models: EffectiveModels;
   budgets: EffectiveBudgets;
+  /**
+   * §4 D303 — may this account create a project, and where would it land. The server's
+   * `project_creation_right`; absent from a server older than D303 (the button then reads
+   * the account role, as it did before).
+   */
+  project_creation?: ProjectCreationRight | null;
 }
 
 /**
@@ -210,6 +217,7 @@ export function roleFallbackCapabilities(
     features,
     models: { all_allowed: true, allowed_codes: [], default_code: null, fallback_code: null },
     budgets: { ...EMPTY_BUDGETS },
+    project_creation: projectCreationFromRole(r),
   };
 }
 
@@ -287,6 +295,7 @@ export function normalizeCapabilities(raw: unknown): EffectiveCapabilities | nul
       today_cost_usd: num(budgets.today_cost_usd),
       today_requests: num(budgets.today_requests),
     },
+    project_creation: normalizeProjectCreation(o.project_creation),
   };
 }
 

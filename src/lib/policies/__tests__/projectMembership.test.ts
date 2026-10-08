@@ -29,12 +29,21 @@ const ROOT = join(__dirname, "..", "..", "..", "..");
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
 
 type LiveDef = { name: string; migration: string; sql: string };
-const live = () => liveDefinitions() as { policies: Map<string, LiveDef>; functions: Map<string, LiveDef> };
+const live = () => liveDefinitions() as {
+  policies: Map<string, LiveDef>; functions: Map<string, LiveDef>; overloads: Map<string, Map<string, LiveDef>>;
+};
 const fn = (name: string): LiveDef => {
   const d = live().functions.get(name);
   expect(d, `no live function ${name}()`).toBeDefined();
   return d!;
 };
+/** One overload by its argument types — `functions` holds whichever was created last (§4 D303). */
+const overload = (name: string, args: string): LiveDef => {
+  const d = live().overloads.get(name)?.get(args);
+  expect(d, `no live function ${name}(${args})`).toBeDefined();
+  return d!;
+};
+const projectResolver = () => overload("capabilities_for_user", "uuid,uuid");
 
 describe("the resolver keeps the property the access layer is built on", () => {
   it("both forms take their user id explicitly and read no session GUC", () => {
@@ -42,7 +51,7 @@ describe("the resolver keeps the property the access layer is built on", () => {
     // GUC on a pooled PostgREST connection is the one thing here that cannot be
     // relied on. capabilities_for_user has always taken _user_id instead. The
     // project-aware form must not quietly undo that.
-    const project = squash(fn("capabilities_for_user").sql);
+    const project = squash(projectResolver().sql);
     expect(project).toMatch(/capabilities_for_user\s*\(\s*_user_id\s+uuid\s*,\s*_project_id\s+uuid\s*\)/i);
     expect(project, "the resolver reads a session GUC").not.toMatch(/current_setting\s*\(/);
     expect(squash(fn("effective_project_role").sql), "effective_project_role reads a session GUC")
@@ -60,13 +69,14 @@ describe("the resolver keeps the property the access layer is built on", () => {
   it("/profile is still non-deniable", () => {
     // A deniable /profile is a self-lockout loop: the page you would use to fix
     // your own permissions is the page the permissions took away.
-    expect(squash(fn("capabilities_for_user").sql)).toMatch(/c\.key = '\/profile' THEN true/);
+    expect(squash(projectResolver().sql)).toMatch(/c\.key = '\/profile' THEN true/);
+    expect(squash(overload("capabilities_for_user", "uuid").sql)).toMatch(/c\.key = '\/profile' THEN true/);
   });
 
   it("resolves role -> org -> project -> user, most specific first", () => {
     // As a COALESCE the order reverses: user, project, org, role, false. Getting
     // this backwards would make a role default beat a user's explicit grant.
-    const body = squash(fn("capabilities_for_user").sql);
+    const body = squash(projectResolver().sql);
     // `public.` qualified on purpose: "role_capabilities" is a SUBSTRING of
     // "project_role_capabilities", so an unqualified indexOf finds the wrong one.
     const order = ["user_capabilities", "project_role_capabilities", "org_capabilities", "role_capabilities"]
