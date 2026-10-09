@@ -1,0 +1,9 @@
+run_id: 37992664882  outcome: success
+trigger: push  ref: main  sha: 08e874a8cd13f0226034ee3e70b254e85e0c681f
+──────────────────────────────────────
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ • 20261009000003_nexus_demand_at_risk.sql
+ [Y/n] 
+Applying migration 20261009000003_nexus_demand_at_risk.sql...
+Finished supabase db push.
