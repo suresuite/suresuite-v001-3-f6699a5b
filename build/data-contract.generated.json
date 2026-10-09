@@ -11443,15 +11443,22 @@
             "transform": "rateToWeekly(volume, time_unit) — normalized to weeks",
             "missing_default": "0 (the arc carries no share)"
           },
-          "substitutions": [],
+          "substitutions": [
+            {
+              "when": "the CSV cell is blank (the column lands NULL — optional since 2026-10-09)",
+              "value": "0 — the arc carries no supply share",
+              "provenance": "default",
+              "visible_as": "the upload's per-row \"defaulted\" count on the review screen"
+            }
+          ],
           "ingest": {
             "csv_header": "volume",
-            "required": true,
-            "validate": "numeric >= 0; blank becomes NULL, not 0 (D7)",
+            "required": false,
+            "validate": "numeric >= 0; a blank cell lands NULL, never 0 (D7) — the arc carries no supply share",
             "rule": {
               "kind": "numeric",
               "min": 0,
-              "blank": "reject"
+              "blank": "null"
             }
           },
           "surfaces": [],
@@ -11626,12 +11633,12 @@
           ],
           "ingest": {
             "csv_header": "unit_price",
-            "required": true,
-            "validate": "numeric > 0",
+            "required": false,
+            "validate": "numeric > 0; a blank cell lands NULL and the engine's 1.0 default stands in, with a MappingWarning",
             "rule": {
               "kind": "numeric",
               "exclusive_min": 0,
-              "blank": "reject"
+              "blank": "null"
             }
           },
           "surfaces": [],
@@ -45094,5 +45101,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "5ec67443cac9"
+  "contract_version": "b3dbb4b6d2c6"
 }

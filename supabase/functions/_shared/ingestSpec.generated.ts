@@ -361,15 +361,15 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
       {
         "column": "volume",
         "csvHeader": "volume",
-        "required": true,
+        "required": false,
         "type": "numeric",
         "nullable": true,
         "rule": {
           "kind": "numeric",
           "min": 0,
-          "blank": "reject"
+          "blank": "null"
         },
-        "validate": "numeric >= 0; blank becomes NULL, not 0 (D7)"
+        "validate": "numeric >= 0; a blank cell lands NULL, never 0 (D7) — the arc carries no supply share"
       },
       {
         "column": "time_unit",
@@ -399,15 +399,15 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
       {
         "column": "unit_price",
         "csvHeader": "unit_price",
-        "required": true,
+        "required": false,
         "type": "numeric",
         "nullable": true,
         "rule": {
           "kind": "numeric",
           "exclusive_min": 0,
-          "blank": "reject"
+          "blank": "null"
         },
-        "validate": "numeric > 0"
+        "validate": "numeric > 0; a blank cell lands NULL and the engine's 1.0 default stands in, with a MappingWarning"
       },
       {
         "column": "lead_time_unit",

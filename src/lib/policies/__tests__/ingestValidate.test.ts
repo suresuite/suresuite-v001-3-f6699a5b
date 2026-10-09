@@ -9,7 +9,10 @@
  *
  * The four §10 exit checks live here (the fifth, the semicolon file, is a parse
  * question and lives in csvParse.test.ts):
- *   · blank `volume` is rejected with a ROW-LEVEL finding
+ *   · a blank REQUIRED numeric (`lead_time`) is rejected with a ROW-LEVEL finding
+ *     — `volume` was the example until 2026-10-09, when it and `unit_price`
+ *     became optional: a blank lands NULL and the engine's declared default
+ *     stands in (0 share; 1.0 with a MappingWarning)
  *   · `" MAT-1 "` and `"MAT-1"` resolve to one id
  *   · an integer `time_unit` is rejected with a finding, NEVER coerced
  *   · a quoted comma survives all the way into a staged row
@@ -28,7 +31,7 @@ describe("the contract is what decides", () => {
   it("maps every required inbound header the contract names", () => {
     const headers = INBOUND.columns.filter((c) => c.required).map((c) => c.csvHeader);
     expect(headers.sort()).toEqual(
-      ["lead_time", "material_id", "supplier_id", "unit_price", "volume"],
+      ["lead_time", "material_id", "supplier_id"],
     );
   });
 
@@ -46,26 +49,41 @@ describe("the contract is what decides", () => {
 });
 
 describe("D7 — a blank required numeric is rejected, never silently null", () => {
-  it("rejects a blank volume with a row-level finding naming the row and the column", () => {
-    const r = run("SUP-1,MAT-1,,week,2,3");
+  it("rejects a blank lead_time with a row-level finding naming the row and the column", () => {
+    const r = run("SUP-1,MAT-1,10,week,,3");
     expect(rowCodes(r)).toEqual(["required_blank"]);
     expect(r.rows[0].findings[0].row).toBe(2);
-    expect(r.rows[0].findings[0].field).toBe("volume");
+    expect(r.rows[0].findings[0].field).toBe("lead_time");
     expect(r.counts.rows_rejected).toBe(1);
   });
 
-  it("puts NO volume key in `parsed` — absent, not null", () => {
+  it("puts NO lead_time key in `parsed` — absent, not null", () => {
     // The distinction is the defect: `null` says "the file said empty and that
-    // is allowed", and 376 production rows say exactly that today.
-    const r = run("SUP-1,MAT-1,,week,2,3");
-    expect("volume" in r.rows[0].parsed).toBe(false);
+    // is allowed", and 376 production rows said exactly that about volume.
+    const r = run("SUP-1,MAT-1,10,week,,3");
+    expect("lead_time" in r.rows[0].parsed).toBe(false);
   });
 
   it("rejects the row without rejecting the file", () => {
-    const r = run("SUP-1,MAT-1,,week,2,3\nSUP-2,MAT-2,20,week,2,3");
+    const r = run("SUP-1,MAT-1,10,week,,3\nSUP-2,MAT-2,20,week,2,3");
     expect(r.ok).toBe(true);
     expect(r.rows).toHaveLength(2);
     expect(rowCodes(r, 1)).toEqual([]);
+  });
+
+  it("accepts a blank volume and a blank unit_price — optional, and the defaults are counted", () => {
+    const r = run("SUP-1,MAT-1,,week,2,\nSUP-2,MAT-2,,week,2,3");
+    expect(rowCodes(r, 0)).toEqual([]);
+    expect(rowCodes(r, 1)).toEqual([]);
+    expect(r.counts.rows_rejected).toBe(0);
+    expect(r.counts.fields_defaulted).toBe(3);
+    expect("volume" in r.rows[0].parsed).toBe(false);
+    expect("unit_price" in r.rows[0].parsed).toBe(false);
+    expect(r.rows[1].parsed.unit_price).toBe(3);
+  });
+
+  it("still rejects a unit_price of zero — blank is allowed, zero is not a price", () => {
+    expect(rowCodes(run("SUP-1,MAT-1,10,week,2,0"))).toEqual(["out_of_range"]);
   });
 
   it("accepts a volume of zero — the contract says >= 0, not > 0", () => {

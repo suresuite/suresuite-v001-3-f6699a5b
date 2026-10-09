@@ -194,7 +194,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D4 | `risk_data` queried by two network pages; no migration, no `project_id`, quoted column names. **It is not absent — it exists untracked in production**, which a static replay cannot distinguish from absent (CI proved it; §16 WP 1.4) | `src/pages/ProductLevelNetwork.tsx:500`, `src/pages/FirmLevelNetwork.tsx:301` | WP 1.4 ✅ *(`20260915000003_risk_data.sql` both CREATEs on a fresh database and ADOPTS the untracked one: reference tier, `source`/`vintage`/`licence`/`refreshed_at`, `country`/`risk_class` unquoted, CHECKs `NOT VALID` on the adopted rows. No `project_id` — deliberately: country risk is a property of the world)* |
 | D5 | No natural-key uniqueness on any lane table → re-upload duplicates. **Measured, 2026-09-16 (§15 run `35146894995`, re-taken for WP 3.3 after WP 3.2's merge and UNCHANGED — the CSV path has still run zero times):** against `natural_key_intended`, `inbound_logistics` holds **96 rows a unique index would reject** (1 787 rows, 7 projects) and `bom_multi_level` holds 2; `outbound_logistics`, `bom_single_level` and the three WP 3.2 described hold none. WP 3.3's dedup is not a no-op. **AND THE KEY AS WRITTEN DOES NOT ENFORCE ITSELF ON THREE OF THE SEVEN TABLES**: `bom_multi_level.higher_level_component_id`, `tier2_suppliers.material_id` and `tier3_suppliers.material_id` are NULLABLE and their NULLs are meaningful (the sidecars say so — a BOM root has no parent). A plain `CREATE UNIQUE INDEX` treats NULLs as distinct, so it constrains none of those rows, and `ON CONFLICT` infers from the same index and INSERTS a duplicate instead of updating — which makes this package's own exit check, "uploading the same file twice is a no-op", false and silent for exactly the rows no constraint has ever touched. `natural_key_intended` is a list of COLUMNS and a list of columns is not a constraint; the NULL rule is the half nobody wrote down. Closed with `NULLS NOT DISTINCT` on all seven, not on the three that need it today, because nullability is a schema property a later `ALTER` can change | `20250820145837_…sql`; §15's sweep; the three sidecars' own `meaning` for those columns | WP 3.3 ✅ *(`20260916000017` deduplicates 98 rows on the rule "most complete copy, then the later one"; `20260916000018` creates all seven unique indexes, every one `NULLS NOT DISTINCT`; `contract:check` R5 is a `fail` in the same commit and grew a second half that compares the landed columns against `natural_key_intended`; and `ingest_apply_run` upserts on the key it reads from the catalog. `supabase/rehearsal/080` runs the dedup and then builds the real index over the result — the only claim about the first migration worth making is that the second can follow it. **CLOSED AGAINST A MEASUREMENT, not against a migration that landed** (§15 run `35151725863`, every project): `inbound_logistics` 1 787 → **1 691**, `bom_multi_level` 794 → **792**, and `rows_the_unique_index_would_reject` is **0** on all seven. And the number nobody predicted: `null_volume` 376 → 280 and `null_lead_time` 414 → 318, both down by exactly the 96 deleted, while `null_price` held at 30 — so every deleted row was an empty one and the completeness tie-break never chose the emptier copy)* |
 | D6 | CSV parse is `split(',')` — not quote-safe | was `UploadWizard.tsx:502,523`; the parser is now `_shared/csvParse.ts` | WP 3.2 ✅ *(server-side RFC 4180; `csvParse.test.ts` pins the whole trace — quoted comma, BOM, CRLF, lone CR, trailing comma, short and long rows, quoted newline)* |
-| D7 | Required-field validation misses `null` (blank numerics pass). **Measured, 2026-09-16 (§15):** of 1 787 `inbound_logistics` rows, **376 have a null `volume`, 414 a null `lead_time`, 30 a null `unit_price`** — and the single project §15 told the reader to measure has none of them | was `UploadWizard.tsx:384` vs `:530-531`; §15's sweep | WP 3.2 ✅ *(for NEW rows: a blank required cell is a row-level finding and the row is held in tier 1. The 376/414/30 are already in tier 2 and a parser cannot reach back for them — see §16 · WP 3.2)* |
+| D7 | Required-field validation misses `null` (blank numerics pass). **Measured, 2026-09-16 (§15):** of 1 787 `inbound_logistics` rows, **376 have a null `volume`, 414 a null `lead_time`, 30 a null `unit_price`** — and the single project §15 told the reader to measure has none of them | was `UploadWizard.tsx:384` vs `:530-531`; §15's sweep | WP 3.2 ✅ *(for NEW rows: a blank required cell is a row-level finding and the row is held in tier 1. The 376/414/30 are already in tier 2 and a parser cannot reach back for them — see §16 · WP 3.2. **Narrowed 2026-10-09 at the owner's request**: `inbound_logistics.volume` and `unit_price` are OPTIONAL — a blank lands NULL, never 0, and the engine's declared default stands in; `lead_time` is still required — see §16 · D7 · 2026-10-09)* |
 | D8 | Inbound/outbound ids not trimmed or empty-checked (BOM-multi is) | `ingest-inbound-logistics/index.ts:38-39` | WP 3.2 ✅ *(on the CSV path: `ingestValidate.ts` applies BOM-multi's own trim/empty pattern from the contract, so `" MAT-1 "` and `"MAT-1"` are one id. The named function is untouched and still live for `StagePolicyTable`'s grid writes — a different path, and not this defect's)* |
 | D9 | `lead_time_unit` read by engine; no column, dropped by sanitizer | `project_map.py:420`; `datamap.py:126` | WP 1.3 ✅ |
 | D10 | Three competing unit tables disagree (`quarter` is 13× wrong in SQL) | `grading.ts:113`, `effectiveEconomics.ts:48`, `item_master.sql:138` | WP 1.3 ✅ *(one table; `contract:units -- --check` is the gate)* |
@@ -24182,6 +24182,33 @@ organization role grants creation and the page only — editing or deleting a pr
 four project rights on it are theirs (D279). (4) Who gains the page on deploy is every account
 that is an organization Owner or Admin with a `user` account; that is a §15 reading after the
 merge, not one a branch can take (D153).
+
+### D7 — blank `volume` and `unit_price` land on an inbound upload · 2026-10-09 · no migration
+
+**What was asked.** An inbound-logistics file with 180 rows whose `volume` (and a few whose
+`unit_price`) was blank held every one of them in tier 1 as `required_blank`, and the owner asked
+for blank data to upload.
+
+**What changed.** The sidecar only: `inbound_logistics.volume` and `unit_price` are
+`required: false`, `blank: "null"`. A blank cell lands NO value (absent from `parsed`, counted in
+`fields_defaulted`), so tier 2 holds NULL — never 0, which is what D7 is about and still holds. The
+engine's defaults were already declared and need nothing: a NULL volume is a lane with no supply
+share, a NULL price is 1.0 with a `warn` MappingWarning. The volume's blank case is now a declared
+substitution on the sidecar. The value rules stand: a negative volume and a price of ZERO or less
+are still row findings — a blank says "not known", a zero says something false. `lead_time` stays
+required. The columns were always nullable, so no migration; `UploadWizard.tsx` is untouched because
+a described dataset is validated by the server from the generated spec alone.
+
+**Gate results.** `contract:generate` regenerated the spec and pages (every page's contract-hash
+footer moves). `contract:check` passes. `ingestValidate.test.ts` 29 of 29: the D7 tests now use a
+blank `lead_time`, the remaining required numeric, plus a blank volume/price that lands and a zero
+price that does not. `npm test`: the only failures are the six `manualExample.test.ts` "retains
+its reviewed content" checks, which fail the same way on the base branch without this change.
+
+**Gap check.** The §10 exit line "blank `volume` is rejected" was true of WP 3.2 and is left as
+written; the D7 row says what is true now. A blank on a re-upload of an existing arc OVERWRITES its
+stored volume or price with NULL. The promotion is an upsert of what the file says, and the file
+said blank.
 
 ## 17. Sequencing
 
