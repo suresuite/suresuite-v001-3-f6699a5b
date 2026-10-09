@@ -85,6 +85,8 @@ interface ProjectCardProps {
   isEditing: boolean;
   globalSelectedProjectId: string | null;
   canModify: boolean;
+  /** §4 D304 — an Owner/Admin of this project's organization, working in it. */
+  orgAdmin?: boolean;
   role: string;
   userId: string;
   editProjectName: string;
@@ -124,6 +126,7 @@ export function ProjectCard({
   isEditing,
   globalSelectedProjectId,
   canModify,
+  orgAdmin = false,
   role,
   userId,
   editProjectName,
@@ -300,8 +303,11 @@ export function ProjectCard({
     fallbackDates.start.toLocaleDateString() + ' → ' + fallbackDates.end.toLocaleDateString();
   const periodDefaulted = !project.simulation_start || !project.simulation_end;
 
-  // Deleting the project stays the owner rule it always was (no /profile right states it).
-  const owns = canModify && (project.modeler_id === userId || role === 'admin' || role === 'super_admin');
+  // Deleting the project is `delete_project`'s rule (no /profile right states it): its creator,
+  // an app admin, or — since D304 — an Owner/Admin of its organization.
+  const owns = project.modeler_id === userId
+    || (canModify && (role === 'admin' || role === 'super_admin'))
+    || orgAdmin;
   // D230 — every other action is the right /profile lists for this person on this project:
   // uploads, the item master, combining and generating the node list are "Edit Input Data";
   // the settings form is "Edits project settings"; downloading the node list is "Export".
@@ -541,7 +547,7 @@ export function ProjectCard({
               },
               'permanent',
               !owns,
-              'Only the project’s modeller or an admin can delete this project.',
+              'Only the project’s creator, an app admin or an admin of its organization can delete this project.',
             )}
           </div>
         </MobileSheet>

@@ -26,7 +26,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc get_deep_tier_datasets"
     grain: table
-    evidence: "src/components/ProjectDataViewer.tsx:126"
+    evidence: "src/components/ProjectDataViewer.tsx:128"
     confirmed: true
   - page: "ProductLevelNetwork.tsx"
     via: "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)"

@@ -63,13 +63,15 @@ interface ProjectDataViewerProps {
   project: Project;
   onClose: () => void;
   onDataDeleted: () => void;
+  /** §4 D304 — an Owner/Admin of this project's organization may empty its datasets. */
+  orgAdmin?: boolean;
 }
 
 const SMALL_TXT = 'text-xs';
 const HEAD_CELL_PAD = 'h-7 px-2 py-1 font-medium text-white text-left';
 const CELL_PAD = 'h-6 px-2 py-1';
 
-const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewerProps) => {
+const ProjectDataViewer = ({ project, onClose, onDataDeleted, orgAdmin = false }: ProjectDataViewerProps) => {
   const [bomData, setBomData] = useState<any[]>([]);
   const [inboundData, setInboundData] = useState<any[]>([]);
   const [outboundData, setOutboundData] = useState<any[]>([]);
@@ -91,7 +93,7 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
   // The server's rule is the project's owner or an admin of its organization;
   // "Edit Input Data" is the browser's copy of it (`v_land`, D230/D256).
   const rights = useProjectRights(project.id, { modelerId: project.modeler_id });
-  const mayDelete = rights.can('data_edit_inputs');
+  const mayDelete = rights.can('data_edit_inputs') || orgAdmin;
 
   useEffect(() => {
     loadProjectData();

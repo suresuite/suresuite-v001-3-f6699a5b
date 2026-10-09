@@ -9,7 +9,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { normalizeCapabilities, roleFallbackCapabilities } from '@/lib/capabilities';
-import { normalizeProjectCreation, projectCreationFromRole, projectCreationNote, type ProjectCreationRight } from '../projectCreation';
+import {
+  adminsProjectOrganization, normalizeProjectCreation, projectCreationFromRole, projectCreationNote, type ProjectCreationRight,
+} from '../projectCreation';
 
 const orgAdmin: ProjectCreationRight = {
   allowed: true, decided_by: 'organization_role', account_role: 'user',
@@ -61,5 +63,32 @@ describe('project_creation (D303)', () => {
     expect(page).toMatch(/const newProjectAction = canCreate &&/);
     expect(page).toMatch(/isCreating && canCreate &&/);
     expect(page).not.toMatch(/const newProjectAction = canModify &&/);
+  });
+});
+
+describe('deleting as an organization admin (D304)', () => {
+  it('is an Owner or Admin of the organization the project belongs to, while working in it', () => {
+    expect(adminsProjectOrganization(orgAdmin, 'org-a')).toBe(true);
+    expect(adminsProjectOrganization({ ...orgAdmin, org_role: 'owner' }, 'org-a')).toBe(true);
+    expect(adminsProjectOrganization({ ...orgAdmin, org_role: 'member' }, 'org-a')).toBe(false);
+    expect(adminsProjectOrganization(orgAdmin, 'org-b')).toBe(false);
+    expect(adminsProjectOrganization(orgAdmin, null)).toBe(false);
+    expect(adminsProjectOrganization(null, 'org-a')).toBe(false);
+  });
+
+  it('the Delete project action and the dataset trash button read it', () => {
+    const card = readFileSync(path.resolve(__dirname, '../../../components/ProjectCard.tsx'), 'utf8');
+    expect(card).toMatch(/const owns = project\.modeler_id === userId\s*\|\| \(canModify && \(role === 'admin' \|\| role === 'super_admin'\)\)\s*\|\| orgAdmin;/);
+    const viewer = readFileSync(path.resolve(__dirname, '../../../components/ProjectDataViewer.tsx'), 'utf8');
+    expect(viewer).toMatch(/const mayDelete = rights\.can\('data_edit_inputs'\) \|\| orgAdmin;/);
+    const page = readFileSync(path.resolve(__dirname, '../../../pages/DataManager.tsx'), 'utf8');
+    expect(page.match(/orgAdmin=\{orgAdminOf\(project\)\}/g)?.length).toBe(2);
+  });
+
+  it('the database answer the buttons mirror is read by both deleting writers', () => {
+    const sql = readFileSync(path.resolve(__dirname, '../../../../supabase/migrations/20261009000001_org_admin_deletes_projects.sql'), 'utf8');
+    const body = (name: string) => sql.slice(sql.indexOf(`FUNCTION public.${name}(`), sql.indexOf('$$;', sql.indexOf(`FUNCTION public.${name}(`)));
+    expect(body('delete_project')).toMatch(/public\.project_org_admin\(p_user_id, p_project_id\)/);
+    expect(body('delete_project_dataset')).toMatch(/public\.project_org_admin\(public\.get_current_user_id\(\), p_project_id\)/);
   });
 });

@@ -49,7 +49,7 @@ import { confirmProjectDeletion } from '@/lib/projects/projectDeletion';
 import { useConfirm } from '@/components/shared/confirm/useConfirm';
 import { planRefusal } from '@/lib/auth/organizationPlan';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { projectCreationNote } from '@/lib/auth/projectCreation';
+import { adminsProjectOrganization, projectCreationNote } from '@/lib/auth/projectCreation';
 
 interface Project {
   id: string;
@@ -61,6 +61,7 @@ interface Project {
   created_at: string;
   modeler_id: string;
   modeler_name: string;
+  organization_id?: string | null;
   simulation_start?: string | null;
   simulation_end?: string | null;
   deep_tier_enabled?: boolean;
@@ -193,6 +194,8 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   const projectCreation = capabilities?.project_creation ?? null;
   const canCreate = projectCreation ? projectCreation.allowed : canModify;
   const creationNote = projectCreationNote(projectCreation);
+  // §4 D304 — an Owner/Admin of the project's organization may delete it and its data.
+  const orgAdminOf = (p: Project) => adminsProjectOrganization(projectCreation, p.organization_id);
 
   const isDuplicateName = projects.some(
     (project) => project.name.toLowerCase() === newProjectName.trim().toLowerCase()
@@ -320,7 +323,8 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   // waits for `public.delete_project` — one transaction, all or nothing — and a
   // refusal or failure arrives here with its reason.
   const handleDeleteProject = async (project: Project) => {
-    if (!canModify || !user?.id) return;
+    // The card shows Delete to whom `delete_project` admits; the database decides (D304).
+    if (!user?.id) return;
 
     const { data, error } = await supabase.functions.invoke('delete-project', {
       body: { projectId: project.id, userId: user.id, userEmail: user.email ?? '' },
@@ -933,6 +937,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                   isEditing={editingProject?.id === project.id}
                   globalSelectedProjectId={globalSelectedProjectId}
                   canModify={canModify}
+                  orgAdmin={orgAdminOf(project)}
                   role={role}
                   userId={user?.id || ''}
                   editProjectName={editProjectName}
@@ -999,6 +1004,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                     )}>
                      <ProjectDataViewer
                        project={project}
+                       orgAdmin={orgAdminOf(project)}
                        onClose={() => setExpandedProjectId(null)}
                        onDataDeleted={() => {
                          checkProjectDataCompletion(project.id).then((status) => {
