@@ -77,6 +77,16 @@ country and industry they can name the company (--keep-firm-size); database
 provenance (project_id, ingest_run_id, source_row_id, surrogate id,
 timestamps, hashes, organisation, modeler) is dropped.
 
+PLANT NAME: removed from every table (the upload takes the plant from the
+project); --keep-plant-name keeps it as PLANT-01.
+
+INBOUND BLANKS: the upload refuses a lane with a blank volume, lead_time or
+unit_price. Those cells are filled with what the engine uses when they are
+missing — volume 0, lead_time 2 (weeks), unit_price 1.0 — so the copy uploads
+and simulates exactly as the original did. Each filled cell is counted in the
+report (--no-fill leaves them blank). Any other blank the upload would refuse
+is listed as a warning, never filled.
+
 NOT CHANGED: every number (costs, prices, volumes, lead times, rates, demand),
 levels, units and enums, so a simulation of the copy reproduces the original.
 Numbers can be commercially sensitive on their own; decide before sharing.
@@ -134,6 +144,20 @@ DROP_COLUMNS = {"id", "project_id", "ingest_run_id", "source_row_id", "created_a
                 "computed_from_hash", "computed_at", "organization", "organization_id",
                 "modeler_id", "modeler_name", "project_name", "uploaded_by", "graph_hash",
                 "hash_inputs", "hash_network", "hash_simulation", "label", "dataset_version_id"}
+
+# Inbound lanes: the upload refuses a blank volume / lead_time / unit_price, and the
+# engine fills exactly these values when one is missing (contract `missing_default`;
+# scsim/io/project_map.py: NULL price -> 1.0 before the cheapest-price fallback,
+# NULL lead time -> 2 weeks, NULL volume -> no weight). Filling them makes the copy
+# uploadable and simulates identically; every filled cell is counted in the report.
+INBOUND_ENGINE_DEFAULTS = {"volume": "0", "lead_time": "2", "unit_price": "1.0"}
+# Required on upload with no default the engine shares: reported, never filled.
+REQUIRED_ON_UPLOAD = {
+    "inbound_logistics": ("supplier_id", "material_id", "volume", "lead_time", "unit_price"),
+    "outbound_logistics": ("customer_id", "product_id", "volume", "expected_lead_time", "unit_price"),
+    "bom_multi_level": ("material_id", "level", "consumption_rate"),
+    "bom_single_level": ("product_id", "material_id", "consumption_rate"),
+}
 
 PREFIX = {"supplier": "SUP", "customer": "CUS", "plant": "PLANT", "firm": "FIRM",
           "product": "PRD", "assembly": "ASM", "material": "MAT"}
@@ -508,11 +532,15 @@ def map_value(idmap: IdMap, col: str, v):
     return idmap.alias[key]
 
 
-def rewrite(tables: list[Table], idmap: IdMap, keep_coords: bool, keep_firm_size: bool, actions: dict):
+def rewrite(tables: list[Table], idmap: IdMap, keep_coords: bool, keep_firm_size: bool, actions: dict,
+            keep_plant: bool = False):
+    drop = DROP_COLUMNS | (set() if keep_plant else {"plant_name"})
     for t in tables:
-        out_cols = [c for c in t.columns if c not in DROP_COLUMNS]
+        out_cols = [c for c in t.columns if c not in drop]
         for c in t.columns:
-            if c in DROP_COLUMNS:
+            if c == "plant_name" and c in drop:
+                actions[t.source][c] = "dropped (the upload sets the plant from the project)"
+            elif c in DROP_COLUMNS:
                 actions[t.source][c] = "dropped (database provenance)"
             elif c in ID_COLUMNS:
                 actions[t.source][c] = f"ID -> {ID_COLUMNS[c]} map"
@@ -544,6 +572,35 @@ def rewrite(tables: list[Table], idmap: IdMap, keep_coords: bool, keep_firm_size
                 else:
                     o[c] = v
             t.out_rows.append(o)
+
+
+def fill_inbound_defaults(tables: list[Table], fills: Counter):
+    """Fill blank inbound volume / lead_time / unit_price with the engine's own defaults."""
+    for t in tables:
+        if t.kind != "inbound_logistics":
+            continue
+        for col in INBOUND_ENGINE_DEFAULTS:
+            if col not in t.out_columns:
+                t.out_columns.append(col)
+        for o in t.out_rows:
+            for col, value in INBOUND_ENGINE_DEFAULTS.items():
+                if _clean(o.get(col)) in (None, ""):
+                    o[col] = value
+                    fills[col] += 1
+                    # 2 means 2 WEEKS; a stated unit on that row would change it
+                    if col == "lead_time" and _clean(o.get("lead_time_unit")) not in (None, ""):
+                        o["lead_time_unit"] = "week"
+
+
+def blank_required(tables: list[Table]) -> list[tuple[str, str, int]]:
+    """(table, column, blank cells) for every column the upload will refuse blank."""
+    out = []
+    for t in tables:
+        for col in REQUIRED_ON_UPLOAD.get(t.kind, ()):
+            n = sum(1 for o in t.out_rows if _clean(o.get(col)) in (None, ""))
+            if n:
+                out.append((t.kind, col, n))
+    return out
 
 
 def _blank(col: str, keep_coords: bool, keep_firm_size: bool) -> bool:
@@ -634,7 +691,7 @@ def _inside_git_repo(p: Path) -> bool:
 
 
 def write_outputs(out: Path, tables, docs, idmap: IdMap, secret_generated: bool, actions,
-                  results, leaks, numeric_ids, ambiguous, skipped=()):
+                  results, leaks, numeric_ids, ambiguous, skipped=(), fills=None, still_blank=()):
     priv, share = out / "private", out / "shareable"
     priv.mkdir(parents=True, exist_ok=True)
     share.mkdir(parents=True, exist_ok=True)
@@ -700,6 +757,15 @@ def write_outputs(out: Path, tables, docs, idmap: IdMap, secret_generated: bool,
     if numeric_ids:
         L += ["", f"{len(numeric_ids)} original IDs are purely numeric, so the leak scan cannot tell them from "
               "quantities and skips them; they are still mapped in every ID column."]
+    if fills:
+        L += ["", "## Inbound blanks filled with the engine's own defaults (same simulation, now uploadable)", "",
+              "| Column | Filled with | Cells |", "|---|---|---|"]
+        L += [f"| {c} | {INBOUND_ENGINE_DEFAULTS[c]}{' week' if c == 'lead_time' else ''} | {n} |"
+              for c, n in sorted(fills.items())]
+    if still_blank:
+        L += ["", "## Still blank where the upload requires a value (fill these before uploading)", "",
+              "| Table | Column | Blank cells |", "|---|---|---|"]
+        L += [f"| {k} | {c} | {n} |" for k, c, n in still_blank]
     if skipped:
         L += ["", "## Skipped — out of scope (nothing from these files is in the output)", ""]
         L += [f"- {t.source} (`{t.kind}`, {len(t.rows)} rows)" for t in skipped]
@@ -744,6 +810,10 @@ def main(argv=None) -> int:
                     help="replace every variant/revision tail token too, not only the long ones")
     ap.add_argument("--include-network", action="store_true",
                     help="also de-identify the node list and the deep-tier files (skipped by default)")
+    ap.add_argument("--keep-plant-name", action="store_true",
+                    help="keep plant_name (as PLANT-01); by default the column is removed")
+    ap.add_argument("--no-fill", action="store_true",
+                    help="leave blank inbound volume / lead_time / unit_price blank")
     ap.add_argument("--allow-in-git", action="store_true", help="allow --out inside a git working tree")
     args = ap.parse_args(argv)
 
@@ -773,15 +843,24 @@ def main(argv=None) -> int:
     build_map(tables, idmap, args.naming, args.plain_tails, not args.hide_family_letters, args.role_prefix)
     ambiguous = {v for v, n in Counter(k[1] for k in idmap.alias).items() if n > 1}
     actions = defaultdict(dict)
-    rewrite(tables, idmap, args.keep_coordinates, args.keep_firm_size, actions)
+    rewrite(tables, idmap, args.keep_coordinates, args.keep_firm_size, actions, args.keep_plant_name)
+    fills = Counter()
+    if not args.no_fill:
+        fill_inbound_defaults(tables, fills)
+    still_blank = blank_required(tables)
     results, leaks, numeric_ids = run_checks(tables, idmap, args.also_hide)
     counts = write_outputs(out, tables, docs, idmap, secret_generated, actions, results, leaks,
-                           numeric_ids, ambiguous, skipped)
+                           numeric_ids, ambiguous, skipped, fills, still_blank)
 
     print(f"read {len(tables)} tables, {sum(len(t.rows) for t in tables)} rows")
     print("map: " + ", ".join(f"{p} {n}" for p, n in sorted(counts.items())))
     for name, ok, detail in results:
         print(f"  [{'PASS' if ok else 'FAIL'}] {name} — {detail}")
+    for c, n in sorted(fills.items()):
+        print(f"  filled {n} blank inbound {c} with the engine default "
+              f"{INBOUND_ENGINE_DEFAULTS[c]}{' week' if c == 'lead_time' else ''}")
+    for k, c, n in still_blank:
+        print(f"  WARNING: {k}.{c} is blank in {n} rows — the upload will refuse those rows")
     print(f"private (keep it so): {out / 'private'}")
     print(f"shareable:            {out / 'shareable'}")
     return 0 if all(ok for _, ok, _ in results) else 1

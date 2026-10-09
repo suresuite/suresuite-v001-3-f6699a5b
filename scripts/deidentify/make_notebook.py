@@ -47,6 +47,8 @@ OUT = "./aa_ver3_deid"              # NOT inside a git repo (the private map mus
 SECRET = None                       # None = generate one and save it to private/secret.txt
 EXISTING_MAP = None                 # e.g. "./aa_ver2_deid/private/id_map.csv" to keep its aliases
 NAMING = "structured"               # "structured": ASM-F1.010.000.10-SA · "simple": ASM-001
+KEEP_PLANT_NAME = False             # False removes plant_name from every table (the upload sets it)
+FILL_INBOUND_DEFAULTS = True        # blank inbound volume / lead_time / unit_price -> the engine's 0 / 2 weeks / 1.0
 ROLE_PREFIX = False                 # True writes PRD- / ASM- / MAT- in front (the role is always in id_map.csv)
 HIDE_FAMILY_LETTERS = False         # True: families become F1, F2 ... instead of DSC, DB, WP, E1, 1C
 PLAIN_TAILS = False                 # True also replaces short tails like .000.10 / -SA with V1, V2 ...
@@ -67,6 +69,8 @@ cells += [
 if SECRET: args += ["--secret", SECRET]
 if EXISTING_MAP: args += ["--existing-map", EXISTING_MAP]
 args += ["--naming", NAMING]
+if KEEP_PLANT_NAME: args.append("--keep-plant-name")
+if not FILL_INBOUND_DEFAULTS: args.append("--no-fill")
 if ROLE_PREFIX: args.append("--role-prefix")
 if HIDE_FAMILY_LETTERS: args.append("--hide-family-letters")
 if PLAIN_TAILS: args.append("--plain-tails")
