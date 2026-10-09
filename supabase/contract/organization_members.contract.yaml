@@ -99,7 +99,9 @@ fields:
       `project_members`. The two share the word "owner" and mean different
       things by it. Since D303 an `owner` or `admin` row of the account's ACTIVE
       organization lets a `user` account create projects there
-      (`project_creation_right`, read by `capabilities_for_user`).
+      (`project_creation_right`, read by `capabilities_for_user`), and since D304
+      delete that organization's projects and their data (`project_org_admin`,
+      read by `delete_project` and `delete_project_dataset`).
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions:

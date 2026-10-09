@@ -1985,7 +1985,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:430"
+        "evidence": "src/pages/DataManager.tsx:434"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",
@@ -2348,7 +2348,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:430"
+        "evidence": "src/pages/DataManager.tsx:434"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -7146,7 +7146,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:430"
+        "evidence": "src/pages/DataManager.tsx:434"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -12057,7 +12057,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc delete_project_dataset",
-        "evidence": "src/pages/DataManager.tsx:720"
+        "evidence": "src/pages/DataManager.tsx:724"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -12325,7 +12325,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:430"
+        "evidence": "src/pages/DataManager.tsx:434"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -12730,7 +12730,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:430"
+        "evidence": "src/pages/DataManager.tsx:434"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -13495,7 +13495,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_deep_tier_datasets",
-        "evidence": "src/components/ProjectDataViewer.tsx:126"
+        "evidence": "src/components/ProjectDataViewer.tsx:128"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -13866,7 +13866,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_node_list",
-        "evidence": "src/pages/DataManager.tsx:442"
+        "evidence": "src/pages/DataManager.tsx:446"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -14728,7 +14728,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": "one of owner / admin / member",
-        "meaning": "The member's standing in the organization — `owner`, `admin` or `member`, CHECK-constrained. This is an ORG vocabulary and it is not the project vocabulary: `min_project_role` throughout this contract speaks of viewer / analyst / editor / owner, which WP 2.2 creates on `project_members`. The two share the word \"owner\" and mean different things by it. Since D303 an `owner` or `admin` row of the account's ACTIVE organization lets a `user` account create projects there (`project_creation_right`, read by `capabilities_for_user`).",
+        "meaning": "The member's standing in the organization — `owner`, `admin` or `member`, CHECK-constrained. This is an ORG vocabulary and it is not the project vocabulary: `min_project_role` throughout this contract speaks of viewer / analyst / editor / owner, which WP 2.2 creates on `project_members`. The two share the word \"owner\" and mean different things by it. Since D303 an `owner` or `admin` row of the account's ACTIVE organization lets a `user` account create projects there (`project_creation_right`, read by `capabilities_for_user`), and since D304 delete that organization's projects and their data (`project_org_admin`, read by `delete_project` and `delete_project_dataset`).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -15345,7 +15345,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:430"
+        "evidence": "src/pages/DataManager.tsx:434"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -19829,7 +19829,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/DataManager.tsx:210"
+        "evidence": "src/pages/DataManager.tsx:213"
       },
       {
         "page": "DeveloperApi.tsx",
@@ -27221,7 +27221,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:657"
+        "evidence": "src/pages/DataManager.tsx:661"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -27785,7 +27785,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:657"
+        "evidence": "src/pages/DataManager.tsx:661"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",

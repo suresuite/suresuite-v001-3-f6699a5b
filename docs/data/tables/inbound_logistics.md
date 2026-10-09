@@ -76,7 +76,7 @@ partially or get corrected — the write fails.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:430` | yes |
+| `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:434` | yes |
 | `ProjectPolicies.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:244` | yes |
 | `SimulationLab.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:244` | yes |
 
@@ -537,6 +537,6 @@ A triangular or uniform lane's longest lead time — a duration in the lane's `l
 
 ---
 
-*Generated from data contract `1e2e09dfcb05`, engine `0.8.0`,
+*Generated from data contract `d0dacc0a298f`, engine `0.8.0`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

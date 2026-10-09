@@ -56,6 +56,23 @@ export function projectCreationFromRole(role: string | null | undefined): Projec
   };
 }
 
+/**
+ * §4 D304 — is this person an Owner or Admin of the organization a project belongs to, while
+ * working in it? The database's answer is `project_org_admin`, which `delete_project` and
+ * `delete_project_dataset` read; this mirrors it for the buttons from the answer the
+ * capability read already carries (the active organization and the role in it). It decides
+ * which buttons show, never whether the delete is allowed.
+ */
+export function adminsProjectOrganization(
+  right: ProjectCreationRight | null | undefined,
+  projectOrganizationId: string | null | undefined,
+): boolean {
+  return Boolean(
+    right?.organization_id && projectOrganizationId && right.organization_id === projectOrganizationId
+      && (right.org_role === 'owner' || right.org_role === 'admin'),
+  );
+}
+
 /** One line under the create form: where the project goes, and why this person may create it. */
 export function projectCreationNote(right: ProjectCreationRight | null | undefined): string | null {
   if (!right?.allowed || !right.organization_name) return null;
