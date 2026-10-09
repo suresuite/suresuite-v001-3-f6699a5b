@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 406,
-  "migrations_applied": 398,
+  "migrations_found": 407,
+  "migrations_applied": 399,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261009000001_org_admin_deletes_projects.sql",
+  "last_migration": "20261009000002_deep_tier_completion_per_statement.sql",
   "counts": {
     "tables": 94,
     "views": 8,
     "enums": 4,
-    "functions": 422,
+    "functions": 424,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -25365,6 +25365,28 @@
       "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
+      "name": "_project_completion_refresh",
+      "signature": "_project_completion_refresh(uuid)",
+      "args": [
+        "pid uuid"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261009000002_deep_tier_completion_per_statement.sql"
+    },
+    {
+      "name": "_project_completion_touch",
+      "signature": "_project_completion_touch()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261009000002_deep_tier_completion_per_statement.sql"
+    },
+    {
       "name": "_proposals_touch",
       "signature": "_proposals_touch()",
       "args": [],
@@ -30293,7 +30315,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20250908063902_b102cbb5-f431-40da-a4d8-167da46216b6.sql"
+      "defined_by": "20261009000002_deep_tier_completion_per_statement.sql"
     },
     {
       "name": "update_project_completion_status",
