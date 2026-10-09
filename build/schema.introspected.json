@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 407,
-  "migrations_applied": 399,
+  "migrations_found": 408,
+  "migrations_applied": 400,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261009000002_deep_tier_completion_per_statement.sql",
+  "last_migration": "20261009000003_nexus_demand_at_risk.sql",
   "counts": {
     "tables": 94,
     "views": 8,
     "enums": 4,
-    "functions": 424,
+    "functions": 426,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -26404,6 +26404,20 @@
       "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
+      "name": "analysis_apply_critical_nodes",
+      "signature": "analysis_apply_critical_nodes(uuid, jsonb, uuid)",
+      "args": [
+        "_run_id uuid",
+        "_scores jsonb",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "§4 D307 — the critical_nodes run's entity mirror: one score per NODE on node_list ",
+      "defined_by": "20261009000003_nexus_demand_at_risk.sql"
+    },
+    {
       "name": "analysis_apply_node_metrics",
       "signature": "analysis_apply_node_metrics(uuid, jsonb, uuid)",
       "args": [
@@ -26500,7 +26514,7 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
+      "comment": "DEPRECATED (§4 D307): scored lane rows, which every lane rebuild deletes (D196). ",
       "defined_by": "20260917000007_analyzer_provenance.sql"
     },
     {
@@ -28004,6 +28018,19 @@
       "defined_by": "20260726000001_chat_plans.sql"
     },
     {
+      "name": "get_critical_node_stats",
+      "signature": "get_critical_node_stats(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "p_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "§4 D307 — the nexus card's read: node counts, method, threshold, staleness and ",
+      "defined_by": "20261009000003_nexus_demand_at_risk.sql"
+    },
+    {
       "name": "get_current_approved_user",
       "signature": "get_current_approved_user()",
       "args": [],
@@ -28386,7 +28413,7 @@
       "returns": "TABLE( total_count bigint, critical_count bigint, non_critical_count bigint, last_prediction_timestamp timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
+      "comment": "DEPRECATED (§4 D307): counted lane rows by plant name across every project. ",
       "defined_by": "20250822031816_1e1e3bf7-279c-4eaf-b1d5-54df228b3daa.sql"
     },
     {

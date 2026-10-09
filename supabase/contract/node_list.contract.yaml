@@ -49,6 +49,21 @@ surfaces:
     grain: table
     evidence: "src/components/MapView.tsx:355"
     confirmed: true
+  - page: "FirmLevelNetwork.tsx"
+    via: "rpc get_critical_node_stats (MLPrediction, §4 D307)"
+    grain: table
+    evidence: "src/components/MLPrediction.tsx:93"
+    confirmed: true
+  - page: "ProcessLevelNetwork.tsx"
+    via: "rpc get_critical_node_stats (MLPrediction, §4 D307)"
+    grain: table
+    evidence: "src/components/MLPrediction.tsx:93"
+    confirmed: true
+  - page: "ProductLevelNetwork.tsx"
+    via: "rpc get_critical_node_stats (MLPrediction, §4 D307)"
+    grain: table
+    evidence: "src/components/MLPrediction.tsx:93"
+    confirmed: true
   - page: "ProductLevelNetwork.tsx"
     via: "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)"
     grain: table
@@ -336,13 +351,15 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      ANALYSIS OUTPUT — the critical-node prediction. NOTE that the LIVE
-      writer of this prediction is `analysis_mark_critical_nodes`, which
-      writes `supply_chain_data`, not this table; these columns are the
-      older destination and §15 has never measured whether anything
-      still fills them.
+      ANALYSIS OUTPUT — whether this node is a NEXUS node: losing it alone
+      puts at least the run's threshold (default 10 %) of finished-goods
+      demand at risk. §4 D307 made this the live destination: one value per
+      node, written by `analysis_apply_critical_nodes` from a
+      `critical_nodes` run, and NULL on a node the latest run did not score.
+      Before D307 the prediction was written onto `supply_chain_data` lane
+      rows, which every rebuild deletes (D196).
     grain: level
-    computed_by: "predict-critical-nodes"
+    computed_by: "analysis_apply_critical_nodes (called by predict-critical-nodes)"
     engine:
       consumed_by: null
       transform: null
@@ -363,10 +380,12 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      ANALYSIS OUTPUT — the prediction score. See `is_critical_node` on
-      which destination is live.
+      ANALYSIS OUTPUT — the node's DEMAND AT RISK: the share of
+      finished-goods demand (by weekly volume) that cannot be served if this
+      node alone is lost, with no rerouting and no stock. In [0, 1]. Computed
+      by `supabase/functions/_shared/criticalNodes.ts` (§4 D307).
     grain: level
-    computed_by: "predict-critical-nodes"
+    computed_by: "analysis_apply_critical_nodes (called by predict-critical-nodes)"
     engine:
       consumed_by: null
       transform: null
@@ -388,9 +407,9 @@ fields:
     unit_source: none
     meaning: >-
       When the prediction columns were last written. Superseded by
-      `computed_at`.
+      `computed_at`; both are set by `analysis_apply_critical_nodes`.
     grain: metadata
-    computed_by: "predict-critical-nodes"
+    computed_by: "analysis_apply_critical_nodes (called by predict-critical-nodes)"
     engine:
       consumed_by: null
       transform: null
@@ -518,7 +537,7 @@ fields:
       reportable state and not a silent default (`declared-fallback`,
       I6). This is the column invariant `input-hash` (I5) is about.
     grain: metadata
-    computed_by: "analysis_mark_critical_nodes"
+    computed_by: "analysis_apply_critical_nodes (called by predict-critical-nodes)"
     engine:
       consumed_by: null
       transform: null
@@ -543,7 +562,7 @@ fields:
       current_graph_hash()`, which is WP 4.4's one rule, and a timestamp
       comparison is the thing that rule replaces (§4 D12).
     grain: metadata
-    computed_by: "analysis_mark_critical_nodes"
+    computed_by: "analysis_apply_critical_nodes (called by predict-critical-nodes)"
     engine:
       consumed_by: null
       transform: null

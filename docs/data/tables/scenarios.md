@@ -442,6 +442,6 @@ What the scenario is for — `experiment`, a what-if a person set up in the Lab 
 
 ---
 
-*Generated from data contract `96b966c3a2b0`, engine `0.8.0`,
+*Generated from data contract `4818369024a0`, engine `0.8.0`,
 sidecar `supabase/contract/scenarios.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
