@@ -23,6 +23,7 @@ export * from './encoding';
 export * from './subgraph';
 export * from './focus';
 export * from './echelon';
+export * from './laneEdges';
 export * from './productGraph';
 export * from './placement';
 export * from './lensLayout';
