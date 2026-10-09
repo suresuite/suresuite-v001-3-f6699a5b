@@ -7413,7 +7413,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unit": "currency per unit of material",
         "csvHeader": "unit_price",
         "required": false,
-        "validate": "numeric > 0; a blank cell lands NULL and the engine's 1.0 default stands in, with a MappingWarning",
+        "validate": "numeric >= 0; zero lands WITH A WARNING (the engine reads a zero price as 1.0, with a MappingWarning); a blank cell lands NULL and the same 1.0 default stands in",
         "meaning": "What one unit of this material costs from this supplier, delivered.",
         "primaryKey": false,
         "unique": false,

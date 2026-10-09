@@ -1187,6 +1187,8 @@ export function renderIngestSpecModule(contract) {
     "  min?: number;",
     "  exclusive_min?: number;",
     "  max?: number;",
+    "  /** In bounds but at or below this: lands, with a row-level `warn` finding. */",
+    "  warn_at_or_below?: number;",
     "  values?: string[];",
     "  /** What an empty cell means: land no value, or reject the row. */",
     "  blank?: 'null' | 'reject';",

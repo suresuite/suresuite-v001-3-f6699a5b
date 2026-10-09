@@ -148,6 +148,17 @@ function validateCell(
                    (column.validate ? ` (the contract says: ${column.validate})` : "") + ".",
         } };
       }
+      // In bounds but at the contract's warning line: the row LANDS and says so.
+      // The engine substitutes a declared default for such a value (a zero price
+      // is read as 1.0), and §5 T2 wants that visible next to the row it is
+      // about rather than refused or found later in a run's mapping report.
+      if (rule.warn_at_or_below !== undefined && n <= rule.warn_at_or_below) {
+        return { value: n, finding: {
+          level: "warn", field: column.csvHeader, code: "at_warning_threshold", row: line,
+          message: `${where}: ${n} was accepted, but it is at or below ${rule.warn_at_or_below}` +
+                   (column.validate ? ` (the contract says: ${column.validate})` : "") + ".",
+        } };
+      }
       return { value: n };
     }
 
@@ -268,7 +279,11 @@ export function validateRows(parse: CsvParseResult, spec: IngestDataset): Valida
         const at = index.get(column.csvHeader);
         if (at === undefined) continue;  // already a file-level error
         const outcome = validateCell(column, row.cells[at], row.line);
-        if (outcome.finding) { findings.push(outcome.finding); failed += 1; continue; }
+        if (outcome.finding) {
+          findings.push(outcome.finding);
+          // A `warn` finding comes WITH a value: the cell lands and the row is not held.
+          if (outcome.finding.level === "error") { failed += 1; continue; }
+        }
         if (outcome.defaulted) { defaulted += 1; continue; }
         parsed[column.column] = outcome.value ?? null;
         mapped += 1;

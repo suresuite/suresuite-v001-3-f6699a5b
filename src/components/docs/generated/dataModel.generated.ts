@@ -25,7 +25,7 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "b3dbb4b6d2c6";
+export const CONTRACT_VERSION = "1e2e09dfcb05";
 export const ENGINE_VERSION = "0.8.0";
 export const LAST_MIGRATION = "20261008000001_org_admin_creates_projects.sql";
 

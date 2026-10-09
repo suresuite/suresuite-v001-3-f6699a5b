@@ -458,6 +458,10 @@
                   "type": "number",
                   "description": "Inclusive upper bound."
                 },
+                "warn_at_or_below": {
+                  "type": "number",
+                  "description": "A value inside the bounds but at or below this one LANDS, with a row-level `warn` finding. Used where the engine substitutes a declared default for the value (e.g. a zero price), so the substitution is visible at upload (§5 T2) rather than refused."
+                },
                 "values": {
                   "type": "array",
                   "items": {

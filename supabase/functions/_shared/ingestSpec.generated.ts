@@ -15,6 +15,8 @@ export type IngestRule = {
   min?: number;
   exclusive_min?: number;
   max?: number;
+  /** In bounds but at or below this: lands, with a row-level `warn` finding. */
+  warn_at_or_below?: number;
   values?: string[];
   /** What an empty cell means: land no value, or reject the row. */
   blank?: 'null' | 'reject';
@@ -404,10 +406,11 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
         "nullable": true,
         "rule": {
           "kind": "numeric",
-          "exclusive_min": 0,
+          "min": 0,
+          "warn_at_or_below": 0,
           "blank": "null"
         },
-        "validate": "numeric > 0; a blank cell lands NULL and the engine's 1.0 default stands in, with a MappingWarning"
+        "validate": "numeric >= 0; zero lands WITH A WARNING (the engine reads a zero price as 1.0, with a MappingWarning); a blank cell lands NULL and the same 1.0 default stands in"
       },
       {
         "column": "lead_time_unit",

@@ -12,7 +12,7 @@
       "path": "supabase/functions/_shared/ingestValidate.ts",
       "symbols": "validateRows",
       "manual_page": "uploading-data",
-      "sha256": "850f70533b99d2da3b907d3a07e737c771431a932980b97199df5dcba05ec94c"
+      "sha256": "0e3a1f49d3a548a32b63b976a2b9d3a99f45fa53b30f547dca1f602f8db23136"
     },
     {
       "path": "supabase/functions/_shared/ingestSpec.generated.ts",

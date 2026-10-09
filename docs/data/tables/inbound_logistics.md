@@ -320,7 +320,7 @@ What one unit of this material costs from this supplier, delivered.
 | Read by the engine | `project_map.py::_map_supply -> SupplierLink.cost` |
 | Transform | float(); a value <= 0 is replaced, not rejected |
 | When NULL, the engine uses | 1.0, with a `warn` MappingWarning |
-| Validated at ingest | numeric > 0; a blank cell lands NULL and the engine's 1.0 default stands in, with a MappingWarning |
+| Validated at ingest | numeric >= 0; zero lands WITH A WARNING (the engine reads a zero price as 1.0, with a MappingWarning); a blank cell lands NULL and the same 1.0 default stands in |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 **The engine calls this `recommended`.** Purchase cost per sourcing arc — a missing price defaults to 1.0 and distorts procurement spend.
@@ -537,6 +537,6 @@ A triangular or uniform lane's longest lead time — a duration in the lane's `l
 
 ---
 
-*Generated from data contract `b3dbb4b6d2c6`, engine `0.8.0`,
+*Generated from data contract `1e2e09dfcb05`, engine `0.8.0`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

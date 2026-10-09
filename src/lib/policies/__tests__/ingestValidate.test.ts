@@ -82,8 +82,22 @@ describe("D7 — a blank required numeric is rejected, never silently null", () 
     expect(r.rows[1].parsed.unit_price).toBe(3);
   });
 
-  it("still rejects a unit_price of zero — blank is allowed, zero is not a price", () => {
-    expect(rowCodes(run("SUP-1,MAT-1,10,week,2,0"))).toEqual(["out_of_range"]);
+  it("lands a unit_price of zero WITH a warning — the row is not held back", () => {
+    const r = run("SUP-1,MAT-1,10,week,2,0");
+    expect(rowCodes(r)).toEqual(["at_warning_threshold"]);
+    expect(r.rows[0].findings[0].level).toBe("warn");
+    expect(r.rows[0].findings[0].row).toBe(2);
+    expect(r.rows[0].parsed.unit_price).toBe(0);
+    expect(r.counts.rows_rejected).toBe(0);
+    expect(r.counts.fields_failed).toBe(0);
+  });
+
+  it("still rejects a negative unit_price", () => {
+    expect(rowCodes(run("SUP-1,MAT-1,10,week,2,-1"))).toEqual(["out_of_range"]);
+  });
+
+  it("puts no warning on a positive unit_price", () => {
+    expect(rowCodes(run("SUP-1,MAT-1,10,week,2,0.01"))).toEqual([]);
   });
 
   it("accepts a volume of zero — the contract says >= 0, not > 0", () => {
