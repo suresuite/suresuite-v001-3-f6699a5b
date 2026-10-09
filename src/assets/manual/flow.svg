@@ -1,27 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 393" aria-hidden="true">
-<text x="12" y="18" font-size="13" fill="hsl(var(--foreground))">A file is not yet a simulation input</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 500" aria-hidden="true">
+<text x="12" y="18" font-size="13" fill="hsl(var(--foreground))">Follow P-CONTROL → M-CASE</text>
 <rect x="8" y="32" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
-<text x="18" y="47" font-size="12" fill="hsl(var(--foreground))">Raw file → staged rows</text>
-<text x="18" y="62" font-size="11" fill="hsl(var(--foreground))">Original cells + parsed values + findings</text>
-<text x="18" y="77" font-size="11" fill="hsl(var(--foreground))">Contract-driven CSV path only</text>
-<path d="M160 84v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
-<rect x="8" y="101" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
-<text x="18" y="116" font-size="12" fill="hsl(var(--foreground))">Review → promotion</text>
-<text x="18" y="131" font-size="11" fill="hsl(var(--foreground))">Upsert eligible rows by natural key</text>
-<text x="18" y="146" font-size="11" fill="hsl(var(--foreground))">Held rows remain out of accepted inputs.</text>
-<path d="M160 153v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
-<rect x="8" y="170" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
-<text x="18" y="185" font-size="12" fill="hsl(var(--foreground))">Accepted inputs → derived views</text>
-<text x="18" y="200" font-size="11" fill="hsl(var(--foreground))">Refresh affected lanes and analyses</text>
-<text x="18" y="215" font-size="11" fill="hsl(var(--foreground))">Check freshness and input coverage.</text>
-<path d="M160 222v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
-<rect x="8" y="239" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
-<text x="18" y="254" font-size="12" fill="hsl(var(--foreground))">Frozen dataset + policy versions</text>
-<text x="18" y="269" font-size="11" fill="hsl(var(--foreground))">Scenario and engine bind the run</text>
-<text x="18" y="284" font-size="11" fill="hsl(var(--foreground))">The worker reads the frozen snapshots.</text>
-<path d="M160 291v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
-<rect x="8" y="308" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
-<text x="18" y="323" font-size="12" fill="hsl(var(--foreground))">Result → review</text>
-<text x="18" y="338" font-size="11" fill="hsl(var(--foreground))">Completed replications, notes and KPIs</text>
-<text x="18" y="353" font-size="11" fill="hsl(var(--foreground))">Older records may have less provenance.</text>
+<text x="18" y="48" font-size="12" fill="hsl(var(--foreground))">1 · Upload</text>
+<text x="18" y="63" font-size="11" fill="hsl(var(--foreground))">Keep the original CSV file</text>
+<text x="18" y="78" font-size="11" fill="hsl(var(--foreground))">One control unit needs two housings</text>
+<path d="M160 86v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="98" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="114" font-size="12" fill="hsl(var(--foreground))">2 · Check</text>
+<text x="18" y="129" font-size="11" fill="hsl(var(--foreground))">Stage rows for review</text>
+<text x="18" y="144" font-size="11" fill="hsl(var(--foreground))">New, changed, unchanged or held</text>
+<path d="M160 152v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="164" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="180" font-size="12" fill="hsl(var(--foreground))">3 · Accept</text>
+<text x="18" y="195" font-size="11" fill="hsl(var(--foreground))">Promote eligible rows into inputs</text>
+<text x="18" y="210" font-size="11" fill="hsl(var(--foreground))">The same product/material pair updates</text>
+<path d="M160 218v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="230" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="246" font-size="12" fill="hsl(var(--foreground))">4 · Compute</text>
+<text x="18" y="261" font-size="11" fill="hsl(var(--foreground))">Build views from accepted inputs</text>
+<text x="18" y="276" font-size="11" fill="hsl(var(--foreground))">100 units/week → 200 housings/week</text>
+<path d="M160 284v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="296" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="312" font-size="12" fill="hsl(var(--foreground))">5 · Decide</text>
+<text x="18" y="327" font-size="11" fill="hsl(var(--foreground))">Save a policy and scenario</text>
+<text x="18" y="342" font-size="11" fill="hsl(var(--foreground))">Keep the intended input versions</text>
+<path d="M160 350v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="362" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="378" font-size="12" fill="hsl(var(--foreground))">6 · Simulate</text>
+<text x="18" y="393" font-size="11" fill="hsl(var(--foreground))">Run from frozen copies</text>
+<text x="18" y="408" font-size="11" fill="hsl(var(--foreground))">Wait for the completed result</text>
+<path d="M160 416v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="428" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="444" font-size="12" fill="hsl(var(--foreground))">7 · Stamp</text>
+<text x="18" y="459" font-size="11" fill="hsl(var(--foreground))">Record what the run used</text>
+<text x="18" y="474" font-size="11" fill="hsl(var(--foreground))">Keep the versions and settings</text>
 </svg>

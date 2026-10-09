@@ -827,11 +827,11 @@ spine — see §6.5.
 |---|---|
 | What SuReSuite is | The tool in one page — what problem it solves, what it produces. Mined from the archived ACCURATE framing. |
 | **How SuReSuite is designed** | **The architecture.** The six tiers as the journey your data takes, the figures, and the three laws: external data never lands below staging; computed data is always rebuildable; every decision remembers the data it was made on. |
-| The data model at a glance | Every table in the system on one page, grouped by tier, each linking to its reference page. The map you keep open in another tab. **G** |
 | How your data flows | Upload → we check it → it becomes your data → we compute from it → you set policies → you simulate → results are stamped. One diagram, one paragraph per hop. |
 | What happens to your data | The five commitments (§5.3) in user language: we never change your numbers silently; substitutions are always marked; your data stays in your organization; export or delete any time. |
 | System boundary | What runs where — browser, Supabase, simulation worker, scsim engine — and what crosses each boundary. For IT and for anyone evaluating the tool. |
 | Known limits | Per T3. Steady-state engine, `graph_hash` v1 scope, no price-volatility model. Stated plainly, at the top of the manual, not buried. |
+| The data model at a glance | Reference at the end of this section. Every table in the system on one page, grouped by tier, each linking to its reference page. The map you keep open in another tab. **G** |
 
 #### 2 · Getting started  *(3 pages · W)*
 
@@ -1060,7 +1060,9 @@ decides what a reader is shown, not what can be downloaded: page bodies ship in 
 bundle. Section 16, Questions & answers, is the one part whose words live in the
 database (`docs_faq`), filtered per reader.
 
-**The figures are authored in-repo as inline SVG** — `src/components/docs/figures.tsx`.
+**The figures are authored in-repo as SVG assets** — `src/assets/manual/`, indexed by
+`src/components/docs/figureManifest.ts` and inlined by `DocFigure`. Early schematic
+fallbacks remain in `src/components/docs/figures.tsx`.
 *(Corrected in WP 5.2a; this paragraph said "WP 5.2a moves the figure SVGs into the
 repo".)* There was nothing to move: the repository contained **zero** SVG files, and
 the figures that sentence refers to live in an artifact this repository does not
@@ -24318,6 +24320,75 @@ shared component's number on the two pages is proved by the unit tests, not on s
 it is the next place this rule belongs. (3) The Process page's "consumption rate" label fallback
 for a zero-flow edge shows a rate where a flow would be; kept, because it is what the page
 showed before and it is labelled in the details card.
+
+
+### WP 5.2a follow-up — Restore the first-reader spine · 2026-10-09 · no migration
+
+Preconditions held? **No** — `HowItIsDesigned` had drifted from §6.5 and its
+registry summary: the six tiers and three laws had been replaced by component and
+engineer setup material. The tiers figure combined six responsibilities into four
+unnumbered boxes; the data-flow body combined seven promised hops into four sections.
+
+Exit checks passed? **Partial** — the new reader/search/anchor tests pass. The
+required documentation test command reports 315 passed and six failed source-review
+hash assertions, reproduced unchanged on base `f15f9a84` in
+`manualExample.test.ts`. The evidence hashes were not refreshed without reviewing
+the broader claims they protect. Typecheck passes its existing 15-error baseline;
+`check:docs` and build pass. Lint remains red on the same 294 ESLint errors and 111
+warnings reproduced on the untouched base; its UI audit, docs, typecheck and
+notebook gates pass. No engine, worker, ingestion or authorization logic changed.
+
+Discovered and addressed:
+- Restored §6.5's numbered six-tier journey and three laws, with current exceptions
+  stated beside them. Engineer setup remains below the overview, reachable from
+  the home card by a working fragment link.
+- `/docs` now leads with the product and three-step workflow; four role paths use
+  released destinations even when only section 1 is public. Manual counts are a
+  short note after those paths. Registry remains the owner of article titles,
+  summaries, keywords and order.
+- Data flow follows upload → check → accept → compute → decide → simulate → stamp,
+  retaining P-CONTROL → M-CASE. New glossary entries define staging, promotion,
+  natural key, canonical and frozen, plus related terms.
+- Known limits opens with five manager-facing bullets. All old anchors survive,
+  now attached to meaningful sections. The owner explicitly chose to keep the
+  browser simulation authorization finding on both first-reader pages; it is
+  retained, expanded on the architecture page, and not fixed by this change.
+- The trust and system-boundary prose had stronger claims than their existing
+  detailed guides (complete isolation, no provider processing, administrative-only
+  auditing and complete deletion). They now distinguish commitments from current
+  checks and direct the reader to those guides. The model limit now recognizes
+  product production delay and its work-in-progress while retaining the single
+  focal stage boundary.
+- Data model is last and labelled reference in the registry and §6.3. Counts and
+  table lists still come from generated metadata; the page shows each grain's
+  opening description rather than engineering history. §6.5 now names the actual
+  SVG asset/manifest/inline-rendering path rather than only early schematics.
+- Search ignores stop-words and punctuation, matches word starts, ranks complete
+  title matches above complete keyword matches and mixed-field matches, and
+  provides release-aware fallback links. Tests pin the requested reader queries.
+
+Handoff:
+- Screenshots cover `/docs` and all seven overview pages at 390px and 1280px before
+  and after. Local signed-out rendering uses release fixtures, not production
+  release changes; browser interaction checks also cover an overview-only release.
+- The six stale evidence assertions need a separate review of their protected
+  upload, policy, mapping, comparison and API claims. Do not update hashes merely
+  to turn the suite green. The authorization finding remains a separate fix.
+- Publishing remains the existing section-audience action in `/admin/docs`; this
+  change does not alter live audiences or deploy the application.
+
+**Post-approval integration · 2026-10-09.** The owner asked to implement the
+reviewed draft. Integrated main `08e874a8`, retaining both this entry and D307's
+entry after their append-point conflict; the newer generated artifacts remain
+unchanged. The required immediate merge checks report 1,779 passing tests and the
+same six source-review hash failures. `contract:check` reports one R7 failure:
+the historical D7 heading was renamed, so its former identity is missing. This
+failure is reproduced on unchanged `08e874a8` with full history; the rule is not
+weakened. Documentation tests remain 315 passing / six existing failures.
+Typecheck, `check:docs` and build pass; lint reports 289 errors and 110 warnings
+after the already-merged nexus rewrite. No first-reader content, engine behavior,
+caller authorization or section audiences were changed by the integration.
+
 
 ### D307 — nexus nodes are scored by demand at risk, one per node, and kept · 2026-10-09 · `20261009000003`
 

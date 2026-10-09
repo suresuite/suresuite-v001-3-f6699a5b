@@ -272,3 +272,46 @@ describe("the generated reference module (WP 5.2h)", () => {
     for (const c of united) expect(c.unit!.trim().length).toBeGreaterThan(0);
   });
 });
+
+// Questions a first-time supply-chain reader actually types, ordered by usefulness.
+describe("first-reader search", () => {
+  it.each([
+    ["how do i start", "your-first-project"],
+    ["begin", "your-first-project"],
+    ["login", "account-and-password"],
+    ["sign in", "account-and-password"],
+    ["what is a policy", "how-policies-work"],
+    ["sample", "your-first-project"],
+    ["example data", "your-first-project"],
+    ["demo", "your-first-project"],
+    ["tour", "your-first-project"],
+    ["laws", "how-suresuite-is-designed"],
+    ["tiers", "how-suresuite-is-designed"],
+  ])("%s leads to %s", (query, slug) => {
+    expect(searchPages(query)[0]?.slug).toBe(slug);
+  });
+
+  it("ignores punctuation and case, and supports word starts", () => {
+    expect(searchPages("HOW do I START?")[0]?.slug).toBe("your-first-project");
+    expect(searchPages("reproducib")[0]?.slug).toBe("reproducibility-record");
+    expect(searchPages("how do i a is what the to")).toEqual([]);
+  });
+
+  it("does not confuse a substring with a word", () => {
+    expect(searchPages("sign in").map(p => p.slug)).not.toContain("how-suresuite-is-designed");
+    expect(searchPages("gn")).toEqual([]);
+  });
+
+  it("ranks a title above an earlier page's keywords", () => {
+    // The architecture keywords also carry 'data'; the reference title should win.
+    expect(searchPages("data model")[0]?.slug).toBe("data-model");
+    expect(searchPages("policy")[0]?.slug).toBe("how-policies-work");
+  });
+
+  it("never suggests a section closed to this reader", () => {
+    const visible = searchPages("example data", key => key === "overview");
+    expect(visible.map(p => p.slug)).not.toContain("your-first-project");
+    expect(visible.every(p => p.sectionKey === "overview")).toBe(true);
+    expect(searchPages("tiers", key => key === "overview")[0]?.slug).toBe("how-suresuite-is-designed");
+  });
+});

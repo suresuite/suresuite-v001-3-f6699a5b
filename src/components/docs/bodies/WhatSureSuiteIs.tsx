@@ -1,25 +1,27 @@
 import { Badge } from "@/components/ui/badge";
-import { PageTitle, Section, P, Key, Bullets, Callout, Defs, DocLink } from "@/components/docs/prose";
+import { DocPageTitle, InShort, Section, P, Key, Bullets, Callout, Defs, DocLink } from "@/components/docs/prose";
 
 export default function WhatSureSuiteIs() {
   return (
     <>
-      <PageTitle lead="A supply chain you can run experiments on, instead of arguing about.">
-        What SuReSuite is
-      </PageTitle>
+      <DocPageTitle slug="what-suresuite-is" />
+      <InShort items={[
+        "Model your supply chain, test a disruption, and compare cost and service under different responses.",
+        "The results depend on your data and assumptions; the tool does not place orders or predict every real-world event.",
+        <>Read <DocLink to="how-suresuite-is-designed">how it is designed</DocLink>, or try <DocLink to="your-first-project">the worked example</DocLink>.</>,
+      ]} />
 
       <Section id="the-problem" title="The problem it solves">
         <P>
-          Every supply chain team already knows where its chain is fragile, in the way you know a
-          floorboard is loose — from experience, in fragments, and never in a form you can put in
-          front of someone who controls a budget. The question that stops the conversation is always
-          the same one: <em>how much worse would it actually be?</em>
+          If a supplier loses capacity for four weeks, how much demand could you miss?
+          Would more stock or a backup source reduce that loss enough to justify its cost?
+          SuReSuite lets you compare those choices on the same modeled chain.
         </P>
         <P>
-          Answering it by hand means holding a network, a bill of materials, a set of lead times and
-          a demand pattern in your head at once, and then imagining all of them going wrong together.
-          Spreadsheets cannot do it, because the interesting part is the interaction. Intuition
-          cannot do it, because the interesting part is the arithmetic.
+          Build a supply-chain model from suppliers, materials, products, demand and a bill of
+          materials (BOM): the quantities of materials needed for one product.
+          A policy is a rule for operating the chain, such as when to reorder.
+          A scenario is the situation you test, including any disruption.
         </P>
         <Key>
           SuReSuite builds a working model of your chain from the data you already have, then lets
@@ -32,15 +34,15 @@ export default function WhatSureSuiteIs() {
           items={[
             {
               term: "A model of your chain",
-              def: "Built from files you already keep — suppliers, materials, products, the bill of materials, inbound and outbound lanes. Not a drawing: a structure the simulation reads.",
+              def: "Built from files you already keep — suppliers, materials, products, the bill of materials, inbound and outbound lanes. Lanes connect suppliers to materials and products to customers. The simulation reads the modeled inputs; a graph can also contain relationships it does not simulate.",
             },
             {
               term: "A structural read on it",
-              def: "Which materials everything depends on, which suppliers have no alternative, and where a single failure reaches furthest.",
+              def: "Inspect connections and single-source exposure in the supplied network. Structural importance helps choose what to investigate; it is not proof of disruption losses.",
             },
             {
               term: "Answers to what-if",
-              def: "A supplier goes down for sixty days. A route closes. Demand doubles. You get a distribution of outcomes with a confidence interval, not one number that looks more certain than it is.",
+              def: "Test a supplier capacity loss or another supported change. Repeated runs show variation in outcomes. A confidence interval describes uncertainty in an estimated result across those repeats, conditional on the model assumptions.",
             },
             {
               term: "A comparison between responses",
@@ -48,7 +50,7 @@ export default function WhatSureSuiteIs() {
             },
             {
               term: "A figure you can defend",
-              def: "Every result carries the data, the policies, the scenario and the engine version that produced it, so someone else can rerun it and get the same answer.",
+              def: "Current version-bound runs identify the inputs, policies, scenario and engine build used. Keep those saved versions and run settings for reproduction; older records may be incomplete.",
             },
           ]}
         />
@@ -80,10 +82,10 @@ export default function WhatSureSuiteIs() {
 
       <Section id="what-it-is-not" title="What it is not">
         <P>
-          It is not a planning system and it does not place orders. It holds no live connection to
-          your production environment, and nothing it computes is pushed anywhere. It is a place to
-          ask questions about a chain, get numbers back, and see exactly where each number came
-          from.
+          SuReSuite supports experiments and decision review. It does not place operational orders.
+          The engine advances in weekly steps around one focal production stage; it does not
+          simulate every upstream company or individual factory operation shown in a graph. The engine is the software that calculates outcomes.
+          Optional connectors can import data from business systems, so check how your project is connected.
         </P>
         <Callout tone="limit" title="Read this before you rely on a number">
           <p>
@@ -108,9 +110,10 @@ export default function WhatSureSuiteIs() {
           to simplify.
         </P>
         <P>
-          That origin shows up in the product as a bias towards evidence: assumptions are written
-          down, substitutions are visible at the point of display, and a result that cannot be
-          reproduced is treated as a result that should not have been published.
+          That origin informs the transparency commitments: write down assumptions, mark
+          substitutions where they are displayed, and publish results with the information needed
+          to repeat them. <DocLink to="what-happens-to-your-data">What happens to your data</DocLink> explains
+          those commitments and the gaps you should check today.
         </P>
       </Section>
 

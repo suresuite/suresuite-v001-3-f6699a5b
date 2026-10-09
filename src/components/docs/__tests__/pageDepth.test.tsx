@@ -35,3 +35,30 @@ describe("reader journeys and destinations", () => {
     }
   });
 });
+
+// Protect the public reading path and the URLs old pages already link to.
+describe("first-reader overview", () => {
+  const overview = ["what-suresuite-is", "how-suresuite-is-designed", "how-your-data-flows", "what-happens-to-your-data", "system-boundary", "known-limits", "data-model"];
+  it.each(overview)("%s opens with takeaways and keeps engineering evidence out of the body", slug => {
+    const body = html.get(slug)!;
+    expect(body.indexOf("In short")).toBeLessThan(body.indexOf("<section"));
+    expect(body).not.toMatch(/§4 D\d|Work package \d|[a-z/]+\.tsx?:\d+/i);
+    expect(body).toContain('href="/docs/');
+  });
+  it("keeps limits anchors and the explicit security warning", () => {
+    const body = html.get("known-limits")!;
+    for (const id of ["data-limits", "documentation-limits", "how-to-use", "model-limits", "why-at-the-front"]) {
+      expect(body).toContain(`id="${id}"`);
+    }
+    for (const slug of ["known-limits", "how-suresuite-is-designed"]) {
+      expect(html.get(slug)).toContain("incomplete caller authorization on the browser simulation endpoint");
+    }
+  });
+  it("keeps the seven-step journey and glossary definitions reachable", () => {
+    const body = html.get("how-your-data-flows")!;
+    for (const id of ["upload", "check", "promote", "compute", "decide", "freeze", "stamp"]) expect(body).toContain(`id="${id}"`);
+    for (const id of ["staged", "promotion", "natural-key", "canonical", "frozen"]) expect(html.get("glossary")).toContain(`id="${id}"`);
+    expect(body).toContain("P-CONTROL");
+    expect(body).toContain("M-CASE");
+  });
+});

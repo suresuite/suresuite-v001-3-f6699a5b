@@ -1,22 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 324" aria-hidden="true">
-<text x="12" y="18" font-size="13" fill="hsl(var(--foreground))">Keep inputs, decisions and results distinct</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 434" aria-hidden="true">
+<text x="12" y="18" font-size="13" fill="hsl(var(--foreground))">Six tiers: your file to your result</text>
 <rect x="8" y="32" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
-<text x="18" y="47" font-size="12" fill="hsl(var(--foreground))">Landing and staging</text>
-<text x="18" y="62" font-size="11" fill="hsl(var(--foreground))">Raw upload, parsed rows, findings</text>
-<text x="18" y="77" font-size="11" fill="hsl(var(--foreground))">Review before promotion.</text>
-<path d="M160 84v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
-<rect x="8" y="101" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
-<text x="18" y="116" font-size="12" fill="hsl(var(--foreground))">Accepted data and derived views</text>
-<text x="18" y="131" font-size="11" fill="hsl(var(--foreground))">BOM, lanes and masters → graphs</text>
-<text x="18" y="146" font-size="11" fill="hsl(var(--foreground))">Inputs and derived measures differ.</text>
-<path d="M160 153v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
-<rect x="8" y="170" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
-<text x="18" y="185" font-size="12" fill="hsl(var(--foreground))">Decisions and versions</text>
-<text x="18" y="200" font-size="11" fill="hsl(var(--foreground))">Policies + frozen inputs + validation</text>
-<text x="18" y="215" font-size="11" fill="hsl(var(--foreground))">Record what the run will use.</text>
-<path d="M160 222v14m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
-<rect x="8" y="239" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
-<text x="18" y="254" font-size="12" fill="hsl(var(--foreground))">Results</text>
-<text x="18" y="269" font-size="11" fill="hsl(var(--foreground))">KPIs, replications and weekly series</text>
-<text x="18" y="284" font-size="11" fill="hsl(var(--foreground))">Review assumptions and provenance.</text>
+<text x="18" y="48" font-size="12" fill="hsl(var(--foreground))">Tier 0 · Landing</text>
+<text x="18" y="63" font-size="11" fill="hsl(var(--foreground))">Keep the original file</text>
+<text x="18" y="78" font-size="11" fill="hsl(var(--foreground))">Separate the source from later changes</text>
+<path d="M160 86v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="98" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="114" font-size="12" fill="hsl(var(--foreground))">Tier 1 · Staging</text>
+<text x="18" y="129" font-size="11" fill="hsl(var(--foreground))">Check rows and review changes</text>
+<text x="18" y="144" font-size="11" fill="hsl(var(--foreground))">Not yet accepted as model inputs</text>
+<path d="M160 152v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="164" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="180" font-size="12" fill="hsl(var(--foreground))">Tier 2 · Accepted inputs (canonical)</text>
+<text x="18" y="195" font-size="11" fill="hsl(var(--foreground))">Apply the reviewed rows</text>
+<text x="18" y="210" font-size="11" fill="hsl(var(--foreground))">Consistent identifiers and units</text>
+<path d="M160 218v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="230" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="246" font-size="12" fill="hsl(var(--foreground))">Tier 3 · Computed views (derived)</text>
+<text x="18" y="261" font-size="11" fill="hsl(var(--foreground))">Build lanes, graphs and measurements</text>
+<text x="18" y="276" font-size="11" fill="hsl(var(--foreground))">Refresh when their inputs change</text>
+<path d="M160 284v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="296" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="312" font-size="12" fill="hsl(var(--foreground))">Tier 4 · Decisions</text>
+<text x="18" y="327" font-size="11" fill="hsl(var(--foreground))">Save policies and scenarios</text>
+<text x="18" y="342" font-size="11" fill="hsl(var(--foreground))">Remember the data used for a decision</text>
+<path d="M160 350v10m-4-4 4 4 4-4" fill="none" stroke="hsl(var(--muted-foreground))"/>
+<rect x="8" y="362" width="304" height="54" rx="5" fill="hsl(var(--muted))" stroke="hsl(var(--border))"/>
+<text x="18" y="378" font-size="12" fill="hsl(var(--foreground))">Tier 5 · Results</text>
+<text x="18" y="393" font-size="11" fill="hsl(var(--foreground))">Record outcomes and versions</text>
+<text x="18" y="408" font-size="11" fill="hsl(var(--foreground))">Check status, assumptions and sources</text>
 </svg>
