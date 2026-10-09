@@ -12,7 +12,9 @@ import {
   adaptiveColumnLayout,
   lensNodeSize,
   edgeWidthForFlow,
+  flowLabel,
   maxFlow,
+  sumLaneEdges,
   DEPTH_SHADE,
   GRAPH_INK,
   type Echelon,
@@ -480,56 +482,47 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         console.log(`   ${level}: ${typesSummary}`);
       });
 
-      // CORRECTED LOGIC: Step 3 - Create edges from from_location to to_location with weighted values
-      const edgeSet = new Set<string>();
-      
-      multiTierData.forEach((record) => {
-        const fromNode = record.from_location;
-        const toNode = record.to_location;
-        
-        // Create edge if both nodes exist and are different
-        if (fromNode && toNode && fromNode !== toNode && nodeMap[fromNode] && nodeMap[toNode]) {
-          const edgeKey = `${fromNode}-${toNode}`;
-          
-          if (!edgeSet.has(edgeKey)) {
-            edgeSet.add(edgeKey);
-            
-            // Update connection counts
-            nodeMap[fromNode].outgoing++;
-            nodeMap[toNode].incoming++;
-            
-            // Update flow volumes using weighted values
-            const weightedValue = record.weighted || 0;
-            const consumptionRate = record.material_consumption_rate || 0;
-            
-            nodeMap[fromNode].flowVolume += weightedValue;
-            nodeMap[toNode].flowVolume += weightedValue;
-            nodeMap[fromNode].consumptionRate += consumptionRate;
-            nodeMap[toNode].consumptionRate += consumptionRate;
+      // ── ONE edge per pair, its weight SUMMED (§4 D306) ────────────────────
+      //
+      // The deep lane writes a BOM edge once per ROOT product it serves, and every
+      // lane once per plant. This used to keep the FIRST row per pair and drop the
+      // rest — and the read orders ties by a random uuid, so a component shared by two
+      // products showed one product's share, picked arbitrarily. `sumLaneEdges` is the
+      // same rule the Product-level view uses, so the two pages show one number.
+      for (const e of sumLaneEdges(multiTierData)) {
+        const fromNode = e.source;
+        const toNode = e.target;
+        if (!nodeMap[fromNode] || !nodeMap[toNode]) continue;
 
-            // Stroke, width and arrowhead come from `styleColumnEdge`; the label
-            // from the Labels toggle, at render.
-            edgeMap[edgeKey] = {
-              id: edgeKey,
-              source: fromNode,
-              target: toNode,
-              label: '',
-              animated: false,
-              type: 'straight',
-              data: { 
-                consumptionRate: consumptionRate,
-                flowVolume: weightedValue,
-                dataSource: record.data_source,
-                connectionType: record.data_source,
-                isConnected: true,
-                mappingConfidence: 1.0,
-                originalLabel: weightedValue > 0 ? `${Math.round(weightedValue)}` : 
-                               consumptionRate > 0 ? `${consumptionRate.toFixed(1)}` : ''
-              },
-            };
-          }
-        }
-      });
+        nodeMap[fromNode].outgoing++;
+        nodeMap[toNode].incoming++;
+        nodeMap[fromNode].flowVolume += e.flow;
+        nodeMap[toNode].flowVolume += e.flow;
+        nodeMap[fromNode].consumptionRate += e.consumptionRate;
+        nodeMap[toNode].consumptionRate += e.consumptionRate;
+
+        // Stroke, width and arrowhead come from `styleColumnEdge`; the label
+        // from the Labels toggle, at render.
+        const edgeKey = `${fromNode}-${toNode}`;
+        edgeMap[edgeKey] = {
+          id: edgeKey,
+          source: fromNode,
+          target: toNode,
+          label: '',
+          animated: false,
+          type: 'straight',
+          data: {
+            consumptionRate: e.consumptionRate,
+            flowVolume: e.flow,
+            dataSource: e.lane,
+            connectionType: e.lane,
+            isConnected: true,
+            mappingConfidence: 1.0,
+            originalLabel: flowLabel(e.flow) ||
+              (e.consumptionRate > 0 ? `${e.consumptionRate.toFixed(1)}` : ''),
+          },
+        };
+      }
 
       console.log('📊 Created', Object.keys(edgeMap).length, 'edges using corrected logic');
 

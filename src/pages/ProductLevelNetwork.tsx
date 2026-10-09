@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   buildProductLevelGraph,
   edgeWidthForFlow,
+  flowLabel,
   maxFlow,
   adaptiveColumnLayout,
   lensNodeSize,
@@ -28,6 +29,7 @@ import {
   RotateCcw,
   AlertTriangle,
   Map as MapIcon,
+  Tag,
 } from 'lucide-react';
 import {
   PageLayout,
@@ -201,6 +203,8 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
   const [metricsOutcome, setMetricsOutcome] = useState<MetricsOutcome>(null);
   const [disruptionDialogOpen, setDisruptionDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'network' | 'map'>('network');
+  // Labels default ON, as on the Process-level view: node ids and each edge's flow.
+  const [showLabels, setShowLabels] = useState(true);
   const [countryRiskMap, setCountryRiskMap] = useState<Record<string, string>>({});
   // D4: `risk_data` gained its migration in WP 1.4, so the read now succeeds
   // against a real table — but an EMPTY one until an operator loads a vintage.
@@ -489,6 +493,10 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
         };
       }
 
+      // `buildProductLevelGraph` returns ONE edge per pair with its flow summed over
+      // every lane row it stands for (§4 D306), so a node's totals and the edge drawn
+      // between two nodes read the same number.
+      const edgeFlowMax = maxFlow(productGraph.edges);
       for (const e of productGraph.edges) {
         const from = nodeMap[e.source];
         const to = nodeMap[e.target];
@@ -500,19 +508,22 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
         to.incomingFlow += e.flow;
 
         const edgeKey = `${e.source}-${e.target}`;
-        if (!edgeMap[edgeKey]) {
-          edgeMap[edgeKey] = {
-            id: edgeKey,
-            source: e.source,
-            target: e.target,
-            // WIDTH ENCODES FLOW, and DIRECTION IS VISIBLE: `styleColumnEdge` draws
-            // `data.width` and a fixed-size arrowhead, grey at rest and blue with a
-            // selection — `weighted` was once loaded, stored and never rendered, and
-            // these directed lanes read as undirected because nothing drew an arrow.
-            type: 'straight',
-            data: { weight: e.flow, lane: e.lane, width: edgeWidthForFlow(e.flow, maxFlow(productGraph.edges)) },
-          };
-        }
+        edgeMap[edgeKey] = {
+          id: edgeKey,
+          source: e.source,
+          target: e.target,
+          // WIDTH ENCODES FLOW, and DIRECTION IS VISIBLE: `styleColumnEdge` draws
+          // `data.width` and a fixed-size arrowhead, grey at rest and blue with a
+          // selection. The NUMBER is the edge label, behind the Labels toggle — the
+          // same keys and the same formatter as the Process-level view (§4 D306).
+          type: 'straight',
+          data: {
+            flowVolume: e.flow,
+            lane: e.lane,
+            width: edgeWidthForFlow(e.flow, edgeFlowMax),
+            originalLabel: flowLabel(e.flow),
+          },
+        };
       }
 
       // T3 — a view states the limit of its own computation, at the point of display.
@@ -532,12 +543,13 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
           `intermediate assemblies collapsed · ${productGraph.unreachedMaterials.length} materials reach no product`,
       );
 
-      // Filter out nodes with zero incoming and outgoing flow
+      // Hide a node only when NO EDGE touches it, as the Process-level view does. A
+      // zero-flow edge is drawn at the minimum width rather than hidden — "no demand
+      // reaches this lane" is a finding (`edgeWidthForFlow`) — and filtering on FLOW
+      // used to hide a supplier whose material no product's demand reaches (§4 D306).
       const originalNodeCount = Object.keys(nodeMap).length;
       const filteredNodeMap = Object.fromEntries(
-        Object.entries(nodeMap).filter(([id, node]) => 
-          !(node.incomingFlow === 0 && node.outgoingFlow === 0)
-        )
+        Object.entries(nodeMap).filter(([, node]) => node.incoming + node.outgoing > 0)
       );
 
       const filteredCount = originalNodeCount - Object.keys(filteredNodeMap).length;
@@ -609,7 +621,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
       setLoadNonce((k) => k + 1);
       console.log('✅ Visualization updated with', nodeList.length, 'nodes and', Object.keys(filteredEdgeMap).length, 'edges');
       const message = filteredCount > 0 
-        ? `Loaded ${filteredData.length} records for project (${filteredCount} zero-flow nodes filtered out)`
+        ? `Loaded ${filteredData.length} records for project (${filteredCount} unconnected nodes hidden)`
         : `Loaded ${filteredData.length} records for project`;
       toast.success(message);
     } catch (e) {
@@ -671,6 +683,18 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
       topNexusName: topNexus?.name ?? null,
     };
   }, [groupCounts, supplierVolumes, networkMetrics]);
+
+  // The Labels toggle hides node ids and edge flow labels without touching the
+  // data, so the details card, the search and the map still read the real id. The
+  // same two memos as the Process-level view (§4 D306).
+  const displayNodes = useMemo(
+    () => (showLabels ? lens.nodes : lens.nodes.map((n) => ({ ...n, style: { ...n.style, color: 'transparent' } }))),
+    [lens.nodes, showLabels],
+  );
+  const displayEdges = useMemo(
+    () => lens.edges.map((e) => ({ ...e, label: showLabels ? ((e.data?.originalLabel as string) || '') : '' })),
+    [lens.edges, showLabels],
+  );
 
   // §9 — the visible set, so search keeps working inside a focus.
   const searchCandidates = useMemo(
@@ -757,6 +781,17 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                 </>
               )}
               
+              <Button
+                onClick={() => setShowLabels(!showLabels)}
+                variant={showLabels ? 'default' : 'outline'}
+                size="icon"
+                className={cn(HDR_ICON_BUTTON, showLabels && HDR_ICON_BUTTON_ON)}
+                aria-label={showLabels ? 'Hide labels' : 'Show labels'}
+                title={showLabels ? 'Hide labels' : 'Show labels'}
+              >
+                <Tag className="h-4 w-4" />
+              </Button>
+
               <LensSearch
                 open={lens.searchOpen}
                 onOpenChange={lens.setSearchOpen}
@@ -965,8 +1000,8 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             <GraphCard
               ref={graphRef}
               legend={GROUP_ORDER.map((g) => ({ key: g, label: GROUP_LABELS[g], color: GROUP_COLORS[g], count: groupCounts[g] }))}
-              nodes={lens.nodes}
-              edges={lens.edges}
+              nodes={displayNodes}
+              edges={displayEdges}
               onNodesChange={lens.onNodesChange}
               onNodeClick={lens.onNodeClick}
               onNodeDoubleClick={lens.onNodeDoubleClick}

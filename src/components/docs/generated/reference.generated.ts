@@ -1995,7 +1995,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:382"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:384"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -12330,7 +12330,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc get_network_metrics_for_materials",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:272"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:277"
       }
     ],
     "governance": {
@@ -19849,12 +19849,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:283"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:285"
       },
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:247"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:252"
       },
       {
         "page": "ProjectIntelligence.tsx",
@@ -20685,7 +20685,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:363"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:368"
       }
     ],
     "governance": {

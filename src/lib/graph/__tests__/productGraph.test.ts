@@ -157,3 +157,67 @@ describe('what it refuses to invent', () => {
     expect(g.unreachedMaterials).toEqual([]);
   });
 });
+
+/**
+ * §4 D306 — the product view's weight is the SAME number the Process-level view draws,
+ * because both are the lanes' `weighted`, written by one demand walk.
+ */
+describe('the weight is the lanes’ `weighted` (§4 D306)', () => {
+  it('on the rows the ETL writes today — already collapsed — a bom edge is Σ weighted', () => {
+    // `rebuild_supply_chain_lanes` writes the flat bom lane as purchased material →
+    // finished product, `material_consumption_rate` = effective rate (qty / demand)
+    // and `weighted` = the propagated qty. Demand 10, effective rate 24 → 240.
+    const g = buildProductLevelGraph([
+      { plant_name: 'P', data_source: 'inbound', from_location: 'SUP', to_location: 'MAT', weighted: 240 },
+      { plant_name: 'P', data_source: 'bom', from_location: 'MAT', to_location: 'PROD', material_consumption_rate: 24, weighted: 240 },
+      { plant_name: 'P', data_source: 'outbound', from_location: 'PROD', to_location: 'CUST', weighted: 10 },
+    ]);
+    expect(g.edges.map((e) => [e.lane, e.flow])).toEqual([['inbound', 240], ['bom', 240], ['outbound', 10]]);
+  });
+
+  it('two plants making one product with two recipes — Σ per plant, never (Σd) × (Σr)', () => {
+    // Plant A: demand 10 × rate 2 = 20. Plant B: demand 5 × rate 4 = 20. Total 40.
+    // The unkeyed walk gave (10 + 5) × (2 + 4) = 90.
+    const g = buildProductLevelGraph([
+      { plant_name: 'A', data_source: 'inbound', from_location: 'SUP', to_location: 'MAT', weighted: 20 },
+      { plant_name: 'B', data_source: 'inbound', from_location: 'SUP', to_location: 'MAT', weighted: 20 },
+      { plant_name: 'A', data_source: 'bom', from_location: 'MAT', to_location: 'PROD', material_consumption_rate: 2, weighted: 20 },
+      { plant_name: 'B', data_source: 'bom', from_location: 'MAT', to_location: 'PROD', material_consumption_rate: 4, weighted: 20 },
+      { plant_name: 'A', data_source: 'outbound', from_location: 'PROD', to_location: 'CUST', weighted: 10 },
+      { plant_name: 'B', data_source: 'outbound', from_location: 'PROD', to_location: 'CUST', weighted: 5 },
+    ]);
+    const flow = (lane: string) => g.edges.filter((e) => e.lane === lane).map((e) => e.flow);
+    expect(flow('bom')).toEqual([40]);
+    // One drawn edge per pair, summed over the plants — not one per row.
+    expect(flow('inbound')).toEqual([40]);
+    expect(flow('outbound')).toEqual([15]);
+  });
+
+  it('a BOM walk never crosses plants', () => {
+    // The tree is in plant A, the demand only in plant B: no edge, and the material is
+    // reported as reaching no product rather than borrowing another plant's recipe.
+    const g = buildProductLevelGraph([
+      { plant_name: 'A', data_source: 'inbound', from_location: 'SUP', to_location: 'MAT', weighted: 0 },
+      { plant_name: 'A', data_source: 'bom', from_location: 'MAT', to_location: 'PROD', material_consumption_rate: 2 },
+      { plant_name: 'B', data_source: 'outbound', from_location: 'PROD', to_location: 'CUST', weighted: 5 },
+    ]);
+    expect(g.edges.filter((e) => e.lane === 'bom')).toEqual([]);
+    expect(g.unreachedMaterials).toEqual(['MAT']);
+  });
+
+  it('a supplier with no weighted flow carries 0 — never its 0–1 share as a volume', () => {
+    const g = buildProductLevelGraph([
+      { data_source: 'inbound', from_location: 'SUP', to_location: 'MAT', weighted: 0, sourcing_ratio: 0.4 },
+    ]);
+    expect(g.edges[0].flow).toBe(0);
+  });
+
+  it('a blank consumption rate is 0, as in the SQL walk — never 1', () => {
+    const g = buildProductLevelGraph([
+      { data_source: 'inbound', from_location: 'SUP', to_location: 'MAT', weighted: 0 },
+      { data_source: 'bom', from_location: 'MAT', to_location: 'PROD', material_consumption_rate: null },
+      { data_source: 'outbound', from_location: 'PROD', to_location: 'CUST', weighted: 10 },
+    ]);
+    expect(g.edges.find((e) => e.lane === 'bom')!.flow).toBe(0);
+  });
+});

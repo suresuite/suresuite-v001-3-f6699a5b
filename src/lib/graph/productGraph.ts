@@ -31,27 +31,37 @@
  * ── THE EDGE RULE, WHICH IS THE PART THAT HAS TO BE RIGHT ──────────────────
  *
  * Collapsing nodes without collapsing quantities would leave every edge weight
- * describing one BOM hop of a path it no longer draws.
+ * describing one BOM hop of a path it no longer draws. Every edge's weight is the
+ * SAME number the Process-level view draws for that lane (§4 D306), because both are
+ * the lanes' `weighted`, written by one demand walk (`rebuild_supply_chain_lanes`):
  *
- *   Supplier → Material   the inbound flow, per supplier, as uploaded.
- *   Material → Product    the demand PROPAGATED down the BOM: the product's own
- *                         demand times the product of the consumption rates along
- *                         every path from that product down to that material. A
- *                         material reached by two paths sums them, because it is
- *                         needed for both.
- *   Product → Customer    the outbound volume, as uploaded.
+ *   Supplier → Material   Σ `weighted`: the material's demand times this supplier's
+ *                         share of it, summed over plants.
+ *   Material → Product    the demand PROPAGATED down the BOM, PER PLANT: the product's
+ *                         demand in that plant times the product of the consumption
+ *                         rates along every path from that product down to that
+ *                         material, summed over paths and over plants. On the rows
+ *                         the ETL writes today — already collapsed, carrying the
+ *                         effective rate — this is exactly Σ `weighted`; on tree-shaped
+ *                         rows it still collapses the tree.
+ *   Product → Customer    Σ `weighted`: the weekly outbound volume.
+ *
+ * One drawn edge per pair, its flow summed (`sumLaneEdges`).
  *
  * A material that reaches no finished product produces NO edge and is REPORTED
  * (`unreachedMaterials`) rather than dropped quietly — T3, a view publishing the limit
  * of its own computation.
  */
 import type { Echelon } from './types';
+import { sumLaneEdges } from './laneEdges';
 
 /** One `supply_chain_data` row, as the page already holds it. */
 export interface FlatLaneRow {
   from_location: string;
   to_location: string;
   data_source?: string | null;
+  /** The plant the row belongs to. The BOM walk never crosses plants, as in SQL. */
+  plant_name?: string | null;
   /** On a bom row: how much of `from_location` per unit of `to_location`. */
   material_consumption_rate?: number | null;
   sourcing_ratio?: number | null;
@@ -61,7 +71,7 @@ export interface FlatLaneRow {
 export interface ProductLevelEdge {
   source: string;
   target: string;
-  /** Flow on this edge, in the lane's own units. */
+  /** Flow on this edge per week — the lanes' `weighted`, summed (§4 D306). */
   flow: number;
   lane: 'inbound' | 'bom' | 'outbound';
   /** How many BOM hops this edge stands for. 1 on inbound/outbound. */
@@ -87,6 +97,7 @@ const id = (v: string | null | undefined) => {
   return s === '' ? null : s;
 };
 const num = (v: number | null | undefined) => (Number.isFinite(v as number) ? (v as number) : 0);
+const plantKey = (plant: string, node: string) => `${plant}\u0000${node}`;
 
 /**
  * Build the four-echelon product view from the flat lane rows.
@@ -105,66 +116,75 @@ export function buildProductLevelGraph(rows: readonly FlatLaneRow[]): ProductLev
   const products = new Set<string>();    // things a customer buys
   const customers = new Set<string>();
 
-  // parent -> children, with the rate of child per unit of parent.
+  // (plant, parent) -> children, with the rate of child per unit of parent. Keyed by
+  // PLANT because a BOM belongs to a plant: two plants making one product with two
+  // recipes need (d₁ × r₁) + (d₂ × r₂), and an unkeyed walk gave (d₁ + d₂) × (r₁ + r₂).
   const childrenOf = new Map<string, { child: string; rate: number }[]>();
-  const inbound: { supplier: string; material: string; flow: number }[] = [];
-  const outbound: { product: string; customer: string; flow: number }[] = [];
+  const inboundRows: FlatLaneRow[] = [];
+  const outboundRows: FlatLaneRow[] = [];
+  // Demand per (plant, finished product), from outbound.
+  const demandOf = new Map<string, { plant: string; product: string; demand: number }>();
 
   for (const r of rows) {
     const lane = (r.data_source ?? '').toLowerCase();
     const from = id(r.from_location);
     const to = id(r.to_location);
     if (!from || !to) continue;
+    const plant = (r.plant_name ?? '').trim();
 
     if (lane === 'inbound') {
       suppliers.add(from);
       purchased.add(to);
-      inbound.push({ supplier: from, material: to, flow: num(r.weighted) || num(r.sourcing_ratio) });
+      inboundRows.push(r);
     } else if (lane === 'outbound') {
       products.add(from);
       customers.add(to);
-      outbound.push({ product: from, customer: to, flow: num(r.weighted) });
+      outboundRows.push(r);
+      const key = plantKey(plant, from);
+      const d = demandOf.get(key) ?? { plant, product: from, demand: 0 };
+      d.demand += num(r.weighted);
+      demandOf.set(key, d);
     } else if (lane === 'bom') {
-      // `from` is consumed into `to`. `to` is the parent.
-      const list = childrenOf.get(to) ?? [];
-      list.push({ child: from, rate: num(r.material_consumption_rate) || 1 });
-      childrenOf.set(to, list);
+      // `from` is consumed into `to`. `to` is the parent. A blank rate is 0, as in the
+      // SQL walk — never 1, which would invent a recipe the BOM does not state.
+      const key = plantKey(plant, to);
+      const list = childrenOf.get(key) ?? [];
+      list.push({ child: from, rate: num(r.material_consumption_rate) });
+      childrenOf.set(key, list);
     }
   }
 
-  // Demand per finished product, from outbound.
-  const demandOf = new Map<string, number>();
-  for (const o of outbound) demandOf.set(o.product, (demandOf.get(o.product) ?? 0) + o.flow);
-
-  // ── the collapse: walk DOWN from each product, accumulating the multiplier, and
-  //    record a (material, product) pair whenever the walk reaches a purchased leaf.
+  // ── the collapse: walk DOWN from each (plant, product), accumulating the demand, and
+  //    record a (material, product) flow whenever the walk reaches a purchased leaf.
   //    Downward from the product is the right direction: it visits each product's own
   //    tree once, and the multiplier composes naturally on the way.
   const materialToProduct = new Map<string, Map<string, number>>();
   const intermediates = new Set<string>();
 
-  const descend = (product: string, node: string, multiplier: number, depth: number, seen: Set<string>) => {
+  const descend = (plant: string, product: string, node: string, qty: number, depth: number, seen: Set<string>) => {
     if (depth > MAX_DEPTH || seen.has(node)) return;
-    const children = childrenOf.get(node);
+    const children = childrenOf.get(plantKey(plant, node));
     if (!children || children.length === 0) return;
     const nextSeen = new Set(seen).add(node);
     for (const { child, rate } of children) {
-      const qty = multiplier * rate;
+      const childQty = qty * rate;
       if (purchased.has(child)) {
         let byProduct = materialToProduct.get(child);
         if (!byProduct) { byProduct = new Map(); materialToProduct.set(child, byProduct); }
-        byProduct.set(product, (byProduct.get(product) ?? 0) + qty);
+        byProduct.set(product, (byProduct.get(product) ?? 0) + childQty);
       }
       // A node can be BOTH purchased and an assembly the plant builds further. It is
       // recorded as a material above AND descended through here, because both are true.
-      if (childrenOf.has(child)) {
+      if (childrenOf.has(plantKey(plant, child))) {
         if (!purchased.has(child)) intermediates.add(child);
-        descend(product, child, qty, depth + 1, nextSeen);
+        descend(plant, product, child, childQty, depth + 1, nextSeen);
       }
     }
   };
 
-  for (const product of products) descend(product, product, 1, 0, new Set());
+  for (const { plant, product, demand } of demandOf.values()) {
+    descend(plant, product, product, demand, 0, new Set());
+  }
 
   // ── nodes: exactly the four echelons this view is about.
   const nodes = new Map<string, { echelon: Echelon }>();
@@ -173,33 +193,27 @@ export function buildProductLevelGraph(rows: readonly FlatLaneRow[]): ProductLev
   for (const p of products) nodes.set(p, { echelon: 'product' });
   for (const c of customers) if (!nodes.has(c)) nodes.set(c, { echelon: 'customer' });
 
-  // ── edges.
+  // ── edges: one per pair, its flow summed over every row it stands for.
   const edges: ProductLevelEdge[] = [];
 
-  for (const i of inbound) {
-    if (!nodes.has(i.supplier) || !nodes.has(i.material)) continue;
-    edges.push({ source: i.supplier, target: i.material, flow: i.flow, lane: 'inbound', hops: 1 });
+  for (const e of sumLaneEdges(inboundRows)) {
+    if (!nodes.has(e.source) || !nodes.has(e.target)) continue;
+    edges.push({ source: e.source, target: e.target, flow: e.flow, lane: 'inbound', hops: 1 });
   }
 
   for (const [material, byProduct] of materialToProduct) {
     if (!nodes.has(material)) continue;
-    for (const [product, qtyPerUnit] of byProduct) {
-      if (!nodes.has(product)) continue;
-      edges.push({
-        source: material,
-        target: product,
-        // The propagated requirement: what this product's demand needs of this
-        // material, through every path between them.
-        flow: (demandOf.get(product) ?? 0) * qtyPerUnit,
-        lane: 'bom',
-        hops: 1,
-      });
+    for (const [product, flow] of byProduct) {
+      if (!nodes.has(product) || material === product) continue;
+      // The propagated requirement: what this product's demand needs of this
+      // material, through every path between them, in every plant.
+      edges.push({ source: material, target: product, flow, lane: 'bom', hops: 1 });
     }
   }
 
-  for (const o of outbound) {
-    if (!nodes.has(o.product) || !nodes.has(o.customer)) continue;
-    edges.push({ source: o.product, target: o.customer, flow: o.flow, lane: 'outbound', hops: 1 });
+  for (const e of sumLaneEdges(outboundRows)) {
+    if (!nodes.has(e.source) || !nodes.has(e.target)) continue;
+    edges.push({ source: e.source, target: e.target, flow: e.flow, lane: 'outbound', hops: 1 });
   }
 
   const unreachedMaterials = [...purchased]
