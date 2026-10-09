@@ -16,6 +16,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { CONTRACT_VERSION, ENGINE_VERSION } from "@/components/docs/generated/dataModel.generated";
+import { getPage } from "@/components/docs/registry";
 
 /**
  * Render a contract string, turning `backticked` spans into code.
@@ -55,6 +56,19 @@ export function PageTitle({ children, lead }: { children: ReactNode; lead?: Reac
       {lead && <p className="text-base text-muted-foreground md:text-lg">{lead}</p>}
     </header>
   );
+}
+
+/** Keep article titles and search summaries in the registry. */
+export function DocPageTitle({ slug }: { slug: string }) {
+  const page = getPage(slug);
+  return <PageTitle lead={page?.summary}>{page?.title}</PageTitle>;
+}
+
+/** Three short takeaways before the detail, from the same payload at every width. */
+export function InShort({ items }: { items: [ReactNode, ReactNode, ReactNode] }) {
+  return <Callout title="In short">
+    {items.map((item, i) => <p key={i}>{item}</p>)}
+  </Callout>;
 }
 
 export function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {

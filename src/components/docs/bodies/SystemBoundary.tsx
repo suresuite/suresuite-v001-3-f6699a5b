@@ -1,139 +1,44 @@
-import { PageTitle, Section, P, Key, Callout, Defs, DocLink, Term } from "@/components/docs/prose";
+import { DocPageTitle, InShort, Section, P, Callout, Defs, DocLink } from "@/components/docs/prose";
 import { DocFigure } from "@/components/docs/DocFigure";
-import { SystemBoundaryFigure } from "@/components/docs/figures";
 
-export default function SystemBoundary() {
-  return (
-    <>
-      <PageTitle lead="What runs where, what crosses each line, and what never leaves.">
-        System boundary
-      </PageTitle>
-
-      <Section id="who-this-is-for" title="Who this page is for">
-        <P>
-          Someone has to approve this tool before anyone uses it. That person usually needs four
-          answers — where the data sits, what reaches it, what leaves, and what happens when a
-          component is compromised — and they need them without reading the rest of a user manual.
-          This page is those four answers.
-        </P>
-      </Section>
-
-      <Section id="the-layers" title="The four layers">
-        <DocFigure id="boundary" fallback={<SystemBoundaryFigure />} />
-        <Defs
-          items={[
-            {
-              term: "Your browser",
-              def: "A React application. It renders the interface and holds nothing durable — no copy of your data survives a closed tab beyond ordinary browser caching. It never connects to a database directly.",
-            },
-            {
-              term: "Supabase",
-              def: "A managed PostgreSQL database plus a set of small server functions. Your files, your data, your policies and your results live here. So do the rules about who may read them, expressed as database policies rather than as application code.",
-            },
-            {
-              term: "Simulation worker",
-              def: "A long-running process on Fly.io. It takes a job from a queue, runs it, reports progress, and writes the result back. It holds no state of its own between jobs.",
-            },
-            {
-              term: "Engine",
-              def: "The model itself, a Python library. It receives parameters and returns results. It has no database credentials and no network access of its own — it cannot read anything it was not handed.",
-            },
-          ]}
-        />
-      </Section>
-
-      <Section id="what-crosses" title="What crosses each line">
-        <Defs
-          items={[
-            {
-              term: "Browser to Supabase",
-              def: "Authenticated requests only. Every request carries the caller's identity, and the database decides what that identity may see. A request that asks for another organization's rows does not get an error — it gets nothing back, which is the correct answer to a question the caller was not entitled to ask.",
-            },
-            {
-              term: "Supabase to the queue",
-              def: "A job: which project, which scenario, which policy set, which engine version. Not the data itself — a reference to it.",
-            },
-            {
-              term: "Queue to the worker",
-              def: "The worker picks up the job and fetches exactly the project data that job needs.",
-            },
-            {
-              term: "Worker to engine",
-              def: "Parameters in, results out. The engine is a pure computation at this boundary: same inputs, same outputs, no side effects.",
-            },
-            {
-              term: "Worker back to Supabase",
-              def: "The result rows, and progress messages that the browser receives live over a subscription so a long run shows movement rather than a spinner.",
-            },
-          ]}
-        />
-      </Section>
-
-      <Section id="the-honest-parts" title="The parts worth asking about">
-        <Callout title="The worker runs with elevated database access">
-          <p>
-            The simulation worker authenticates with a service credential, which bypasses the
-            per-user access rules — it has to, because it acts on behalf of a job rather than a
-            person, and the person may well have closed their browser. The isolation at that layer
-            therefore comes from the worker's own code being narrow, not from the database refusing
-            it. This is the sharpest edge in the architecture and it is stated here rather than
-            left to be discovered.
-          </p>
-        </Callout>
-        <Callout title="The worker keeps your graph in memory for a while after a run">
-          <p>
-            A run is not the worker's only contact with your data. It loads your graph and your
-            effective policies on first use and <strong>keeps them in memory</strong>, so a second
-            run on the same project does not refetch everything — and an idle timer drops them
-            again, ten minutes after last use by default.
-          </p>
-          <p>
-            Nothing is written to disk at that layer. But <em>where the data sits</em> is the first
-            question this page exists to answer, and the honest answer includes a bounded residency
-            on the worker rather than only the database. It is deliberate and it is why a repeated
-            run is fast; it is stated here rather than left to be discovered.
-          </p>
-        </Callout>
-        <Callout title="Audit today covers the administrative plane">
-          <p>
-            Changes to accounts, roles and organizations are recorded with the actor who made them.
-            Movements of data between tiers are not yet recorded to the same standard. If your
-            approval process requires a complete data-plane audit trail, that is a gap today and is
-            listed on <DocLink to="known-limits">Known limits</DocLink>.
-          </p>
-        </Callout>
-        <Key>
-          Both of these are scheduled work, not design decisions. They are on this page because a
-          boundary description that omits its own weak points is not a boundary description.
-        </Key>
-      </Section>
-
-      <Section id="what-never-leaves" title="What never leaves">
-        <P>
-          Your data is not sent to any third party as part of normal operation. It is not pooled
-          across customers and it is not used as training material. Where the assistant is used, the
-          scope of what it can see is described on{" "}
-          <DocLink to="ai-assistant">The AI assistant</DocLink> — it is bounded by the same access
-          rules as any other reader, not exempt from them.
-        </P>
-        <P>
-          Exports leave when you export them, in formats that can be read without this software.
-          Deleting a project removes its data and the results derived from it.
-        </P>
-      </Section>
-
-      <Section id="verifying" title="Verifying any of this">
-        <P>
-          The access rules are generated from a written description of every table — which
-          capability is needed to read it, which to write it, and what the minimum project role is.
-          That description is in the repository and the database rules are produced from it, so the
-          two cannot disagree. <Term>npm run contract:check</Term> is the command that asserts it.
-        </P>
-        <P>
-          <DocLink to="who-can-see-your-data">Who can see your data</DocLink> covers the same ground
-          from the user's side rather than the architecture's.
-        </P>
-      </Section>
-    </>
-  );
-}
+export default function SystemBoundary() { return <>
+<DocPageTitle slug="system-boundary" />
+<InShort items={[
+  "You review data in the browser; hosted services store the model and execute server runs.",
+  "The simulation engine, the software that calculates outcomes, receives prepared inputs rather than database access keys.",
+  <>Check access gaps and optional AI processing before uploading sensitive data. Then read <DocLink to="roles-and-capabilities">Roles and capabilities</DocLink>.</>,
+]} />
+<Section id="who-this-is-for" title="Before you approve the tool">
+  <P>This page explains where data is stored and which services handle it. The six data tiers describe stages in its life; the components below describe where work happens. A deployment is the running version of the application; it must be checked separately from a source-code description.</P>
+</Section>
+<Section id="the-layers" title="The four components">
+  <DocFigure id="boundary" />
+  <Defs items={[
+    {term:"Your browser",def:"Displays the app, prepares edits and sends requests. Unsaved edits can be lost on refresh. The app also supports running the Python engine in the browser for validation and local execution; do not assume all computation happens on a server."},
+    {term:"Supabase",def:"The hosted database, file storage and server functions. Accepted inputs, saved policies, versions and run records live here. Database rules and request handlers govern access, with gaps noted below."},
+    {term:"Simulation worker",def:"A server process hosted on Fly.io. It receives a queued job, loads the run's saved input and policy versions, calculates outcomes and saves results. Some worker paths retain project data in memory between requests."},
+    {term:"scsim engine",def:"The Python library that calculates a weekly supply-chain simulation. It receives prepared model inputs. It does not need database credentials to perform that calculation."},
+  ]} />
+</Section>
+<Section id="what-crosses" title="What moves between them">
+  <Defs items={[
+    {term:"Browser → Supabase",def:"Uploaded files, saved edits and requests to read or run a project. Some paths carry an application-asserted identity rather than an authenticated Supabase user; access must be checked for the operation, not inferred from a sign-in screen."},
+    {term:"Request service → queue",def:"A job naming the project, scenario and saved versions. A queue holds work until a worker picks it up; it is not the permanent record of your model."},
+    {term:"Queue → worker → engine",def:"The worker loads saved versions and translates them into engine inputs. The engine returns calculated outcomes to the worker."},
+    {term:"Worker → storage → browser",def:"Saved result records and progress messages. The browser reads the result. Detailed series may use separate result-file storage, so storage is not limited to database rows."},
+  ]} />
+</Section>
+<Section id="the-honest-parts" title="Access and temporary copies">
+  <Callout title="The worker has elevated database access"><p>The worker uses a service credential that bypasses per-user database rules. Its request and execution code therefore matters to isolation. Hiding an action in the interface is not proof that the server refuses it.</p></Callout>
+  <Callout title="Some worker paths keep data in memory"><p>The worker's graph cache can retain project graphs and effective policies between uses. Its idle timer drops cached data after ten minutes by default. A current version-bound experiment reads frozen copies (saved for that run), rather than using later edits to the live project.</p></Callout>
+  <P>Source review identified incomplete caller authorization on the browser simulation endpoint. This path does not establish the caller's project role before dispatch. The documentation changes do not fix the issue, and no production bypass test was run. Read <DocLink to="roles-and-capabilities">the full access finding</DocLink> before treating the interface as a security boundary.</P>
+  <P>The <DocLink to="audit-log">Audit log</DocLink> describes administrative, data-change and access events, including coverage and identity limits. A recorded identity is not always independently verified.</P>
+</Section>
+<Section id="what-never-leaves" title="Optional processing, exports and deletion">
+  <P>Hosted storage and execution involve the configured service providers. If you use the AI assistant, prompts and relevant project context can also be sent to the configured model provider. Review <DocLink to="ai-assistant">The AI assistant</DocLink> and your deployment's provider arrangements; this page does not establish those providers' retention or training terms.</P>
+  <P>Exports leave the system when you download or share them. Project deletion removes project data through the supported deletion path, with exceptions for some files and account records. Read <DocLink to="exporting-and-deleting">Exporting and deleting your data</DocLink> before assuming every copy disappears.</P>
+</Section>
+<Section id="verifying" title="What to check next">
+  <P>For an IT review, check the deployed services and credentials alongside <DocLink to="roles-and-capabilities">Roles and capabilities</DocLink>. For a modeling decision, read <DocLink to="known-limits">Known limits</DocLink>. For the data path, return to <DocLink to="how-your-data-flows">How your data flows</DocLink>.</P>
+</Section>
+</>; }

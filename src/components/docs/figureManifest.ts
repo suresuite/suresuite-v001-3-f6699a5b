@@ -51,39 +51,26 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   // ── 1 · Overview & architecture ─────────────────────────────────────────
   {
     id: "tiers", page: "how-suresuite-is-designed", file: "tiers.svg",
-    title: "Keep inputs, decisions and results distinct",
-    alt: "Illustration: Landing and staging: Raw upload, parsed rows, findings Review before promotion.. Accepted data and derived views: BOM, lanes and masters → graphs Inputs and derived measures differ.. Decisions and versions: Policies + frozen inputs + validation Record what the run will use.. Results: KPIs, replications and weekly series Review assumptions and provenance.",
-    caption: "Illustration. These are data responsibilities; not every upload follows the same ingestion path.",
-    shows: "Illustration: Landing and staging: Raw upload, parsed rows, findings Review before promotion.. Accepted data and derived views: BOM, lanes and masters → graphs Inputs and derived measures differ.. Decisions and versions: Policies + frozen inputs + validation Record what the run will use.. Results: KPIs, replications and weekly series Review assumptions and provenance.",
+    title: "Six numbered data tiers",
+    alt: "Tier 0 Landing keeps the file; tier 1 Staging checks rows; tier 2 Canonical holds accepted inputs; tier 3 Derived computes views; tier 4 Decisions saves policies and scenarios; tier 5 Results records outcomes and versions.",
+    caption: "Six data responsibilities, numbered 0–5. Standard CSV uploads follow this path; node-list and deep-tier bulk uploads are exceptions. Historical records may lack source or version information.",
+    shows: "Six separate numbered stages, 0 landing, 1 staging, 2 accepted canonical inputs, 3 derived views, 4 decisions, 5 results. Read top to bottom at phone width. These numbers are data tiers, not supplier tiers.",
   },
   {
     id: "flow", page: "how-your-data-flows", file: "flow.svg",
-    title: "A file is not yet a simulation input",
-    alt: "Illustration: Raw file → staged rows: Original cells + parsed values + findings Contract-driven CSV path only. Review → promotion: Upsert eligible rows by natural key Held rows remain out of accepted inputs.. Accepted inputs → derived views: Refresh affected lanes and analyses Check freshness and input coverage.. Frozen dataset + policy versions: Scenario and engine bind the run The worker reads the frozen snapshots.. Result → review: Completed replications, notes and KPIs Older records may have less provenance.",
-    caption: "Illustration. Node-list and deep-tier bulk uploads follow separate paths.",
-    shows: "Illustration: Raw file → staged rows: Original cells + parsed values + findings Contract-driven CSV path only. Review → promotion: Upsert eligible rows by natural key Held rows remain out of accepted inputs.. Accepted inputs → derived views: Refresh affected lanes and analyses Check freshness and input coverage.. Frozen dataset + policy versions: Scenario and engine bind the run The worker reads the frozen snapshots.. Result → review: Completed replications, notes and KPIs Older records may have less provenance.",
+    title: "From upload to a stamped result",
+    alt: "Seven steps for P-CONTROL to M-CASE: upload the file; check staged rows; accept reviewed rows; compute views and the housing requirement; decide policies and scenario; simulate frozen versions; stamp the result with its versions and settings.",
+    caption: "The standard CSV journey, using two housings per control unit. Node-list and deep-tier bulk uploads follow separate paths.",
+    shows: "Seven vertical steps matching the page headings: upload, check, accept, compute, decide, simulate, stamp. Keep P-CONTROL to M-CASE and the 100 products to 200 housings arithmetic visible.",
   },
   {
     id: "boundary",
     page: "system-boundary",
     file: "boundary.svg",
     title: "What runs where",
-    alt:
-      "Four stacked layers — your browser, Supabase, the simulation worker and the engine — " +
-      "with what crosses each line written between them. A filled mark on Supabase says your " +
-      "data is at rest there and nowhere else; a dashed mark on the other three says it is " +
-      "held only in memory, with the worker's ten-minute cache named.",
-    caption:
-      "Four processes, and only one of them your data rests in. The worker holds it in memory " +
-      "after a run too, until an idle timer drops it — which is the part an approver is " +
-      "entitled to and the page did not used to say.",
-    shows:
-      "Browser, Supabase, worker, engine; what crosses each boundary and in which direction; " +
-      "and the brief's second ask, which needed CHECKING rather than inheriting (F3): where a " +
-      "user's data is at rest and where it is only in flight. Reading `GraphCache` for that " +
-      "found §4 D148 — the worker keeps the graph and the effective policies in memory for ten " +
-      "minutes after a run, which neither the figure nor the page had said. Supersedes the " +
-      "`SystemBoundaryFigure` schematic, which stays as the fallback.",
+    alt: "Four stacked components: browser interface and optional browser execution; Supabase database and file storage; Fly.io simulation worker; Python engine. Requests carry uploads and edits, queued jobs name versions, and prepared inputs enter the engine. Some worker paths cache data in memory for ten idle minutes.",
+    caption: "The server-run path. Browser execution is also available. Hosted storage includes database rows and files; some worker paths keep temporary copies in memory. Access checks and optional AI processing need separate review.",
+    shows: "Browser, Supabase, worker and engine, with requests, queued version references and prepared inputs between them. Name browser execution and database plus file storage; do not imply that every request authenticates the caller or that the database is the only location for stored results.",
   },
 
   // ── 3 · Input tables ────────────────────────────────────────────────────

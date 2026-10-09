@@ -1,27 +1,4 @@
-// The manual's front door at /docs.
-//
-// WHY THIS PAGE EXISTS. The index route used to render the first article, so
-// /docs opened mid-manual: a reader who had not yet decided to read anything
-// landed on page one of fifteen sections with no way to see what the other
-// fourteen were without expanding a tree. §6.5's argument is that the
-// architecture is a selling point and that "a prospective customer, a
-// researcher and a new modeller all ask the same opening question" — and all
-// three of them arrive HERE, from the public site, without an account. This
-// page answers that question before asking them to pick an article.
-//
-// It is written in the public site's vocabulary (mono kicker, hairline rules,
-// serif-italic tail on the headline) rather than the manual's, because it is
-// the seam between the two: /docs is reachable from the same top bar as
-// /about, and a reader crossing that seam should not feel they have left.
-//
-// NOTHING HERE IS TYPED TWICE. Every title, blurb, count and link is read from
-// `registry.ts` at render time. The section list cannot fall behind the nav,
-// and the "written" counts cannot flatter the manual, because both are the
-// same numbers the nav and the pager use. That is the point of the counts
-// being here at all: §5.3 T3 says we publish our own blind spots, and a front
-// door that showed only the finished sections would be the tidier, dishonest
-// version of this page — the reader could not tell a feature we do not have
-// from a page we have not written.
+// First-reader paths and page metadata follow the registry and release settings.
 
 import { Link } from "react-router-dom";
 import { ArrowRight, BookText, Compass, Rocket, ShieldCheck } from "lucide-react";
@@ -31,10 +8,12 @@ import { useCapabilities } from "@/hooks/useCapabilities";
 const KICKER = "font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground";
 
 
-/** The three questions §6.5 says every first-time reader arrives with. */
+/** The four role paths §6.5 says every first-time reader arrives with. */
 const START_HERE = [
   {
-    slug: "reading-your-results",
+    slug: "what-suresuite-is",
+    next: "reading-your-results",
+    fragment: "",
     icon: Compass,
     question: "Manager or researcher: assess the model",
   },
@@ -42,27 +21,24 @@ const START_HERE = [
     slug: "how-suresuite-is-designed",
     icon: BookText,
     question: "Engineer: understand and run the project",
+    next: "how-suresuite-is-designed",
+    fragment: "engineer",
   },
   {
     slug: "your-first-project",
+    next: "how-your-data-flows",
+    fragment: "",
     icon: Rocket,
     question: "Analyst: build your first comparison",
   },
   {
     slug: "getting-an-api-key",
+    next: "system-boundary",
+    fragment: "",
     icon: ShieldCheck,
     question: "API developer: make your first request",
   },
 ] as const;
-
-function Stat({ value, label }: { value: string | number; label: string }) {
-  return (
-    <div className="px-5 py-4 md:px-6">
-      <div className="text-2xl font-semibold tabular-nums tracking-tight">{value}</div>
-      <div className={`${KICKER} mt-1 block`}>{label}</div>
-    </div>
-  );
-}
 
 export default function DocsHome() {
   // Released section by section (/admin/docs): the front door lists only what
@@ -74,7 +50,9 @@ export default function DocsHome() {
     return Boolean(page && docs.canReadSection(page.sectionKey));
   };
   const firstPage = groups[0]?.pages.find((p) => p.status === "live");
-  const startHere = START_HERE.filter(({ slug }) => visible(slug));
+  const startHere = START_HERE.map(path => ({ ...path,
+    slug: visible(path.slug) ? path.slug : visible(path.next) ? path.next : "what-suresuite-is",
+  })).filter(({ slug }) => visible(slug));
   const pages = groups.flatMap((g) => g.pages);
   const liveCount = pages.filter((p) => p.status === "live").length;
   return (
@@ -87,10 +65,15 @@ export default function DocsHome() {
           <span className="font-serif font-medium italic">written down.</span>
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
-          The manual is released section by section, and this page lists every section open to
-          you. A prospective user, a researcher and a new modeller all open with the same question — how is this thing put together, and can I
-          trust it? That question is answered first here, before the reference section, because a
-          tool that asks you to stake a decision on its numbers owes you the way it got them.
+          SuReSuite models your supply chain so you can test disruptions and compare the cost and service of different responses.
+        </p>
+        <p className="max-w-2xl text-sm font-medium leading-relaxed">
+          Model your chain → set policies → break it on purpose and compare.
+        </p>
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          A policy is a rule for running the chain, such as when to reorder or which supplier to use.
+          Start with the overview below; you need an approved account to work in a project.{" "}
+          <Link to="/auth" className="text-primary hover:underline">Sign in</Link> if you already have one.
         </p>
         <div className="flex flex-wrap items-center gap-3 pt-1">
           {firstPage && (
@@ -121,14 +104,6 @@ export default function DocsHome() {
         </div>
       </header>
 
-      {/* What the manual covers, in numbers it cannot fake */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-[--hair-rule] border border-[--hair-rule] sm:grid-cols-4 sm:divide-y-0">
-        <Stat value={groups.length} label="Sections" />
-        <Stat value={pages.length} label="Pages mapped" />
-        <Stat value={liveCount} label="Available guides" />
-        <Stat value={pages.length - liveCount} label="Planned guides" />
-      </div>
-
       {/* Start here */}
       <section className={startHere.length === 0 ? "hidden" : "space-y-5"}>
         <div className="space-y-2">
@@ -138,28 +113,39 @@ export default function DocsHome() {
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {startHere.map(({ slug, icon: Icon, question }) => {
+          {startHere.map(({ slug, next, fragment, icon: Icon, question }) => {
             const page = getPage(slug);
             if (!page) return null;
             return (
-              <Link
-                key={slug}
-                to={`/docs/${slug}`}
+              <div
+                key={question}
                 className="group rounded-sm border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
                 <div className="flex items-center gap-2">
                   <Icon className="h-4 w-4 shrink-0 text-primary" />
                   <span className="text-sm font-semibold tracking-tight">{question}</span>
                 </div>
-                <div className="mt-2 text-sm font-medium text-foreground group-hover:text-primary">
+                <Link to={`/docs/${slug}`} className="mt-2 block text-sm font-medium text-primary hover:underline">
                   {page.title}
-                </div>
+                </Link>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{page.summary}</p>
-              </Link>
+                {visible(next) && (next !== slug || fragment) && (
+                  <Link to={`/docs/${next}${fragment ? `#${fragment}` : ""}`} className="mt-3 inline-flex min-h-11 items-center text-sm text-primary hover:underline md:min-h-0">
+                    {fragment ? "For engineers: developer setup" : getPage(next)?.title}
+                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  </Link>
+                )}
+                {!visible(next) && <p className="mt-3 text-xs text-muted-foreground">More task guides appear when their section is open to you.</p>}
+              </div>
             );
           })}
         </div>
       </section>
+
+      <p className="text-xs text-muted-foreground">
+        {liveCount} available guides across {groups.length} sections open to you.
+        {pages.length > liveCount && ` ${pages.length - liveCount} more guides are planned.`}
+      </p>
 
       {/* The whole site map */}
       <section className="space-y-5">
@@ -169,7 +155,7 @@ export default function DocsHome() {
             {groups.length} {groups.length === 1 ? "section" : "sections"}, and what each one answers
           </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Browse the sections available to your account. Start with a task guide, then use the concepts and reference pages to understand the values you encounter.
+            Browse the sections open to you, including any released for public reading. Start with a task guide, then use the concepts and reference pages to understand the values you encounter.
           </p>
         </div>
 

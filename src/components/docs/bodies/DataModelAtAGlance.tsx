@@ -9,7 +9,7 @@
 
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { PageTitle, Section, P, Key, Callout, Prose, Provenance, Term, DocLink } from "@/components/docs/prose";
+import { DocPageTitle, InShort, Section, P, Key, Callout, Prose, Provenance, DocLink } from "@/components/docs/prose";
 import { ALL_PAGES } from "@/components/docs/registry";
 import { COUNTS, TIERS, UNDESCRIBED } from "@/components/docs/generated/dataModel.generated";
 
@@ -18,6 +18,7 @@ function pageForTable(table: string) {
   return ALL_PAGES.find((p) => p.table === table);
 }
 
+// The first sentence describes one record; engineering history stays in source metadata.
 function TableRow({ table, grain, columns }: { table: string; grain: string; columns: number }) {
   const page = pageForTable(table);
   return (
@@ -26,7 +27,7 @@ function TableRow({ table, grain, columns }: { table: string; grain: string; col
         <span className="font-mono text-[12px] font-medium text-foreground">{table}</span>
         <span className="mt-1 block text-[11px] text-muted-foreground">{columns} columns</span>
       </th>
-      <td className="p-3 text-sm leading-relaxed text-muted-foreground"><Prose text={grain} /></td>
+      <td className="p-3 text-sm leading-relaxed text-muted-foreground"><Prose text={grain.split(/(?<=\.)\s/)[0].replace(/\([^)]*(?:§4|WP \d)[^)]*\)/g, "").trim()} /></td>
       <td className="whitespace-nowrap p-3 text-right text-xs">
         {page ? (
           page.status === "live" ? (
@@ -34,7 +35,7 @@ function TableRow({ table, grain, columns }: { table: string; grain: string; col
               {page.title}
             </Link>
           ) : (
-            <span className="text-muted-foreground">WP {page.wp}</span>
+            <span className="text-muted-foreground">Reference planned</span>
           )
         ) : (
           <span className="text-muted-foreground">—</span>
@@ -47,27 +48,29 @@ function TableRow({ table, grain, columns }: { table: string; grain: string; col
 export default function DataModelAtAGlance() {
   return (
     <>
-      <PageTitle lead="Every table in the system, grouped by the tier its data sits in. The map worth keeping open in another tab.">
-        The data model at a glance
-      </PageTitle>
+      <DocPageTitle slug="data-model" />
+      <InShort items={[
+        "This is a reference map of tables: stored lists of records with named fields.",
+        "Use the six tier numbers (stages in your data's life) to distinguish inputs, computed views, decisions and results.",
+        <>New to the tool? Read <DocLink to="how-suresuite-is-designed">the architecture overview</DocLink> first. Return here when you need a field reference.</>,
+      ]} />
 
       <Section id="how-to-read-this" title="How to read this page">
         <P>
           Tiers are the stages data passes through, described on{" "}
           <DocLink to="how-suresuite-is-designed">How SuReSuite is designed</DocLink>. A table's
-          tier tells you what it is for and who writes it: tier 2 is the only tier a person edits,
-          tier 3 is always rebuildable, and tier 5 is stamped and never rewritten.
+          tier tells you what it is for and who writes it: tier 2 holds accepted input facts, tier 3 holds computed views, tier 4 holds decisions, and tier 5 holds version-bound results. The overview explains the rules and their current exceptions.
         </P>
         <Key>
           {COUNTS.tablesInSchema} tables, of which {COUNTS.tablesDescribed} are described by the
-          data contract today — {COUNTS.columnsDescribed} columns in all.
+          data contract (the shared definitions of fields and units) today — {COUNTS.columnsDescribed} columns in all.
         </Key>
         <Callout title="Why the other tables are listed rather than hidden">
           <p>
             A page called “the data model” that showed only the {COUNTS.tablesDescribed} described
             tables would be making a false claim by omission. The remaining{" "}
-            {COUNTS.tablesUndescribed} are listed at the bottom of this page, each under the work
-            package that will document it. You can see what exists, what is explained, and what is
+            {COUNTS.tablesUndescribed} are listed at the bottom of this page while their field
+            descriptions are pending. You can see what exists, what is explained, and what is
             not yet — which is the whole of commitment T3 on{" "}
             <DocLink to="what-happens-to-your-data">What happens to your data</DocLink>.
           </p>
@@ -112,18 +115,17 @@ export default function DataModelAtAGlance() {
         <P>
           These {COUNTS.tablesUndescribed} tables exist in the schema and carry real data. What they
           do not yet have is a written description of every column — the thing the rest of this
-          manual is generated from. Each is listed here under the work package that owes it, and a
-          table that appeared in neither list would fail the build.
+          manual is generated from. Both lists are checked against the actual database, so a
+          table cannot silently disappear from this map.
         </P>
         {UNDESCRIBED.map((group) => (
           <div key={group.wp} className="rounded-sm border border-border bg-card p-4 shadow-xs">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <Badge variant="outline">WP {group.wp}</Badge>
+              <Badge variant="outline">Field descriptions pending</Badge>
               <span className="text-xs text-muted-foreground">
                 {group.tables.length} {group.tables.length === 1 ? "table" : "tables"}
               </span>
             </div>
-            <p className="mb-3 text-sm leading-relaxed text-muted-foreground"><Prose text={group.why} /></p>
             <ul className="flex flex-wrap gap-1.5">
               {group.tables.map((t) => (
                 <li key={t.table}>
@@ -141,9 +143,7 @@ export default function DataModelAtAGlance() {
         <P>
           This page is the map. The detailed index — every column of every described table, with its
           type, unit and constraints — is <DocLink to="all-tables">All tables</DocLink>, and{" "}
-          <DocLink to="field-index">Field index</DocLink> lists every field alphabetically. Both
-          arrive with WP 5.2h. In the meantime the same facts are generated for the team under{" "}
-          <Term>docs/data/tables/</Term>.
+          <DocLink to="field-index">Field index</DocLink> lists every field alphabetically. Start there for a field definition, unit or constraint.
         </P>
       </Section>
 

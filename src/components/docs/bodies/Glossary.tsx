@@ -78,6 +78,22 @@ export default function Glossary() {
         />
       </Section>
 
+      <Section id="data-journey" title="Data from upload to result">
+        <Defs items={[
+          { term: <span id="tier">Tier</span>, def: "A numbered stage in the life of data: 0 landing, 1 staging, 2 accepted inputs, 3 computed views, 4 decisions, 5 results. These are data responsibilities, not supplier tiers." },
+          { term: <span id="staged">Staged / staging</span>, def: "Rows parsed and checked for review, but not yet accepted as the project's working inputs." },
+          { term: <span id="promotion">Promotion</span>, def: "Applying reviewed, eligible rows to the accepted project inputs. Uploading alone is not acceptance." },
+          { term: <span id="natural-key">Natural key</span>, def: "The combination of business identifiers that distinguishes one record. For a single-level BOM line, the product/material pair identifies which requirement a re-upload changes." },
+          { term: <span id="canonical">Canonical</span>, def: "The accepted working data, with consistent units and identifiers, from which views and simulation inputs are prepared." },
+          { term: <span id="derived">Derived</span>, def: "Calculated from inputs rather than supplied directly. A view or measurement should be recomputed after the inputs it uses change." },
+          { term: <span id="frozen">Frozen / snapshot</span>, def: "A saved copy fixed for a version or run. Later project edits do not silently replace that run's inputs." },
+          { term: <span id="provenance">Provenance</span>, def: "The record of where a value came from: supplied rows, a calculation, a substitution or a default, and the versions used where available." },
+          { term: <span id="policy">Policy</span>, def: "A rule for operating the chain, such as when to reorder, how much to hold, or which supplier to use. Supported policies can be compared in simulations." },
+          { term: <span id="hash">Hash</span>, def: "A content fingerprint used to identify a version. It does not supply the data needed to reproduce that version." },
+          { term: <span id="seed">Seed</span>, def: "A setting used to repeat random draws. Reproduction also needs the same inputs, policies, scenario, engine and run settings." },
+        ]} />
+      </Section>
+
       <Section id="platform" title="Platform and IT">
         <Defs
           items={[

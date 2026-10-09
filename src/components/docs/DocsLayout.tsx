@@ -22,7 +22,7 @@ import {
   PanelLeftClose, PanelLeftOpen, BookText,
 } from "lucide-react";
 import {
-  ALL_PAGES, DEFAULT_SLUG, DOC_GROUPS, getPage, prevNext, searchPages,
+  ALL_PAGES, DEFAULT_SLUG, DOC_GROUPS, DOC_SEARCH_FALLBACK, getPage, prevNext, searchPages,
 } from "@/components/docs/registry";
 
 const FONT_STEPS = [0.92, 1, 1.12];
@@ -164,7 +164,18 @@ function DocsSearch() {
       {open && q && (
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md overflow-hidden">
           {results.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-muted-foreground">No matches.</div>
+            <div className="px-3 py-3 text-sm text-muted-foreground">
+              <p>No matches. Try:</p>
+              <div className="mt-1 flex flex-wrap gap-x-2">
+                {DOC_SEARCH_FALLBACK.filter(slug => {
+                  const page = getPage(slug);
+                  return page && docs.canReadSection(page.sectionKey);
+                }).map(slug => <button key={slug} type="button" className="min-h-11 text-left text-primary hover:underline md:min-h-0"
+                  onMouseDown={e => e.preventDefault()} onClick={() => go(slug)}>{getPage(slug)?.title}</button>)}
+              </div>
+              {DOC_SEARCH_FALLBACK.every(slug => !docs.canReadSection(getPage(slug)!.sectionKey)) &&
+                <Link to="/docs" className="inline-flex min-h-11 items-center text-primary hover:underline" onClick={() => setOpen(false)}>Browse the overview</Link>}
+            </div>
           ) : (
             <ul className="max-h-80 overflow-auto py-1">
               {results.map((r) => (
@@ -398,11 +409,18 @@ export default function DocsLayout() {
     localStorage.setItem(FONT_KEY, String(n));
   }
 
-  // Scroll to top on page change.
+  // Honor deep links such as the home card's #engineer after the body renders.
   useEffect(() => {
+    if (location.hash) {
+      let id = location.hash.slice(1);
+      try { id = decodeURIComponent(id); } catch { /* Keep a malformed fragment harmless. */ }
+      const target = document.getElementById(id);
+      if (target && contentRef.current?.contains(target)) target.scrollIntoView({ block: "start" });
+      return;
+    }
     contentRef.current?.scrollTo?.({ top: 0 });
     window.scrollTo({ top: 0 });
-  }, [location.pathname]);
+  }, [location.pathname, location.hash, headings]);
 
   // Empty on the front door. `page` is DEFAULT_SLUG's there, and its related
   // list is a statement about THAT article — printing it under "Related

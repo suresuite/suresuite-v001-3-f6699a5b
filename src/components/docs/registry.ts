@@ -118,23 +118,14 @@ export const DOC_GROUPS: DocGroup[] = [
         slug: "how-suresuite-is-designed",
         title: "How SuReSuite is designed",
         summary: "The six tiers as the journey your data takes, and the three laws that govern it.",
-        keywords: "architecture tiers design laws staging canonical derived decisions results governance",
+        keywords: "architecture tiers design laws staging canonical derived decisions results governance engineer setup npm",
         related: ["how-your-data-flows", "data-model", "system-boundary"],
-      },
-      {
-        ...live,
-        slug: "data-model",
-        title: "The data model at a glance",
-        summary: "Every table in the system on one page, grouped by tier.",
-        keywords: "tables schema data model tiers reference map contract coverage",
-        related: ["how-suresuite-is-designed", "all-tables", "inbound-logistics"],
-        source: "contract",
       },
       {
         ...live,
         slug: "how-your-data-flows",
         title: "How your data flows",
-        summary: "Upload, check, promote, compute, decide, simulate, stamp — one paragraph per hop.",
+        summary: "Upload, check, accept, compute, decide, simulate, stamp — follow one example row.",
         keywords: "flow pipeline upload validate promote compute simulate results lifecycle",
         related: ["how-suresuite-is-designed", "uploading-data", "what-happens-to-your-data"],
       },
@@ -142,7 +133,7 @@ export const DOC_GROUPS: DocGroup[] = [
         ...live,
         slug: "what-happens-to-your-data",
         title: "What happens to your data",
-        summary: "The five commitments in plain language — and what each one means you can check.",
+        summary: "Five transparency commitments: sources, substitutions, limits, repeatable results and checked definitions.",
         keywords: "transparency commitments privacy substitution provenance export delete ownership",
         related: ["known-limits", "how-your-data-flows", "who-can-see-your-data"],
       },
@@ -158,9 +149,18 @@ export const DOC_GROUPS: DocGroup[] = [
         ...live,
         slug: "known-limits",
         title: "Known limits",
-        summary: "What this tool does not model, stated before you rely on it.",
+        summary: "The model, data and access limits to check before using a result for a decision.",
         keywords: "limits limitations caveats steady state graph hash price volatility blind spots",
         related: ["what-happens-to-your-data", "how-suresuite-is-designed", "verify-your-inputs"],
+      },
+      {
+        ...live,
+        slug: "data-model",
+        title: "The data model at a glance",
+        summary: "Reference: every table in the system, grouped by the six numbered data tiers.",
+        keywords: "tables schema data model tiers reference map contract coverage",
+        related: ["how-suresuite-is-designed", "all-tables", "inbound-logistics"],
+        source: "contract",
       },
     ],
   },
@@ -175,7 +175,7 @@ export const DOC_GROUPS: DocGroup[] = [
         slug: "your-first-project",
         title: "Your first project",
         summary: "End to end: create, upload, verify, set policies, simulate, read results.",
-        keywords: "getting started tutorial walkthrough first project quickstart steps",
+        keywords: "getting started tutorial walkthrough first project quickstart steps start begin example sample demo tour data",
         related: ["projects", "uploading-data", "verify-your-inputs"],
       },
       {
@@ -236,7 +236,7 @@ export const DOC_GROUPS: DocGroup[] = [
     group: "Policies",
     blurb: "The decisions you make about how the chain should behave.",
     pages: [
-      { ...live, slug: "how-policies-work", title: "How policies work", summary: "Stages, scope, and defaults against overrides.", keywords: "policies stages scope defaults overrides bundle patch" },
+      { ...live, slug: "how-policies-work", title: "How policies work", summary: "Stages, scope, and defaults against overrides.", keywords: "policy policies stages scope defaults overrides bundle patch" },
       { ...live, slug: "how-planning-works", title: "How planning works", summary: "From customer demand to planned production, material orders and per-row fulfillment.", keywords: "planning demand forecast planned production capacity mrp material requirements fg policy base stock min max days of cover backorder allocation" },
       { ...live, slug: "supplier-stage", title: "Supplier stage", summary: "Every column of the supplier policy grid.", keywords: "supplier stage policy grid columns sourcing backup expediting", source: "contract" },
       { ...live, slug: "plant-stage", title: "Plant stage", summary: "Every column of the plant policy grid.", keywords: "plant stage policy grid columns production capacity overtime inventory", source: "contract" },
@@ -347,7 +347,7 @@ export const DOC_GROUPS: DocGroup[] = [
       { ...live, slug: "who-can-see-your-data", title: "Who can see your data", summary: "The honest answer, including the parts that are not you.", keywords: "privacy visibility access rls isolation support staff" },
       { ...live, slug: "audit-log", title: "Audit log", summary: "What is recorded, and what is not yet.", keywords: "audit log admin actions history record actor" },
       { ...live, slug: "admin-screens", title: "Admin screens", summary: "The administrative surfaces and what each controls.", keywords: "admin users roles organizations projects models usage screens" },
-      { ...live, slug: "account-and-password", title: "Account & password", summary: "Managing your own sign-in.", keywords: "account password profile sign in credentials" },
+      { ...live, slug: "account-and-password", title: "Account & password", summary: "Managing your own sign-in.", keywords: "account password profile sign in login log credentials" },
     ],
   },
   {
@@ -432,22 +432,25 @@ export function prevNext(slug: string, canSee: (sectionKey: string) => boolean =
   return { prev, next };
 }
 
-/**
- * Search the whole tree, live pages first.
- *
- * Planned pages are deliberately searchable: someone looking for "fill rate"
- * is better served by "KPIs & the Resilience Index — documented in WP 5.2d"
- * than by "No matches", which reads as "this product has no KPIs".
- */
+/** Reader questions use word starts, never arbitrary substrings ("in" is not "design"). */
+const SEARCH_STOP_WORDS = new Set(["how", "do", "i", "a", "an", "is", "what", "the", "to"]);
+const words = (text: string) => (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).map(w => w === "policies" ? "policy" : w);
+
+export const DOC_SEARCH_FALLBACK = ["your-first-project", "glossary", "questions"] as const;
+
 export function searchPages(query: string, canSee: (sectionKey: string) => boolean = () => true) {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  const terms = q.split(/\s+/);
-  return ALL_PAGES.filter((p) => {
-    if (!canSee(p.sectionKey)) return false;
-    const hay = `${p.title} ${p.group} ${p.summary ?? ""} ${p.keywords ?? ""}`.toLowerCase();
-    return terms.every((term) => hay.includes(term));
-  })
-    .sort((a, b) => Number(b.status === "live") - Number(a.status === "live"))
-    .slice(0, 8);
+  const terms = [...new Set(words(query).filter(t => !SEARCH_STOP_WORDS.has(t)))];
+  if (!terms.length) return [];
+  const matches = (term: string, tokens: string[]) => tokens.some(w => w.startsWith(term));
+  return ALL_PAGES.filter(p => canSee(p.sectionKey)).map(page => {
+    const title = words(page.title);
+    const keywords = words(page.keywords ?? "");
+    const rest = words(`${page.summary ?? ""} ${page.group}`);
+    if (!terms.every(t => matches(t, [...title, ...keywords, ...rest]))) return null;
+    const fieldBonus = terms.every(t => matches(t, title)) ? 1000 : terms.every(t => matches(t, keywords)) ? 500 : 0;
+    const score = fieldBonus + terms.reduce((n, t) => n + (matches(t, title) ? 100 : matches(t, keywords) ? 10 : 1), 0);
+    return { page, score };
+  }).filter((hit): hit is { page: (typeof ALL_PAGES)[number]; score: number } => hit !== null)
+    .sort((a, b) => Number(b.page.status === "live") - Number(a.page.status === "live") || b.score - a.score)
+    .slice(0, 8).map(hit => hit.page);
 }
