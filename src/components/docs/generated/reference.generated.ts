@@ -13874,6 +13874,21 @@ export const REFERENCE_TABLES: RefTable[] = [
         "evidence": "src/components/MapView.tsx:355"
       },
       {
+        "page": "FirmLevelNetwork.tsx",
+        "via": "rpc get_critical_node_stats (MLPrediction, §4 D307)",
+        "evidence": "src/components/MLPrediction.tsx:93"
+      },
+      {
+        "page": "ProcessLevelNetwork.tsx",
+        "via": "rpc get_critical_node_stats (MLPrediction, §4 D307)",
+        "evidence": "src/components/MLPrediction.tsx:93"
+      },
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc get_critical_node_stats (MLPrediction, §4 D307)",
+        "evidence": "src/components/MLPrediction.tsx:93"
+      },
+      {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
         "evidence": "src/components/trust/useProjectFreshness.ts:28"
@@ -14146,7 +14161,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "ANALYSIS OUTPUT — the critical-node prediction. NOTE that the LIVE writer of this prediction is `analysis_mark_critical_nodes`, which writes `supply_chain_data`, not this table; these columns are the older destination and §15 has never measured whether anything still fills them.",
+        "meaning": "ANALYSIS OUTPUT — whether this node is a NEXUS node: losing it alone puts at least the run's threshold (default 10 %) of finished-goods demand at risk. §4 D307 made this the live destination: one value per node, written by `analysis_apply_critical_nodes` from a `critical_nodes` run, and NULL on a node the latest run did not score. Before D307 the prediction was written onto `supply_chain_data` lane rows, which every rebuild deletes (D196).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -14160,7 +14175,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",
-        "computedBy": "predict-critical-nodes"
+        "computedBy": "analysis_apply_critical_nodes (called by predict-critical-nodes)"
       },
       {
         "name": "critical_node_score",
@@ -14170,7 +14185,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "ANALYSIS OUTPUT — the prediction score. See `is_critical_node` on which destination is live.",
+        "meaning": "ANALYSIS OUTPUT — the node's DEMAND AT RISK: the share of finished-goods demand (by weekly volume) that cannot be served if this node alone is lost, with no rerouting and no stock. In [0, 1]. Computed by `supabase/functions/_shared/criticalNodes.ts` (§4 D307).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -14184,7 +14199,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",
-        "computedBy": "predict-critical-nodes"
+        "computedBy": "analysis_apply_critical_nodes (called by predict-critical-nodes)"
       },
       {
         "name": "prediction_timestamp",
@@ -14194,7 +14209,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "When the prediction columns were last written. Superseded by `computed_at`.",
+        "meaning": "When the prediction columns were last written. Superseded by `computed_at`; both are set by `analysis_apply_critical_nodes`.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -14208,7 +14223,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": "predict-critical-nodes"
+        "computedBy": "analysis_apply_critical_nodes (called by predict-critical-nodes)"
       },
       {
         "name": "created_by",
@@ -14328,7 +14343,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": "analysis_mark_critical_nodes"
+        "computedBy": "analysis_apply_critical_nodes (called by predict-critical-nodes)"
       },
       {
         "name": "computed_at",
@@ -14352,7 +14367,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": "analysis_mark_critical_nodes"
+        "computedBy": "analysis_apply_critical_nodes (called by predict-critical-nodes)"
       },
       {
         "name": "echelon",
@@ -27224,16 +27239,6 @@ export const REFERENCE_TABLES: RefTable[] = [
         "evidence": "src/pages/DataManager.tsx:661"
       },
       {
-        "page": "FirmLevelNetwork.tsx",
-        "via": "rpc get_prediction_stats",
-        "evidence": "src/components/MLPrediction.tsx:54"
-      },
-      {
-        "page": "ProcessLevelNetwork.tsx",
-        "via": "rpc get_prediction_stats",
-        "evidence": "src/components/MLPrediction.tsx:54"
-      },
-      {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
         "evidence": "src/components/trust/useProjectFreshness.ts:28"
@@ -27487,7 +27492,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Whether an analyzer flagged this edge's node as critical. An analysis result stored on an entity row — exactly the smearing D19 names.",
+        "meaning": "DEPRECATED (§4 D307). Whether the old lane-row scorer flagged this edge's source node as critical. The live answer is `node_list.is_critical_node`, one per node, which a lane rebuild does not delete.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -27501,7 +27506,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": "predict-critical-nodes"
+        "computedBy": "analysis_mark_critical_nodes"
       },
       {
         "name": "critical_node_score",
@@ -27511,7 +27516,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The score behind `is_critical_node`.",
+        "meaning": "The score behind `is_critical_node`. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -27525,7 +27530,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",
-        "computedBy": "predict-critical-nodes"
+        "computedBy": "analysis_mark_critical_nodes"
       },
       {
         "name": "prediction_timestamp",
@@ -27535,7 +27540,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash.",
+        "meaning": "When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -27549,7 +27554,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": "predict-critical-nodes"
+        "computedBy": "analysis_mark_critical_nodes"
       },
       {
         "name": "uploaded_by",
@@ -27727,7 +27732,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+        "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -27751,7 +27756,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12).",
+        "meaning": "WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12). DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.",
         "primaryKey": false,
         "unique": false,
         "references": null,

@@ -27,16 +27,6 @@ surfaces:
     grain: table
     evidence: "src/pages/DataManager.tsx:661"
     confirmed: true
-  - page: "FirmLevelNetwork.tsx"
-    via: "rpc get_prediction_stats"
-    grain: table
-    evidence: "src/components/MLPrediction.tsx:54"
-    confirmed: true
-  - page: "ProcessLevelNetwork.tsx"
-    via: "rpc get_prediction_stats"
-    grain: table
-    evidence: "src/components/MLPrediction.tsx:54"
-    confirmed: true
   - page: "ProductLevelNetwork.tsx"
     via: "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)"
     grain: table
@@ -266,10 +256,11 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      Whether an analyzer flagged this edge's node as critical. An analysis result
-      stored on an entity row — exactly the smearing D19 names.
+      DEPRECATED (§4 D307). Whether the old lane-row scorer flagged this edge's
+      source node as critical. The live answer is `node_list.is_critical_node`,
+      one per node, which a lane rebuild does not delete.
     grain: metadata
-    computed_by: "predict-critical-nodes"
+    computed_by: "analysis_mark_critical_nodes"
     engine:
       consumed_by: null
       transform: null
@@ -292,8 +283,9 @@ fields:
     unit_source: fixed
     meaning: >-
       The score behind `is_critical_node`.
+      DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.
     grain: level
-    computed_by: "predict-critical-nodes"
+    computed_by: "analysis_mark_critical_nodes"
     engine:
       consumed_by: null
       transform: null
@@ -314,8 +306,9 @@ fields:
     meaning: >-
       When the criticality prediction was made. The closest thing this table has
       to a version stamp, and it names no model and no input hash.
+      DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.
     grain: metadata
-    computed_by: "predict-critical-nodes"
+    computed_by: "analysis_mark_critical_nodes"
     engine:
       consumed_by: null
       transform: null
@@ -486,6 +479,7 @@ fields:
       two-argument `analysis_mark_critical_nodes`, which cannot name its run;
       NULL is the honest record and not a silent default (`declared-fallback`, I6).
       This is the column invariant `input-hash` (I5) is about.
+      DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.
     grain: metadata
     computed_by: "analysis_mark_critical_nodes"
     engine:
@@ -508,6 +502,7 @@ fields:
       provenance, not staleness: staleness is `computed_from_hash <>
       current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is
       precisely what that rule replaces (§4 D12).
+      DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.
     grain: metadata
     computed_by: "analysis_mark_critical_nodes"
     engine:

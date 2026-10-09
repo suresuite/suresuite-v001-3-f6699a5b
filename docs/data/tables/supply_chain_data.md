@@ -54,8 +54,6 @@ Written by the `combine-project` edge function, never by a page. Invariant I2: p
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DataManager.tsx` | rpc combine_project_into_supply_chain | `src/pages/DataManager.tsx:661` | yes |
-| `FirmLevelNetwork.tsx` | rpc get_prediction_stats | `src/components/MLPrediction.tsx:54` | yes |
-| `ProcessLevelNetwork.tsx` | rpc get_prediction_stats | `src/components/MLPrediction.tsx:54` | yes |
 | `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:28` | yes |
 | `ProjectPolicies.tsx` | rpc assign_material_supplier | `src/components/policies/StagePolicyTable.tsx:406` | yes |
 | `SimulationLab.tsx` | rpc assign_material_supplier | `src/components/sim/PreRunValidationPanel.tsx:78` | yes |
@@ -82,9 +80,9 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `sourcing_ratio` | — | `numeric(16,6)` | `fraction of the destination's inbound flow` | — | This edge's share of everything flowing into its destination. A share, so the D2 unit error did not cancel: it decides which supplier the platform calls primary. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the edge was first computed. Server-set. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the edge was last recomputed. Server-set. |
-| `is_critical_node` | — | `boolean` | — | — | Whether an analyzer flagged this edge's node as critical. An analysis result stored on an entity row — exactly the smearing D19 names. |
-| `critical_node_score` | — | `numeric(5,4)` | `score in [0, 1]` | — | The score behind `is_critical_node`. |
-| `prediction_timestamp` | — | `timestamp with time zone` | — | — | When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash. |
+| `is_critical_node` | — | `boolean` | — | — | DEPRECATED (§4 D307). Whether the old lane-row scorer flagged this edge's source node as critical. The live answer is `node_list.is_critical_node`, one per node, which a lane rebuild does not delete. |
+| `critical_node_score` | — | `numeric(5,4)` | `score in [0, 1]` | — | The score behind `is_critical_node`. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys. |
+| `prediction_timestamp` | — | `timestamp with time zone` | — | — | When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys. |
 | `uploaded_by` | — | `uuid` | — | — | The user whose upload produced this edge. Referenced by the RLS policies. NULL once that account is deleted (`ON DELETE SET NULL` since `20260930000007`; before it the key had no ON DELETE rule and refused the delete — §4 D213). |
 | `organization` | — | `text` | — | — | The owning organization, as a NAME with a `default_org` default. A displayable string used as an authorization key — the second half of G1, and the identity D13 says is compared by string. |
 | `project_id` | — | `uuid` | — | — | The project this edge belongs to. NULLABLE here, unlike every lane table — a row with no project is reachable only through the organization/uploader policies. |
@@ -92,8 +90,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `is_zero_flow_filtered` | — | `boolean` | — | — | Whether this edge was hidden for carrying no flow in either direction. |
 | `zero_flow_filter_applied_at` | — | `timestamp with time zone` | — | — | When the zero-flow filter last ran over this edge. |
 | `zero_flow_filter_reason` | — | `text` | — | — | Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow. |
-| `computed_from_hash` | — | `text` | — | — | WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about. |
-| `computed_at` | — | `timestamp with time zone` | — | — | WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12). |
+| `computed_from_hash` | — | `text` | — | — | WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys. |
+| `computed_at` | — | `timestamp with time zone` | — | — | WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12). DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys. |
 
 ## Each column in full
 
@@ -235,7 +233,7 @@ When the edge was last recomputed. Server-set.
 
 ### `is_critical_node`
 
-Whether an analyzer flagged this edge's node as critical. An analysis result stored on an entity row — exactly the smearing D19 names.
+DEPRECATED (§4 D307). Whether the old lane-row scorer flagged this edge's source node as critical. The live answer is `node_list.is_critical_node`, one per node, which a lane rebuild does not delete.
 
 | | |
 |---|---|
@@ -251,7 +249,7 @@ Whether an analyzer flagged this edge's node as critical. An analysis result sto
 
 ### `critical_node_score`
 
-The score behind `is_critical_node`.
+The score behind `is_critical_node`. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.
 
 | | |
 |---|---|
@@ -267,7 +265,7 @@ The score behind `is_critical_node`.
 
 ### `prediction_timestamp`
 
-When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash.
+When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.
 
 | | |
 |---|---|
@@ -393,7 +391,7 @@ Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow.
 
 ### `computed_from_hash`
 
-WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.
+WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.
 
 | | |
 |---|---|
@@ -407,7 +405,7 @@ WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical
 
 ### `computed_at`
 
-WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12).
+WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12). DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.
 
 | | |
 |---|---|
@@ -437,6 +435,6 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 
 ---
 
-*Generated from data contract `96b966c3a2b0`, engine `0.8.0`,
+*Generated from data contract `4818369024a0`, engine `0.8.0`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

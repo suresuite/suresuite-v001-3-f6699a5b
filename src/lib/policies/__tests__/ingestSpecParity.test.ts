@@ -414,8 +414,10 @@ describe("D36's remaining three write through an RPC that names the actor", () =
   const MOVED: Array<[string, string, string[], RegExp]> = [
     ["combine-project", "combine_project_into_supply_chain",
      ["supply_chain_data", "supply_chain_data_multi_tier"], /p_user_id:/],
-    ["predict-critical-nodes", "analysis_mark_critical_nodes",
-     ["supply_chain_data"], /_actor_user_id:/],
+    // §4 D307 — the mirror moved from lane rows to `node_list`, through a new RPC
+    // that takes the actor the same way; neither table may be written directly.
+    ["predict-critical-nodes", "analysis_apply_critical_nodes",
+     ["supply_chain_data", "node_list"], /_actor_user_id:/],
     ["erp-sync-orbit-mrp", "mrp_apply_staged_products", ["products"], /_actor_user_id:/],
   ];
 

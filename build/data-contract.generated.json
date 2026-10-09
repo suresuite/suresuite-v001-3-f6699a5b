@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 407,
-      "migrations_applied": 399,
-      "last_migration": "20261009000002_deep_tier_completion_per_statement.sql"
+      "migrations_found": 408,
+      "migrations_applied": 400,
+      "last_migration": "20261009000003_nexus_demand_at_risk.sql"
     },
     "sidecars": 77,
     "registry": {
@@ -21241,6 +21241,27 @@
           "confirmed": true
         },
         {
+          "page": "FirmLevelNetwork.tsx",
+          "via": "rpc get_critical_node_stats (MLPrediction, §4 D307)",
+          "grain": "table",
+          "evidence": "src/components/MLPrediction.tsx:93",
+          "confirmed": true
+        },
+        {
+          "page": "ProcessLevelNetwork.tsx",
+          "via": "rpc get_critical_node_stats (MLPrediction, §4 D307)",
+          "grain": "table",
+          "evidence": "src/components/MLPrediction.tsx:93",
+          "confirmed": true
+        },
+        {
+          "page": "ProductLevelNetwork.tsx",
+          "via": "rpc get_critical_node_stats (MLPrediction, §4 D307)",
+          "grain": "table",
+          "evidence": "src/components/MLPrediction.tsx:93",
+          "confirmed": true
+        },
+        {
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
@@ -21717,9 +21738,9 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "ANALYSIS OUTPUT — the critical-node prediction. NOTE that the LIVE writer of this prediction is `analysis_mark_critical_nodes`, which writes `supply_chain_data`, not this table; these columns are the older destination and §15 has never measured whether anything still fills them.",
+          "meaning": "ANALYSIS OUTPUT — whether this node is a NEXUS node: losing it alone puts at least the run's threshold (default 10 %) of finished-goods demand at risk. §4 D307 made this the live destination: one value per node, written by `analysis_apply_critical_nodes` from a `critical_nodes` run, and NULL on a node the latest run did not score. Before D307 the prediction was written onto `supply_chain_data` lane rows, which every rebuild deletes (D196).",
           "grain": "level",
-          "computed_by": "predict-critical-nodes",
+          "computed_by": "analysis_apply_critical_nodes (called by predict-critical-nodes)",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -21749,9 +21770,9 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "ANALYSIS OUTPUT — the prediction score. See `is_critical_node` on which destination is live.",
+          "meaning": "ANALYSIS OUTPUT — the node's DEMAND AT RISK: the share of finished-goods demand (by weekly volume) that cannot be served if this node alone is lost, with no rerouting and no stock. In [0, 1]. Computed by `supabase/functions/_shared/criticalNodes.ts` (§4 D307).",
           "grain": "level",
-          "computed_by": "predict-critical-nodes",
+          "computed_by": "analysis_apply_critical_nodes (called by predict-critical-nodes)",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -21781,9 +21802,9 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "When the prediction columns were last written. Superseded by `computed_at`.",
+          "meaning": "When the prediction columns were last written. Superseded by `computed_at`; both are set by `analysis_apply_critical_nodes`.",
           "grain": "metadata",
-          "computed_by": "predict-critical-nodes",
+          "computed_by": "analysis_apply_critical_nodes (called by predict-critical-nodes)",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -21943,7 +21964,7 @@
           "normalize_at_promotion": null,
           "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that wrote this row's computed columns — the world the number came from. NULL means \"written before WP 4.3, provenance unknown\", which is a reportable state and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
           "grain": "metadata",
-          "computed_by": "analysis_mark_critical_nodes",
+          "computed_by": "analysis_apply_critical_nodes (called by predict-critical-nodes)",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -21975,7 +21996,7 @@
           "normalize_at_promotion": null,
           "meaning": "WP 4.3 · when the run that wrote the computed columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, which is WP 4.4's one rule, and a timestamp comparison is the thing that rule replaces (§4 D12).",
           "grain": "metadata",
-          "computed_by": "analysis_mark_critical_nodes",
+          "computed_by": "analysis_apply_critical_nodes (called by predict-critical-nodes)",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -41524,20 +41545,6 @@
           "confirmed": true
         },
         {
-          "page": "FirmLevelNetwork.tsx",
-          "via": "rpc get_prediction_stats",
-          "grain": "table",
-          "evidence": "src/components/MLPrediction.tsx:54",
-          "confirmed": true
-        },
-        {
-          "page": "ProcessLevelNetwork.tsx",
-          "via": "rpc get_prediction_stats",
-          "grain": "table",
-          "evidence": "src/components/MLPrediction.tsx:54",
-          "confirmed": true
-        },
-        {
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
@@ -42077,9 +42084,9 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "Whether an analyzer flagged this edge's node as critical. An analysis result stored on an entity row — exactly the smearing D19 names.",
+          "meaning": "DEPRECATED (§4 D307). Whether the old lane-row scorer flagged this edge's source node as critical. The live answer is `node_list.is_critical_node`, one per node, which a lane rebuild does not delete.",
           "grain": "metadata",
-          "computed_by": "predict-critical-nodes",
+          "computed_by": "analysis_mark_critical_nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -42109,9 +42116,9 @@
           "unit_source": "fixed",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The score behind `is_critical_node`.",
+          "meaning": "The score behind `is_critical_node`. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.",
           "grain": "level",
-          "computed_by": "predict-critical-nodes",
+          "computed_by": "analysis_mark_critical_nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -42141,9 +42148,9 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash.",
+          "meaning": "When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.",
           "grain": "metadata",
-          "computed_by": "predict-critical-nodes",
+          "computed_by": "analysis_mark_critical_nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -42397,7 +42404,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+          "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about. DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.",
           "grain": "metadata",
           "computed_by": "analysis_mark_critical_nodes",
           "engine": {
@@ -42429,7 +42436,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12).",
+          "meaning": "WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12). DEPRECATED (§4 D307): the live destination is `node_list`, one row per node; nothing in the repository writes this lane-row column, and only the published pre-D307 build of `predict-critical-nodes` does until it redeploys.",
           "grain": "metadata",
           "computed_by": "analysis_mark_critical_nodes",
           "engine": {
@@ -45102,5 +45109,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "96b966c3a2b0"
+  "contract_version": "4818369024a0"
 }
