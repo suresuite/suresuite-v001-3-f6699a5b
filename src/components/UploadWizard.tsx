@@ -244,6 +244,10 @@ const UploadWizard = ({
   const [file, setFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<DataRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
+  // Row findings at level `warn`: the row lands, and the person is told why it
+  // is worth a second look (a zero `unit_price` is read by the engine as 1.0).
+  // Shown beside the errors, never blocking the upload the way an error does.
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   // The parse is a network round trip now, so the button has to say so.
   const [isParsing, setIsParsing] = useState(false);
@@ -710,6 +714,7 @@ const UploadWizard = ({
 
     setIsParsing(true);
     setLastRun(null);
+    setWarnings([]);
     try {
       if (selectedDataset === 'deep_tier' && deepTierFormat === 'json') {
         // JSON, not CSV. `JSON.parse` is a real parser and was never the defect;
@@ -724,6 +729,7 @@ const UploadWizard = ({
         setFile(uploadedFile);
         setCsvData([...nodes, ...edges] as DataRow[]);
         setErrors([]);
+        setWarnings([]);
         return;
       }
 
@@ -746,6 +752,7 @@ const UploadWizard = ({
         // second copy of the rules, which is the defect the contract exists to
         // end — so the findings are shown as they came back.
         setErrors(findings.filter((f) => f.level === 'error').map((f) => f.message));
+        setWarnings(findings.filter((f) => f.level === 'warn' && f.row != null).map((f) => f.message));
       } else {
         setErrors(await validateData(data, targetTemplate));
       }
@@ -1203,6 +1210,7 @@ const UploadWizard = ({
         setFile(null);
         setCsvData([]);
         setErrors([]);
+        setWarnings([]);
         // NOTHING HAS BEEN WRITTEN YET, so the toast must not say it has. The
         // old one said "N records uploaded" the moment the bytes arrived, which
         // was true while the landing promoted and would be a lie now.
@@ -1394,6 +1402,7 @@ const UploadWizard = ({
       setFile(null);
       setCsvData([]);
       setErrors([]);
+      setWarnings([]);
       // Clear deep tier data as well
       setNodesFile(null);
       setEdgesFile(null);
@@ -1471,6 +1480,7 @@ const UploadWizard = ({
                 onClick={() => {
                   setFile(null);
                   setErrors([]);
+                  setWarnings([]);
                   // Clear deep tier states as well
                   setNodesFile(null);
                   setEdgesFile(null);
@@ -1571,6 +1581,7 @@ const UploadWizard = ({
                       setFile(null);
                       setCsvData([]);
                       setErrors([]);
+                      setWarnings([]);
                     }}
                     className="flex gap-6"
                   >
@@ -1616,6 +1627,7 @@ const UploadWizard = ({
                       setFile(null);
                       setCsvData([]);
                       setErrors([]);
+                      setWarnings([]);
                       setNodesFile(null);
                       setEdgesFile(null);
                       setNodesData([]);
@@ -1874,6 +1886,20 @@ const UploadWizard = ({
                 )
               )}
             </div>
+
+            {warnings.length > 0 && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className={SMALL_TXT}>
+                  <div className="font-medium">
+                    {warnings.length} warning(s) — these rows will still be uploaded
+                  </div>
+                  {warnings.map((warning, index) => (
+                    <div key={index}>{warning}</div>
+                  ))}
+                </AlertDescription>
+              </Alert>
+            )}
 
             {errors.length > 0 && (
               <Alert variant="destructive">

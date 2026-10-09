@@ -15,6 +15,8 @@ export type IngestRule = {
   min?: number;
   exclusive_min?: number;
   max?: number;
+  /** In bounds but at or below this: lands, with a row-level `warn` finding. */
+  warn_at_or_below?: number;
   values?: string[];
   /** What an empty cell means: land no value, or reject the row. */
   blank?: 'null' | 'reject';
@@ -361,15 +363,15 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
       {
         "column": "volume",
         "csvHeader": "volume",
-        "required": true,
+        "required": false,
         "type": "numeric",
         "nullable": true,
         "rule": {
           "kind": "numeric",
           "min": 0,
-          "blank": "reject"
+          "blank": "null"
         },
-        "validate": "numeric >= 0; blank becomes NULL, not 0 (D7)"
+        "validate": "numeric >= 0; a blank cell lands NULL, never 0 (D7) — the arc carries no supply share"
       },
       {
         "column": "time_unit",
@@ -399,15 +401,16 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
       {
         "column": "unit_price",
         "csvHeader": "unit_price",
-        "required": true,
+        "required": false,
         "type": "numeric",
         "nullable": true,
         "rule": {
           "kind": "numeric",
-          "exclusive_min": 0,
-          "blank": "reject"
+          "min": 0,
+          "warn_at_or_below": 0,
+          "blank": "null"
         },
-        "validate": "numeric > 0"
+        "validate": "numeric >= 0; zero lands WITH A WARNING (the engine reads a zero price as 1.0, with a MappingWarning); a blank cell lands NULL and the same 1.0 default stands in"
       },
       {
         "column": "lead_time_unit",

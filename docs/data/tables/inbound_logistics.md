@@ -98,10 +98,10 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `plant_name` | — | `text` | — | — | The focal plant receiving the material, by NAME. A displayable string used as a join key — the thing invariant G1 forbids; WP 2.1/3.3 replace it with a uuid. |
 | `supplier_id` | `supplier_id` | `text` | — | **yes** | The supplier's code as the user's own systems spell it. |
 | `material_id` | `material_id` | `text` | — | **yes** | The material's code as the user's own systems spell it. Joins to materials and the BOM. |
-| `volume` | `volume` | `numeric` | `units per time_unit` *(from `time_unit`)* | **yes** | How much of this material the user buys from this supplier over one `time_unit`. A RATE, not a quantity — two rows are only comparable after both are converted to the same period. |
+| `volume` | `volume` | `numeric` | `units per time_unit` *(from `time_unit`)* | no | How much of this material the user buys from this supplier over one `time_unit`. A RATE, not a quantity — two rows are only comparable after both are converted to the same period. |
 | `time_unit` | `time_unit` | `text` | — | no | The period `volume` is quoted over — day, week, month, quarter, year. It describes the VOLUME only. It says nothing about `lead_time`. |
 | `lead_time` | `lead_time` | `numeric` | `weeks` *(from `lead_time_unit`)* | **yes** | How long this supplier takes to deliver this material. The contract fixes the unit at WEEKS; `time_unit` does not apply to it and never has. |
-| `unit_price` | `unit_price` | `numeric` | `currency per unit of material` | **yes** | What one unit of this material costs from this supplier, delivered. |
+| `unit_price` | `unit_price` | `numeric` | `currency per unit of material` | no | What one unit of this material costs from this supplier, delivered. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the row was inserted. Server-set. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row last changed. Server-set. |
 | `lead_time_unit` | `lead_time_unit` | `text` | — | no | The period `lead_time` is quoted in — day, week, month, quarter or year. Blank means WEEKS, which is what the engine assumed before this column existed. Distinct from `time_unit`, which is the period `volume` is quoted over and has never applied to the lead time. |
@@ -209,8 +209,15 @@ How much of this material the user buys from this supplier over one `time_unit`.
 | Read by the engine | `project_map.py::_map_supply -> supply-share weighting` |
 | Transform | rateToWeekly(volume, time_unit) — normalized to weeks |
 | When NULL, the engine uses | 0 (the arc carries no share) |
-| Validated at ingest | numeric >= 0; blank becomes NULL, not 0 (D7) |
+| Validated at ingest | numeric >= 0; a blank cell lands NULL, never 0 (D7) — the arc carries no supply share |
 | Rendered at | *not yet recorded (WP 5.1)* |
+
+**Substitutions** — every point where a value you did not supply can stand in
+for one you did.
+
+| When | The value used | Shown as | Visible where |
+|---|---|---|---|
+| the CSV cell is blank (the column lands NULL — optional since 2026-10-09) | 0 — the arc carries no supply share | `default` | the upload's per-row "defaulted" count on the review screen |
 
 **Resolution** — how a value is decided when more than one source could supply one.
 
@@ -313,7 +320,7 @@ What one unit of this material costs from this supplier, delivered.
 | Read by the engine | `project_map.py::_map_supply -> SupplierLink.cost` |
 | Transform | float(); a value <= 0 is replaced, not rejected |
 | When NULL, the engine uses | 1.0, with a `warn` MappingWarning |
-| Validated at ingest | numeric > 0 |
+| Validated at ingest | numeric >= 0; zero lands WITH A WARNING (the engine reads a zero price as 1.0, with a MappingWarning); a blank cell lands NULL and the same 1.0 default stands in |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 **The engine calls this `recommended`.** Purchase cost per sourcing arc — a missing price defaults to 1.0 and distorts procurement spend.
@@ -530,6 +537,6 @@ A triangular or uniform lane's longest lead time — a duration in the lane's `l
 
 ---
 
-*Generated from data contract `5ec67443cac9`, engine `0.8.0`,
+*Generated from data contract `1e2e09dfcb05`, engine `0.8.0`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
